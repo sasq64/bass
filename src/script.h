@@ -5,6 +5,18 @@
 #include <string>
 #include <vector>
 
+class script_error : public std::exception
+{
+public:
+    explicit script_error(std::string m = "Script error") : msg(std::move(m))
+    {}
+    const char* what() const noexcept override { return msg.c_str(); }
+
+private:
+    std::string msg;
+};
+
+
 class Scripting
 {
 public:

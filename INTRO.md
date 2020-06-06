@@ -313,4 +313,43 @@ sine:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }
 ```
 
+So this is all pretty good - but can we take advantage of the fact that we can
+generate circles of different sizes? How about a small animation.
+
+First, lets generate 8 sprites with different radiuses:
+
+```cpp
+spriteData:
+    !rept 8 {
+        !block circle(zeroes(3*21), 3, 12, 10, i + 3)
+        !byte 0
+    }
+```
+
+And we need to copy all frames to sprite memory
+
+```cpp
+!rept 8 {
+    ldx #3*21
+$   lda spriteData-1+i*64,x
+    sta spriteMem-1+i*64,x
+    dex
+    bne -
+}
+```
+
+Then lets add another sine table with an amplitude that matches the number of
+frames, and add some code to set the sprite pointer every frame
+
+```cpp
+    lda sine2,x
+    adc #(spriteMem-0x4000)/64
+
+    sta spritePtrs+2
+    rts
+
+sine2:
+    !rept 256 { !byte (sin(i*Math.Pi*2/96)+1) * 3.5 }
+```
+
 The full example can be found in [asm/example.asm](asm/example.asm)

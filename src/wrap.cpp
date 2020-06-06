@@ -1,9 +1,13 @@
 #include "wrap.h"
 
+#include "script.h"
 #include <peglib.h>
 
 #include <coreutils/log.h>
 #include <iostream>
+#include <string>
+
+using namespace std::string_literals;
 
 SVWrap::SVWrap(peg::SemanticValues const& s) : sv(s) {}
 
@@ -126,6 +130,9 @@ void ParserWrapper::action(
             LOGD("Caught %s", e.what());
             current_error = e.what();
             throw peg::parse_error(e.what());
+        } catch (script_error& e) {
+            throw peg::parse_error(e.what());
+
         } catch (std::bad_any_cast& e) {
             throw peg::parse_error("Data type error");
         }

@@ -81,22 +81,6 @@ Results are saved in tests.<name>
 The assembled changes are then rolled back.
 
 
-### Meta commands
-
-```
-!section <name>, <address>
-
-!byte <value> [, <value> ]*
-
-!if <value> { <statements> }
-
-!test <name> { <statements> }
-
-!assert <expression> [, <message> ]
-
-...
-```
-
 ### Basic Operation in Detail
 
 The source is parsed top to bottom. Included files are inserted
@@ -134,4 +118,40 @@ symbol a warning is issue.
 Macros affect the symbol table, so you can set symbols from macros.
 If you don't want to pollute the symbol table, used "."-symbols, they
 will be local to the macro.
+
+The symbol table supports the following types:
+ * Number (double)
+ * String (`std::string_view`)
+ * Byte Array (`std::vector<uint8_t>`)
+ * Symbols (SymbolTable, based on `std::unordered_map<std::string, std::any>`
+
+Only numbers and strings can be assigned directly.
+
+Arrays are returned from functions, such as `bytes(elems...)` which is the basic
+way of creating an array.
+
+A `Symbols` can be created using the `!enum` meta command.
+
+```cpp
+!enum myObj {
+   name = "hey"
+   x = 1
+   y = 3
+}
+```
+
+### Limitations of the parser
+
+Currently the parser evaluates everything while parsing. This means
+that it is not possible to _parse_ an expression without _evaluating_ it.
+
+To support delayed (macros) or skipped (if) evaulation, the parser
+recognizes blocks ( `'{' anything '}'` ) and saves the contents without
+evalutating it.
+
+If we rewrite the parser to create an AST for delayed evaluation, more
+advanced constructs would be possible.
+
+
+
 

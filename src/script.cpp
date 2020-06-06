@@ -12,7 +12,6 @@ Scripting::Scripting()
 {
     lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::string,
                        sol::lib::math, sol::lib::table, sol::lib::debug);
-
 }
 
 void Scripting::load(utils::path const& p)
@@ -49,10 +48,16 @@ std::any Scripting::call(std::string_view const& name,
         }
         objs.push_back(o);
     }
-    sol::object res = test.call(sol::as_args(objs));
-    if(res.is<double>()) {
+    sol::protected_function_result fres = test.call(sol::as_args(objs));
+    if (!fres.valid()) {
+        sol::error err = fres;
+        std::string what = err.what();
+        throw script_error(what);
+    }
+    sol::object res = fres;
+    if (res.is<double>()) {
         return std::any(res.as<double>());
-    } else if(res.is<std::vector<uint8_t>>()) {
+    } else if (res.is<std::vector<uint8_t>>()) {
         return std::any(res.as<std::vector<uint8_t>>());
     }
     return std::any();

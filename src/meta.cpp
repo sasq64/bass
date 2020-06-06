@@ -220,9 +220,16 @@ void initMeta(Assembler& a)
         if (blocks.empty()) {
             throw parse_error("No block for !rept");
         }
-        auto count = any_cast<Number>(a.evaluateExpression(text));
+
+        std::any data = a.evaluateExpression(text);
+        auto* vec = any_cast<std::vector<uint8_t>>(&data);
+        size_t count = vec ? vec->size() : number<size_t>(data);
+
         for (Number i = 0; i < count; i++) {
             a.getSymbols()["i"] = i;
+            if(vec) {
+                a.getSymbols()["v"] = (*vec)[i];
+            }
             a.evaluateBlock(blocks[0]);
         }
     });

@@ -78,7 +78,7 @@ $   lda #100
     jsr update_sprite
     jmp loop
 
-spriteMem = 0x5f80
+spriteMem = 0x7000
 
 init_sprite
     ; Enable sprite 2
@@ -90,11 +90,13 @@ init_sprite
     sta spritePtrs+2
 
     ; Copy sprite data
+    !rept 10 {
     ldx #3*21
-$   lda spriteData-1,x
-    sta spriteMem-1,x
+$   lda spriteData-1+i*64,x
+    sta spriteMem-1+i*64,x
     dex
     bne -
+    }
     rts
 
 update_sprite
@@ -110,6 +112,11 @@ update_sprite
 
     stx xy
     sty xy+1
+
+    lda sine2,x
+    adc #(spriteMem-0x4000)/64
+
+    sta spritePtrs+2
     rts
 
 xy: !byte 0,0
@@ -117,6 +124,9 @@ xy: !byte 0,0
 
 sine:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }
+
+sine2:
+    !rept 256 { !byte (sin(i*Math.Pi*2/96)+1) * 3.5 }
 
 %{
 
@@ -127,7 +137,8 @@ function setPixel(target, width, x, y)
     end
 end
 
-function circle(target, width, xp, yp, r)
+function circle(target, width, xp, yp, radius)
+    r = math.floor(radius + 0.5)
     for y=-r,r, 1 do
         for x=-r,r, 1 do
             if x*x+y*y <= r*r then
@@ -138,23 +149,18 @@ function circle(target, width, xp, yp, r)
     return target
 end
 
+
+
 }%
 
 circle_sprite = circle(zeroes(3*21), 3, 12, 10, 10)
 
-spriteData
-    ;!rept 3*21 { !byte 0xff>>((i%3)+i/8) }
+spriteData:
+    !rept 8 {
+        !block circle(zeroes(3*21), 3, 12, 10, i + 3)
+        !byte 0xff
+    }
 
-!ifdef BALL {
-    !block circle_sprite
-} else {
-    ; Balloon
-    !byte 0,127,0,1,255,192,3,255,224,3,231,224
-    !byte 7,217,240,7,223,240,2,217,240,3,231,224
-    !byte 3,255,224,3,255,224,2,255,160,1,127,64
-    !byte 1,62,64,0,156,128,0,156,128,0,73,0,0,73,0,0
-    !byte 62,0,0,62,0,0,62,0,0,28,0
-}
     ; Koala Image
 
     koala = load("../data/oys.koa")

@@ -38,7 +38,7 @@ BlockContents <- SkipProgram
 SkipProgram <- (SkipLine EOL)* SkipLine?
 SkipLine <- SkipLabel? _? (SkipMeta / SkipInstruction)? _? LineComment?
 SkipLabel <- (_? DotSymbol ':') / (DotSymbol (_ / &EOL))
-SkipInstruction <- (!(EOL / '}') .)*
+SkipInstruction <- (!(LineComment / EOL / '}') .)*
 SkipMeta <- MetaName _  (!(EOL / '}' / '{') .)* Block? (_ Symbol _ Block)*
 
 String <- _ ["] StringContents ["] _
