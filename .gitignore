@@ -3,3 +3,4 @@ build/
 *.def
 .vscode/
 cmake-*/
+compile_commands.json

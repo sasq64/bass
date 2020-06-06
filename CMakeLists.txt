@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(badass VERSION 0.5)
+project(bass VERSION 0.5)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 set(CMAKE_CXX_STANDARD 17)
@@ -33,8 +33,8 @@ target_compile_options(badlib PRIVATE ${WARN})
 target_include_directories(badlib PRIVATE external/peglib PUBLIC src)
 target_link_libraries(badlib PRIVATE lua sol2::sol2 lodepng fmt coreutils ${THREAD_LIB})
 
-add_executable(badass main.cpp)
-target_link_libraries(badass PRIVATE coreutils badlib CLI11::CLI11)
+add_executable(bass main.cpp)
+target_link_libraries(bass PRIVATE coreutils badlib CLI11::CLI11)
 
 add_executable(tester testmain.cpp asmtest.cpp symtest.cpp)
 target_link_libraries(tester PRIVATE coreutils fmt badlib)

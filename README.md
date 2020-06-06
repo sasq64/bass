@@ -1,5 +1,5 @@
 
-## 6502 Assembler
+## The Bass 6502 Assembler
 
 * ACME like syntax
 * Aims to be on par with Kickassembler in automation/scriptability,
@@ -11,7 +11,7 @@ See [INTRO.md](INTRO.md) for a tutorial / introduction.
 
 ### Invoking
 
-`badass -i <source> -Dname=val ...`
+`bass -i <source> -Dname=val ...`
 
 ### Example
 
@@ -32,13 +32,13 @@ start:
 
     ; Clear 1K
     ldx #0
--   !rept 4 { sta $1000+i*256,x }
+$   !rept 4 { sta $1000+i*256,x }
     dex
     bne -
 
     SetVRAM(0x1234)
     ldx #end - text
--   lda start,x
+$   lda start,x
     sta $1000,x
     dex
     bne -
@@ -59,29 +59,13 @@ A label starting with a dot ('.') is a _local_ label and treated
 as _lastLabel.label_, where _lastLabel_ is the closest previous
 _non local_ label.
 
-A label can be also called '+' or '-'
+A label can be also called '$'.
 
-Referencing '+' will mean the closest _following_ '+' label.
-Referencing '-' will mean the closest _previous_ '-' label.
+Referencing '+' will mean the closest _following_ '$' label.
+Referencing '-' will mean the closest _previous_ '$' label.
 
 Repeated '-' or '+' signs means to skip further.
 
-### Memory Layout
-
-It is assumed that the normal use case is that you want to
-produce a single "product" from a main source, that will include other
-sources. There is no linking step since it is not very useful today.
-
-The default mode then is to start with a _Target_ which defines the
-available memory, assemble all source code into sections, where each
-section can recide in a different part of the targets memory, and
-finally write the entire image as a file.
-
-Other common use cases is that some sections are written as separate
-files, for manual loading by the main (startable) image.
-
-This is compilcated a bit by the various funky layouts of different
-targets, such as cartridge images.
 
 ### Unit Tests
 
@@ -109,6 +93,8 @@ The assembled changes are then rolled back.
 !test <name> { <statements> }
 
 !assert <expression> [, <message> ]
+
+...
 ```
 
 ### Basic Operation in Detail

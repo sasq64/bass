@@ -1,13 +1,17 @@
 
-all :
-	make -C build -j
+all : debug
 
+build/cmake_install.cmake :
+	rm -rf builds/debug
+	cmake -Bbuild -H. -DCMAKE_BUILD_TYPE=ReleaseDebug
+
+compile_commands.json : build/compile_commands.json
+	rm -f compile_commands.json
+	ln -s builds/debug/compile_commands.json .
+
+debug : build/cmake_install.cmake compile_commands.json
+	cmake --build build -- -j8
 
 test : all
 	build/tester
 
-main.prg : asm/test.asm build/badass
-	build/badass -i asm/test.asm
-
-run: main.prg
-	../x16-emulator/build/x16-emu -rom rom.bin -prg result.prg -run
