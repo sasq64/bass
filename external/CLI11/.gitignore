@@ -1,0 +1,10 @@
+a.out*
+*.swp
+/*build*
+/test_package/build
+/Makefile
+/CMakeFiles/*
+/cmake_install.cmake
+/*.kdev4
+/html/*
+!/meson.build
