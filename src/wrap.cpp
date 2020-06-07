@@ -1,5 +1,6 @@
 #include "wrap.h"
 
+#include "defines.h"
 #include "script.h"
 #include <peglib.h>
 
@@ -77,6 +78,7 @@ ParserWrapper::ParserWrapper(std::string const& s)
     : p(std::make_unique<peg::parser>(s.c_str()))
 {
 
+//    p->enable_packrat_parsing();
 #if 0
     p->enable_trace([](const char* name, const char* s, size_t n,
                        const peg::SemanticValues& sv, const peg::Context& c,
@@ -87,12 +89,16 @@ ParserWrapper::ParserWrapper(std::string const& s)
                        size_t) { fmt::print("Leave {}\n", name); });
 #endif
     p->log = [&](size_t line, size_t col, const std::string& msg) {
-
         errors.push_back({line, col, msg});
         fmt::printf("%s (%s) in %d:%d\n", current_error, msg, line, col);
     };
 }
 ParserWrapper::~ParserWrapper() = default;
+
+void ParserWrapper::packrat()
+{
+    p->enable_packrat_parsing();
+}
 
 bool ParserWrapper::parse(std::string_view source, const char* file) const
 {
@@ -132,7 +138,8 @@ void ParserWrapper::action(
             throw peg::parse_error(e.what());
         } catch (script_error& e) {
             throw peg::parse_error(e.what());
-
+        } catch (assert_error& e) {
+            throw peg::parse_error(e.what());
         } catch (std::bad_any_cast& e) {
             throw peg::parse_error("Data type error");
         }

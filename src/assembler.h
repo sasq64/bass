@@ -27,8 +27,7 @@ class Assembler
 public:
     Assembler();
 
-    std::vector<Error> getErrors();
-    void clearErrors();
+    std::vector<Error> getErrors() const;
 
     bool parse(std::string_view const& source, std::string const& fname = "");
     bool parse_path(utils::path const& p);
@@ -70,12 +69,24 @@ public:
     void defineMacro(std::string_view name,
                      std::vector<std::string_view> const& args,
                      std::string_view contents);
+    void addDefine(std::string_view name,
+                     std::vector<std::string_view> const& args,
+                     std::string_view contents);
 
     Symbols evaluateEnum(std::string_view expr);
     void evaluateBlock(std::string_view block, std::string_view fileName = "");
     Symbols runTest(std::string_view name, std::string_view contents);
 
+
+    enum {
+        DEB_TRACE = 1,
+        DEB_PASS = 2
+    };
+
+    void debugflags(uint32_t flags);
+
 private:
+    bool passDebug = false;
     struct Call
     {
         std::string_view name;
@@ -91,7 +102,7 @@ private:
 
     struct Undefined
     {
-        std::vector<std::string> parts;
+        std::string name;
         std::pair<size_t, size_t> line_info;
     };
 
@@ -106,9 +117,12 @@ private:
     };
 
     void applyMacro(Call const& call);
+    std::any applyDefine(Macro const& fn, Call const& call);
     int checkUndefined();
     bool pass(std::string_view const& source);
     void setupRules();
+
+    void setUndefined(std::string const& sym, SVWrap const& sv);
 
     auto save() { return std::tuple(macros, syms, undefined, lastLabel); }
 
@@ -118,7 +132,7 @@ private:
         std::tie(macros, syms, undefined, lastLabel) = t;
     }
 
-    void trace(SVWrap const& sv);
+    void trace(SVWrap const& sv) const;
 
     bool doTrace = false;
 
@@ -126,6 +140,7 @@ private:
     std::unordered_map<std::string, std::string> includes;
     std::shared_ptr<Machine> mach;
     std::unordered_map<std::string_view, Macro> macros;
+    std::unordered_map<std::string_view, Macro> definitions;
     Symbols syms;
     std::vector<Undefined> undefined;
     std::string_view lastLabel;

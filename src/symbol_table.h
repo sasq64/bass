@@ -59,7 +59,7 @@ public:
     }
 
     template <typename FN>
-    void forAll(FN const& fn, std::string const& name, Symbols const* current)
+    void forAll(FN const& fn, std::string const& name, Symbols const* current) const
     {
         for (auto const& p : *current) {
             std::string fullName =
@@ -72,7 +72,7 @@ public:
         }
     }
     template <typename FN>
-    void forAll(FN const& fn)
+    void forAll(FN const& fn) const
     {
         forAll(fn, "", this);
     }

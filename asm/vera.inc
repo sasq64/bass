@@ -58,6 +58,15 @@ INC_2 = $200000
     bne .cl2
 }
 
+!macro BorderOn() {
+    lda #2
+    sta CTRL
+    lda #8
+    sta DC_HSTART
+    lda #0
+    sta CTRL
+}
+
 
 VREG0=$9f23
 VREG1=$9f24
@@ -80,6 +89,8 @@ L1_VSCROLL_L=$9f39
 L1_VSCROLL_H=$9f3a
 L1_HSCROLL_L=$9f37
 L1_HSCROLL_H=$9f38
+
+DC_HSTART=$9f29
 
 BANK_SELECT=$9f61
 

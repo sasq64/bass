@@ -71,6 +71,7 @@ struct ParserWrapper
 
     explicit ParserWrapper(std::string const& source);
 
+    void packrat();
     void action(const char* name,
                 std::function<std::any(SVWrap const&)> const& fn) const;
 

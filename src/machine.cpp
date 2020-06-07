@@ -21,6 +21,9 @@ Machine::~Machine() = default;
 Section& Machine::addSection(std::string const& name, uint32_t start)
 {
     if (!name.empty()) {
+        if (fp != nullptr) {
+            fprintf(fp, "SECTION %s\n", name.c_str());
+        }
         auto it = std::find_if(sections.begin(), sections.end(),
                                [&](auto const& s) { return s.name == name; });
         if (it == sections.end()) {
@@ -121,10 +124,11 @@ void Machine::write(std::string const& name, OutFmt fmt)
     uint32_t end = 0;
     for (auto const& section : sections) {
 
-        if(section.data.empty())
+        if (section.data.empty()) {
             continue;
+        }
 
-        if (section.flags & WriteToDisk) {
+        if ((section.flags & WriteToDisk) != 0) {
             utils::File of{section.name, utils::File::Mode::Write};
             of.write<uint8_t>(section.start & 0xff);
             of.write<uint8_t>(section.start >> 8);
@@ -132,7 +136,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
             of.close();
         }
 
-        if(section.flags & NoStorage) {
+        if ((section.flags & NoStorage) != 0) {
             continue;
         }
 
@@ -151,14 +155,14 @@ void Machine::write(std::string const& name, OutFmt fmt)
                section_end - section.start);
     }
 
-    if(end <= start) {
+    if (end <= start) {
         printf("**Warning: No code generated\n");
         return;
     }
 
-    printf("Writing %04x->%04x\n", start, end);
 
     if (end > start) {
+        fmt::print("Writing {:04x}->{:04x} > {}\n", start, end, name);
         utils::File of{name, utils::File::Mode::Write};
         if (fmt == OutFmt::Prg) {
             of.write<uint8_t>(start & 0xff);
@@ -167,39 +171,6 @@ void Machine::write(std::string const& name, OutFmt fmt)
         of.write(&ram[start], end - start);
         of.close();
     }
-
-#if 0
-    std::sort(sections.begin(), sections.end(),
-              [](auto const& a, auto const& b) { return a.start > b.start; });
-
-    utils::File pf{name + ".pak.prg", utils::File::Mode::Write};
-    start = sections.front().start;
-    pf.write<uint8_t>(start & 0xff);
-    pf.write<uint8_t>(start >> 8);
-    for (auto const& section : sections) {
-        pf.write(section.data);
-    }
-    pf.close();
-
-    for (auto const& section : sections) {
-        if (!section.name.empty()) {
-            utils::File f{section.name + ".prg", utils::File::Mode::Write};
-            f.write<uint8_t>(section.start & 0xff);
-            f.write<uint8_t>(section.start >> 8);
-            f.write(section.data);
-            f.close();
-        }
-    }
-#endif
-}
-void Machine::writePRG(std::string const& name)
-{
-    write(name, OutFmt::Prg);
-}
-
-void Machine::writeRAW(std::string const& name)
-{
-    write(name, OutFmt::Raw);
 }
 
 uint32_t Machine::run(uint16_t pc)
@@ -215,14 +186,6 @@ uint32_t Machine::run(uint16_t pc)
 void Machine::setOutput(FILE* f)
 {
     fp = f;
-}
-
-uint32_t Machine::writeBytes(std::vector<uint8_t> const& v)
-{
-    for (auto const& w : v) {
-        writeByte(w);
-    }
-    return currentSection->pc;
 }
 
 uint32_t Machine::writeByte(uint8_t w)
@@ -248,7 +211,7 @@ int Machine::assemble(Instruction const& instr)
         return NO_SUCH_OPCODE;
     }
 
-    auto diff = arg.val - (int32_t)currentSection->pc - 2;
+    auto diff = arg.val - static_cast<int32_t>(currentSection->pc) - 2;
 
     auto it1 = std::find_if(
         it0->opcodes.begin(), it0->opcodes.end(), [&](auto const& o) {

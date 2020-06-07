@@ -56,10 +56,14 @@ void initFunctions(Assembler& a)
     a.registerFunction("word", [](std::vector<uint8_t> const& data) {
         return data[0] | (data[1] << 8);
     });
+    a.registerFunction("big_word", [](std::vector<uint8_t> const& data) {
+        return data[1] | (data[0] << 8);
+    });
 
     a.registerFunction("to_cbm", [](std::vector<uint8_t> const& data) {
         std::vector<uint8_t> res;
-        for (auto& d : data) {
+        res.reserve(data.size());
+        for (auto d : data) {
             res.push_back(translate(d));
         }
         return res;
@@ -87,8 +91,6 @@ void initFunctions(Assembler& a)
         return sv;
     });
 
-    a.registerFunction("load_sid",
-                       [](std::string_view name) { return loadSid(name); });
     a.registerFunction("load_png", [&](std::string_view name) {
         auto p = utils::path(name);
         if (p.is_relative()) {

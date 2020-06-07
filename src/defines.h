@@ -26,6 +26,10 @@ template <typename T> inline T number(std::any const& v) {
     return static_cast<T>(std::any_cast<Number>(v));
 }
 
+template <typename T> inline std::any any_num(T const& v) {
+    return std::any(static_cast<Number>(v));
+}
+
 class assert_error : public std::exception
 {
 public:
