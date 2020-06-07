@@ -90,7 +90,7 @@ init_sprite
     sta spritePtrs+2
 
     ; Copy sprite data
-    !rept 10 {
+    !rept 8 {
     ldx #3*21
 $   lda spriteData-1+i*64,x
     sta spriteMem-1+i*64,x

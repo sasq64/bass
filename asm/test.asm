@@ -8,14 +8,20 @@
         DATA2
     }
 
-    !enum  {
+    !enum {
         XXX
         YYY
-        ZZZ
+        ZZZ = "Yo"
     }
 
 
     png = load_png("../data/face.png")
+
+    !enum Image {
+        pixels = png.pixels
+        width = 320
+        height = 200
+    }
 
     !section "main", $801
 
@@ -32,23 +38,12 @@
     sei
     lda #SCALE_2X
     sta HSCALE
-    lda #SCALE_2X
     sta VSCALE
 
-    lda #2
-    sta IEN
+;    BorderOn()
+
     lda #0
     sta BORDER
-
-    ; Active area
-    lda #2
-    sta CTRL
-    lda #2
-    sta $9f29
-    lda #158
-    sta $9f2a
-    lda #0
-    sta CTRL
 
     LoadColors(colors)
 
@@ -70,49 +65,74 @@
     inc .loop+2
     dey
     bne .loop
+
     inc BANK_SELECT
     lda #8
     cmp BANK_SELECT
     bne .loop2
 
-go:
-    lda L1_TILEBASE
-    sta save
-    lda L1_CONFIG
-    sta save+1
-
-vbl:
-    WaitLine(0)
-    lda #0
-    sta L1_VSCROLL_H
-    sta L1_VSCROLL_L
     lda #0
     sta L1_TILEBASE
     lda #4 | 3
     sta L1_CONFIG
 
-    lda #$80
-    sta L1_HSCROLL_L
+
+vbl:
+
+
+    WaitLine(10)
+
+    ;jsr scale_effect
+    ;ldx #20
+    ;sta HSCALE
+
 
 
     WaitLine(400)
     lda #5
     sta BORDER
 
-    lda save
-    sta L1_TILEBASE
-    lda save+1
-    sta L1_CONFIG
-    lda #$f
-    sta L1_VSCROLL_H
-    lda #50
-    sta L1_VSCROLL_L
-
     WaitLine(432)
     lda #0
     sta BORDER
 
     jmp vbl
+
+scale_effect:
+    inc sinptr
+    bne +
+    ;inc sinptr+1
+    lda #(scales&0xff)
+    sta sinptr
+$
+    lda sinptr
+    sta ptr+1
+    lda sinptr+1
+    sta ptr+2
+
+
+    ldx #0
+    ldy #0
+loop3
+    NextLine()
+ptr:
+    lda scales,x
+    inx
+    bne +
+    inc ptr+2
+$
+    sta HSCALE
+    dey
+    bne loop3
+
+    rts
+
+
+sinptr:
+    !word scales
+
+scales:
+    !rept 512 { !byte (sin(i*Math.Pi*2/256)+1) * 5 + 59 }
 
 fname:
     !byte "IMAGE", 0
