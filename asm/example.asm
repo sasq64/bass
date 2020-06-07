@@ -15,6 +15,21 @@
     sta $d018
 }
 
+!macro iny2() {
+    iny
+    iny
+}
+
+!macro ldxy(v) {
+    ldx v
+    ldy v+1
+}
+
+!macro stxy(v) {
+    stx v
+    sty v+1
+}
+
 scr_dest = 0x6000
 bitmap_dest = 0x4000
 
@@ -82,7 +97,7 @@ spriteMem = 0x7000
 
 init_sprite
     ; Enable sprite 2
-    lda #$04 
+    lda #$04
     sta $d015
 
     ; Set sprite 2 pointer
@@ -90,28 +105,25 @@ init_sprite
     sta spritePtrs+2
 
     ; Copy sprite data
-    !rept 10 {
-    ldx #3*21
-$   lda spriteData-1+i*64,x
-    sta spriteMem-1+i*64,x
-    dex
-    bne -
+    !rept 8 {
+        ldx #3*21
+    $   lda spriteData-1+i*64,x
+        sta spriteMem-1+i*64,x
+        dex
+        bne -
     }
     rts
 
 update_sprite
-    ldx xy
-    ldy xy+1
+    ldxy xy
     lda sine,x
     inx
     sta $d004    ; Sprite position x++
     lda sine,y
-    iny
-    iny
+    iny2
     sta $d005    ; Sprite position y++
 
-    stx xy
-    sty xy+1
+    stxy xy
 
     lda sine2,x
     adc #(spriteMem-0x4000)/64
@@ -120,7 +132,6 @@ update_sprite
     rts
 
 xy: !byte 0,0
-
 
 sine:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }
@@ -157,7 +168,7 @@ circle_sprite = circle(zeroes(3*21), 3, 12, 10, 10)
 
 spriteData:
     !rept 8 {
-        !block circle(zeroes(3*21), 3, 12, 10, i + 3)
+        !fill circle(zeroes(3*21), 3, 12, 10, i + 3)
         !byte 0xff
     }
 
@@ -169,17 +180,25 @@ spriteData:
     color_ram = koala[0x232a:0x2712]
     bg_color = koala[0x2712]
 
-    sid = load("../data/test.sid")[0x7e:]
+!define swap(x) { (x>>8) | (x<<8) }
+
+    sid = load("../data/test.sid")
+    music_init = swap(word(sid[0xa:0xc]))
+    music_play = swap(word(sid[0xc:0xe]))
+
+    !assert music_init == 0x1000
+
+    music_data = sid[0x7e:]
     !section "music", 0x1000
-    !block sid
+    !fill music_data
 
     !section "colors", *
 colors:
-    !block color_ram
+    !fill color_ram
 
     !section "screen", *
 screen:
-    !block screen_ram
+    !fill screen_ram
 
     !section "koala", 0x4000
-    !block bitmap
+    !fill bitmap

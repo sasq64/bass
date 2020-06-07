@@ -3,19 +3,28 @@
 #include "machine.h"
 
 #include <any>
+#include <coreutils/file.h>
 #include <coreutils/log.h>
+#include <coreutils/split.h>
+#include <coreutils/text.h>
 #include <fmt/format.h>
 #include <iostream>
 #include <vector>
 
 using namespace std::string_literals;
 
-static uint8_t translate(uint8_t c)
-{
+static uint8_t char_translate[256];
 
-    if (c >= 'a' && c <= 'z') return c - 'a' + 1;
-    if (c >= 'A' && c <= 'Z') return c - 'A' + 0x41;
-    return c;
+static void resetTranslate()
+{
+    for (int i = 0; i < 256; i++) {
+        auto c = i;
+        if (c >= 'a' && c <= 'z')
+            c = c - 'a' + 1;
+        else if (c >= 'A' && c <= 'Z')
+            c = c - 'A' + 0x41;
+        char_translate[i] = c;
+    }
 }
 
 static void evalIf(Assembler& a, bool cond,
@@ -43,12 +52,36 @@ void initMeta(Assembler& a)
         a.defineMacro(def.name, def.args, blocks[0]);
     });
 
+    a.registerMeta("define", [&](auto const& text, auto const& blocks) {
+        auto def = a.evaluateDefinition(text);
+        a.addDefine(def.name, def.args, blocks[0]);
+    });
+
+    a.registerMeta("chartrans", [&](auto const& text, auto const&) {
+        if (text.empty()) {
+            resetTranslate();
+        } else {
+            auto list = a.evaluateList(text);
+            std::string text;
+            char* ptr = nullptr;
+            for (auto const& v : list) {
+                if (auto* s = any_cast<std::string_view>(&v)) {
+                    text = *s;
+                    ptr = &text[0];
+                } else {
+                    auto n = number<uint8_t>(v);
+                    char_translate[*ptr++] = n;
+                }
+            }
+        }
+    });
+
     a.registerMeta("text", [&](auto const& text, auto const&) {
         auto list = a.evaluateList(text);
         for (auto const& v : list) {
             if (auto* s = any_cast<std::string_view>(&v)) {
                 for (auto c : *s) {
-                    c = translate(c);
+                    c = char_translate[c];
                     mach.writeByte(c);
                 }
             } else {
@@ -120,6 +153,32 @@ void initMeta(Assembler& a)
         }
     });
 
+    a.registerMeta("map", [&](auto const& text, auto const& blocks) {
+        std::vector<uint8_t> result;
+        auto parts = utils::split(std::string(text), '=');
+        if (parts.size() != 2) {
+            throw parse_error("!map expected equals sign");
+        }
+        auto name = utils::lrstrip(parts[0]);
+        auto data = a.evaluateExpression(parts[1]);
+
+        auto* vec = any_cast<std::vector<uint8_t>>(&data);
+        size_t size = vec ? vec->size() : number<size_t>(data);
+
+        for (size_t i = 0; i < size; i++) {
+            uint8_t d = vec ? (*vec)[i] : 0;
+            for (auto const& b : blocks) {
+                a.getSymbols()["i"] = (Number)i;
+                a.getSymbols()["v"] = (Number)d;
+                auto res = a.evaluateExpression(b);
+                d = number<uint8_t>(res);
+                result.push_back(d);
+            }
+        }
+        a.getSymbols()[name] = result;
+    });
+
+    // TODO: Redundant, use fill
     a.registerMeta("block", [&](auto const& text, auto const&) {
         std::any data = a.evaluateExpression(text);
         auto const& vec = any_cast<std::vector<uint8_t>>(data);
@@ -163,16 +222,16 @@ void initMeta(Assembler& a)
         auto args = a.evaluateList(text);
         for (auto const& arg : args) {
             if (auto* l = any_cast<Number>(&arg)) {
-                std::cout << *l;
+                fmt::print("{}", *l);
             } else if (auto* s = any_cast<std::string_view>(&arg)) {
-                std::cout << *s;
+                fmt::print("{}", *s);
             } else if (auto* v = any_cast<std::vector<uint8_t>>(&arg)) {
                 for (auto const& item : *v) {
                     fmt::print("{:02x} ", item);
                 }
             }
         }
-        std::cout << "\n";
+        fmt::print("\n");
     });
 
     a.registerMeta("section", [&](auto const& text, auto const&) {
@@ -194,9 +253,9 @@ void initMeta(Assembler& a)
         uint16_t pc = start;
         int32_t flags = 0;
         if (args.size() > 2) {
-            a.getSymbols()["NO_STORE"] = (Number)0x100000000;
-            a.getSymbols()["TO_PRG"] = (Number)0x200000000;
-            a.getSymbols()["RO"] = (Number)0x400000000;
+            a.getSymbols()["NO_STORE"] = any_num(0x100000000);
+            a.getSymbols()["TO_PRG"] = any_num(0x200000000);
+            a.getSymbols()["RO"] = any_num(0x400000000);
             auto res = number<uint64_t>(args[2]);
             if (res >= 0x100000000) {
                 flags = res >> 32;
@@ -216,6 +275,19 @@ void initMeta(Assembler& a)
         a.evaluateBlock(source, name);
     });
 
+    a.registerMeta("incbin", [&](auto const& text, auto const&) {
+        auto args = a.evaluateList(text);
+        auto name = any_cast<std::string_view>(args[0]);
+        auto p = utils::path(name);
+        if (p.is_relative()) {
+            p = a.getCurrentPath() / p;
+        }
+        utils::File f{p};
+        for (auto const& b : f.readAll()) {
+            mach.writeByte(b);
+        }
+    });
+
     a.registerMeta("rept", [&](auto const& text, auto const& blocks) {
         if (blocks.empty()) {
             throw parse_error("No block for !rept");
@@ -225,10 +297,10 @@ void initMeta(Assembler& a)
         auto* vec = any_cast<std::vector<uint8_t>>(&data);
         size_t count = vec ? vec->size() : number<size_t>(data);
 
-        for (Number i = 0; i < count; i++) {
-            a.getSymbols()["i"] = i;
-            if(vec) {
-                a.getSymbols()["v"] = (*vec)[i];
+        for (size_t i = 0; i < count; i++) {
+            a.getSymbols()["i"] = any_num(i);
+            if (vec) {
+                a.getSymbols()["v"] = any_num((*vec)[i]);
             }
             a.evaluateBlock(blocks[0]);
         }
