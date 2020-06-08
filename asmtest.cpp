@@ -28,6 +28,68 @@ void printSymbols(Assembler& ass)
     });
 }
 
+struct Tester
+{
+    std::shared_ptr<Assembler> a;
+    Tester() : a{std::make_shared<Assembler>()} {};
+
+    Tester(std::string const& code) : a{std::make_shared<Assembler>()}
+    {
+        a->parse(code);
+    };
+
+    Tester& operator=(std::string const& code)
+    {
+        a = std::make_shared<Assembler>();
+        a->parse(code);
+        return *this;
+    }
+
+    auto& compile(std::string const& code)
+    {
+        a->parse(code);
+        return *this;
+    }
+
+    bool noErrors() { return a->getErrors().empty(); }
+
+    size_t mainSize() { return a->getMachine().getSection("main").data.size(); }
+
+    template <typename T,
+              typename S = std::enable_if_t<std::is_arithmetic_v<T>>>
+    bool haveSymbol(std::string const& name, T v)
+    {
+        auto x = number<T>(a->getSymbols()[name]);
+        return x == v;
+    }
+
+    bool haveSymbol(std::string const& name, std::string const& v)
+    {
+        auto x = std::any_cast<std::string_view>(a->getSymbols()[name]);
+        return x == v;
+    }
+};
+
+TEST_CASE("assembler.first", "[assembler]")
+{
+    Tester t;
+
+    t = "!rept 4 { nop }";
+    REQUIRE(t.noErrors());
+    REQUIRE(t.mainSize() == 4);
+
+    t = "!rept 4 { !rept 4 { nop } }";
+    REQUIRE(t.noErrors());
+    REQUIRE(t.mainSize() == 16);
+
+    t = "!enum { A = 1\nB\n C = \"xx\" }";
+    REQUIRE(t.noErrors());
+    REQUIRE(t.mainSize() == 0);
+    REQUIRE(t.haveSymbol("B", 2));
+    REQUIRE(t.haveSymbol("C", "xx"));
+
+}
+
 TEST_CASE("assembler.basic", "[assembler]")
 {
     Assembler ass;
