@@ -157,7 +157,7 @@ circle_sprite = circle(zeroes(3*21), 3, 12, 10, 10)
 
 spriteData:
     !rept 8 {
-        !block circle(zeroes(3*21), 3, 12, 10, i + 3)
+        !fill circle(zeroes(3*21), 3, 12, 10, i + 3)
         !byte 0xff
     }
 
@@ -171,15 +171,15 @@ spriteData:
 
     sid = load("../data/test.sid")[0x7e:]
     !section "music", 0x1000
-    !block sid
+    !fill sid
 
     !section "colors", *
 colors:
-    !block color_ram
+    !fill color_ram
 
     !section "screen", *
 screen:
-    !block screen_ram
+    !fill screen_ram
 
     !section "koala", 0x4000
-    !block bitmap
+    !fill bitmap

@@ -75,7 +75,16 @@ public:
     void evaluateBlock(std::string_view block, std::string_view fileName = "");
     Symbols runTest(std::string_view name, std::string_view contents);
 
+
+    enum {
+        DEB_TRACE = 1,
+        DEB_PASS = 2
+    };
+
+    void debugflags(uint32_t flags);
+
 private:
+    bool passDebug = false;
     struct Call
     {
         std::string_view name;
@@ -91,7 +100,7 @@ private:
 
     struct Undefined
     {
-        std::vector<std::string> parts;
+        std::string name;
         std::pair<size_t, size_t> line_info;
     };
 
@@ -109,6 +118,8 @@ private:
     int checkUndefined();
     bool pass(std::string_view const& source);
     void setupRules();
+
+    void setUndefined(std::string const& sym, SVWrap const& sv);
 
     auto save() { return std::tuple(macros, syms, undefined, lastLabel); }
 

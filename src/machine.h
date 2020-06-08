@@ -39,7 +39,7 @@ struct Section
     std::string name;
     uint32_t start = 0;
     uint32_t pc = 0;
-    uint32_t flags;
+    uint32_t flags{};
     std::vector<uint8_t> data;
 };
 
@@ -59,7 +59,6 @@ public:
 
     void clear();
 
-    uint32_t writeBytes(std::vector<uint8_t> const& v);
     uint32_t writeByte(uint8_t b);
     int assemble(Instruction const& instr);
     Section& addSection(std::string const& name, uint32_t start);
@@ -70,8 +69,6 @@ public:
     State saveState() const;
     void restoreState(State const& s);
     uint32_t getPC() const;
-    void writeRAW(std::string const& name);
-    void writePRG(std::string const& name);
     void write(std::string const& name, OutFmt fmt);
     void setOutput(FILE* f);
 

@@ -31,7 +31,7 @@ add_library(badlib STATIC
 target_compile_definitions(badlib PUBLIC SOL_USING_CXX_LUA USE_FMT)
 target_compile_options(badlib PRIVATE ${WARN})
 target_include_directories(badlib PRIVATE external/peglib PUBLIC src)
-target_link_libraries(badlib PRIVATE lua sol2::sol2 lodepng fmt coreutils ${THREAD_LIB})
+target_link_libraries(badlib PRIVATE lua lodepng fmt coreutils ${THREAD_LIB} PUBLIC sol2::sol2 )
 
 add_executable(bass main.cpp)
 target_link_libraries(bass PRIVATE coreutils badlib CLI11::CLI11)

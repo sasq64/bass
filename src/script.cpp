@@ -1,13 +1,11 @@
 #include "script.h"
 #include "defines.h"
 
-#include <coreutils/log.h>
 #include <cstdio>
 #include <map>
 #include <sol/sol.hpp>
 #include <string>
 
-sol::state lua;
 
 static const char* to_string = R"(
 function table_print (tt, indent, done)
@@ -50,13 +48,14 @@ function to_string( tbl )
 end
 )";
 
-Scripting::Scripting()
+Scripting::Scripting() : luap(std::make_unique<sol::state>()), lua(*luap)
 {
     lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::string,
                        sol::lib::math, sol::lib::table, sol::lib::debug);
 
     lua.script(to_string);
 }
+Scripting::~Scripting() = default;
 
 void Scripting::load(utils::path const& p)
 {
@@ -74,7 +73,7 @@ bool Scripting::hasFunction(std::string_view const& name)
     return test.valid();
 }
 
-std::any to_any(sol::object const& obj)
+std::any Scripting::to_any(sol::object const& obj)
 {
     if (obj.is<Number>()) {
         return std::any(obj.as<Number>());
@@ -111,15 +110,15 @@ std::any to_any(sol::object const& obj)
     return std::any();
 }
 
-sol::object to_object(std::any const& a)
+sol::object Scripting::to_object(std::any const& a)
 {
-    if (auto* an = std::any_cast<Number>(&a)) {
+    if (auto const* an = std::any_cast<Number>(&a)) {
         return sol::make_object(lua, *an);
     }
-    if (auto* as = std::any_cast<std::string_view>(&a)) {
+    if (auto const* as = std::any_cast<std::string_view>(&a)) {
         return sol::make_object(lua, *as);
     }
-    if (auto* av = std::any_cast<std::vector<uint8_t>>(&a)) {
+    if (auto const* av = std::any_cast<std::vector<uint8_t>>(&a)) {
         // TODO: Can we sol make this 'value' conversion?
         //return sol::make_object(lua, *av);
         sol::table t = lua.create_table();

@@ -2,19 +2,6 @@
     !include "vera.inc"
     !include "x16.inc"
 
-    !enum Vera { 
-        DATA0 = 0x1234
-        DATA1
-        DATA2
-    }
-
-    !enum {
-        XXX
-        YYY
-        ZZZ = "Yo"
-    }
-
-
     png = load_png("../data/face.png")
 
     !enum Image {
@@ -141,7 +128,7 @@ fname_end:
 save: !byte 0,0
 
 colors:
-    !block png.colors
+    !fill png.colors
     !section "IMAGE", 0xa000, NO_STORE|TO_PRG
 pixels:
-    !block png.pixels
+    !fill png.pixels

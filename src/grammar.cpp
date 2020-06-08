@@ -74,7 +74,8 @@ HexNum <- ('$' / '0x') [0-9a-fA-F]+
 Octal <- '0o' [0-7]+
 Binary <- '0b' [01]+
 Decimal <- ([0-9]+ '.')? [0-9]+
-Number <-  HexNum / Binary / Octal / Decimal
+Multi <- '0m' [0-3]+
+Number <-  HexNum / Binary / Octal / Multi / Decimal
 
 LineComment <- ';' (!EOL .)* &EOL
 

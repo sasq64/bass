@@ -50,8 +50,6 @@ start:
 
 charsetFile = "jumps.asm"
 
-!define convert(v) { 
-
     !section "car0", *
 charset0:
     !block convertAll(load(charsetFile))

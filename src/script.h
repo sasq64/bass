@@ -1,7 +1,9 @@
 
 #include <coreutils/path.h>
 
+#include <sol/forward.hpp>
 #include <any>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -21,10 +23,15 @@ class Scripting
 {
 public:
     Scripting();
+    ~Scripting();
     void load(utils::path const& p);
     void add(std::string_view const& code);
     bool hasFunction(std::string_view const& name);
     std::any call(std::string_view const& name, std::vector<std::any> const& args);
 private:
-    //sol::object Scripting::to_object(std::any const& a);
+    std::unique_ptr<sol::state> luap;
+    sol::state& lua;
+
+    sol::object to_object(std::any const& a);
+    std::any to_any(sol::object const& obj);
 };

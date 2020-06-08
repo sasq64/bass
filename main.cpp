@@ -10,7 +10,8 @@
 
 #include <CLI/CLI.hpp>
 
-const char* banner = R"( _               _
+const char* banner = R"(
+ _               _
 | |__   __ _  __| | __ _ ___ ___
 | '_ \ / _` |/ _` |/ _` / __/ __|
 | |_) | (_| | (_| | (_| \__ \__ \
@@ -24,17 +25,20 @@ int main(int argc, char** argv)
     std::vector<std::string> sourceFiles;
     std::vector<std::string> scriptFiles;
     std::vector<std::string> definitions;
-    std::string outFile = "result.prg";
+    std::string outFile;
     bool raw = false;
     bool prg = false;
     bool dumpSyms = false;
-    bool showOpcodes = false;
-    puts(banner);
+    bool showUndef = false;
+    bool showTrace = false;
+    puts(banner + 1);
 
     CLI::App app{"badass"};
-    app.add_flag("--ops", showOpcodes, "Show generated opcodes");
     app.add_flag("-p,--prg", prg, "Output PRG");
     app.add_flag("-b,--bin", raw, "Output RAW");
+    app.add_flag("--trace", showTrace, "Trace rule invocations");
+    app.add_flag("--show-undefined", showUndef,
+                 "Show undefined after each pass");
     app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
     app.add_option("-o,--out", outFile, "Output file");
     app.add_option("-D", definitions, "Add symbol");
@@ -47,8 +51,13 @@ int main(int argc, char** argv)
     CLI11_PARSE(app, argc, argv);
 
     Assembler ass;
+    ass.debugflags((showUndef ? Assembler::DEB_PASS : 0) |
+                   (showTrace ? Assembler::DEB_TRACE : 0));
 
     OutFmt outFmt = raw ? OutFmt::Raw : OutFmt::Prg;
+    if (outFile.empty()) {
+        outFile = outFmt == OutFmt::Prg ? "result.prg" : "result.bin";
+    }
 
     auto& mach = ass.getMachine();
     auto& syms = ass.getSymbols();

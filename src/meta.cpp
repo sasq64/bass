@@ -4,6 +4,8 @@
 
 #include <any>
 #include <coreutils/log.h>
+#include <coreutils/split.h>
+#include <coreutils/text.h>
 #include <fmt/format.h>
 #include <iostream>
 #include <vector>
@@ -121,8 +123,28 @@ void initMeta(Assembler& a)
     });
 
     a.registerMeta("map", [&](auto const& text, auto const& blocks) {
-        std::any data = a.evaluateExpression(text);
+        std::vector<uint8_t> result;
+        auto parts = utils::split(std::string(text), '=');
+        if (parts.size() != 2) {
+            throw parse_error("!map expected equals sign");
+        }
+        auto name = utils::lrstrip(parts[0]);
+        auto data = a.evaluateExpression(parts[1]);
 
+        auto* vec = any_cast<std::vector<uint8_t>>(&data);
+        size_t size = vec ? vec->size() : number<size_t>(data);
+
+        for (size_t i = 0; i < size; i++) {
+            uint8_t d = vec ? (*vec)[i] : 0;
+            for (auto const& b : blocks) {
+                a.getSymbols()["i"] = (Number)i;
+                a.getSymbols()["v"] = (Number)d;
+                auto res = a.evaluateExpression(b);
+                d = number<uint8_t>(res);
+                result.push_back(d);
+            }
+        }
+        a.getSymbols()[name] = result;
     });
 
     // TODO: Redundant, use fill
