@@ -25,4 +25,6 @@ public:
     void add(std::string_view const& code);
     bool hasFunction(std::string_view const& name);
     std::any call(std::string_view const& name, std::vector<std::any> const& args);
+private:
+    //sol::object Scripting::to_object(std::any const& a);
 };

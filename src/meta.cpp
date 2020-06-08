@@ -120,6 +120,12 @@ void initMeta(Assembler& a)
         }
     });
 
+    a.registerMeta("map", [&](auto const& text, auto const& blocks) {
+        std::any data = a.evaluateExpression(text);
+
+    });
+
+    // TODO: Redundant, use fill
     a.registerMeta("block", [&](auto const& text, auto const&) {
         std::any data = a.evaluateExpression(text);
         auto const& vec = any_cast<std::vector<uint8_t>>(data);
@@ -227,7 +233,7 @@ void initMeta(Assembler& a)
 
         for (Number i = 0; i < count; i++) {
             a.getSymbols()["i"] = i;
-            if(vec) {
+            if (vec) {
                 a.getSymbols()["v"] = (*vec)[i];
             }
             a.evaluateBlock(blocks[0]);
