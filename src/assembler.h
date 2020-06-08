@@ -70,6 +70,9 @@ public:
     void defineMacro(std::string_view name,
                      std::vector<std::string_view> const& args,
                      std::string_view contents);
+    void addDefine(std::string_view name,
+                     std::vector<std::string_view> const& args,
+                     std::string_view contents);
 
     Symbols evaluateEnum(std::string_view expr);
     void evaluateBlock(std::string_view block, std::string_view fileName = "");
@@ -115,6 +118,7 @@ private:
     };
 
     void applyMacro(Call const& call);
+    std::any applyDefine(Macro const& fn, Call const& call);
     int checkUndefined();
     bool pass(std::string_view const& source);
     void setupRules();
@@ -137,6 +141,7 @@ private:
     std::unordered_map<std::string, std::string> includes;
     std::shared_ptr<Machine> mach;
     std::unordered_map<std::string_view, Macro> macros;
+    std::unordered_map<std::string_view, Macro> definitions;
     Symbols syms;
     std::vector<Undefined> undefined;
     std::string_view lastLabel;

@@ -83,5 +83,5 @@ private:
     std::unique_ptr<sixfive::Machine<sixfive::DefaultPolicy>> machine;
     std::deque<Section> sections;
     Section* currentSection = nullptr;
-    FILE* fp = stdout;
+    FILE* fp = nullptr;
 };

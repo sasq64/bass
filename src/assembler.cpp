@@ -231,6 +231,40 @@ Symbols Assembler::runTest(std::string_view name, std::string_view contents)
 
     return res;
 }
+std::any Assembler::applyDefine(Macro const& fn, Call const& call)
+{
+    Symbols shadowed;
+    std::vector<std::string> args;
+    for (auto const& a : fn.args) {
+        args.emplace_back(a);
+    }
+
+    for (unsigned i = 0; i < call.args.size(); i++) {
+        auto const& v = syms.get(args[i]);
+        if (v.has_value()) {
+            parser.errors.push_back(
+                {0, 0,
+                 fmt::format("Function '{}' shadows global symbol {}", call.name,
+                             fn.args[i]),
+                 ErrLevel::Warning});
+            shadowed[args[i]] = v;
+            syms.erase(args[i]);
+        }
+        syms[args[i]] = call.args[i];
+        LOGD("%s = %x", fn.args[i],
+             (int32_t)std::any_cast<Number>(call.args[i]));
+    }
+
+    auto res = evaluateExpression(fn.contents);
+
+    for (unsigned i = 0; i < call.args.size(); i++) {
+        syms.erase(args[i]);
+    }
+    for (auto const& shadow : shadowed) {
+        syms[shadow.first] = shadow.second;
+    }
+    return res;
+}
 
 void Assembler::applyMacro(Call const& call)
 {
@@ -287,6 +321,12 @@ void Assembler::defineMacro(std::string_view name,
                             std::string_view contents)
 {
     macros[name] = {name, args, contents};
+}
+void Assembler::addDefine(std::string_view name,
+               std::vector<std::string_view> const& args,
+               std::string_view contents)
+{
+   definitions[name] = {name, args, contents};
 }
 
 void initMeta(Assembler& ass);
@@ -447,6 +487,11 @@ void Assembler::setupRules()
         LOGD("MCALL %s %d", sv[0].type().name(), sv.size());
         auto call = any_cast<Call>(sv[0]);
         auto name = std::string(call.name);
+
+          auto it0 = definitions.find(name);
+          if(it0 != definitions.end()) {
+              return applyDefine(it0->second, call);
+          }
 
         auto it = functions.find(name);
         if (it != functions.end()) {

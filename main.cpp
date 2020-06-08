@@ -79,15 +79,20 @@ int main(int argc, char** argv)
     }
 
     logging::setLevel(logging::Level::Info);
+    bool failed = false;
     for (auto const& sourceFile : sourceFiles) {
         auto sp = utils::path(sourceFile);
         if (!ass.parse_path(sp)) {
             for (auto const& e : ass.getErrors()) {
+                if(e.level == ErrLevel::Error) failed = true;
                 fmt::print("{}:{}:{}: {}: {}\n", sourceFile, e.line, e.column,
                            e.level == ErrLevel::Warning ? "warning" : "error",
                            e.message.c_str());
             }
         }
+    }
+    if(failed) {
+        return 1;
     }
     mach.write(outFile, outFmt);
 

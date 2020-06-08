@@ -45,6 +45,11 @@ void initMeta(Assembler& a)
         a.defineMacro(def.name, def.args, blocks[0]);
     });
 
+    a.registerMeta("define", [&](auto const& text, auto const& blocks) {
+      auto def = a.evaluateDefinition(text);
+      a.addDefine(def.name, def.args, blocks[0]);
+    });
+
     a.registerMeta("text", [&](auto const& text, auto const&) {
         auto list = a.evaluateList(text);
         for (auto const& v : list) {

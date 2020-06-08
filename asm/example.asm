@@ -121,6 +121,9 @@ update_sprite
 
 xy: !byte 0,0
 
+!define msin(x) { x*x }
+
+ARNE = msin(9) + 3
 
 sine:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }
@@ -169,9 +172,17 @@ spriteData:
     color_ram = koala[0x232a:0x2712]
     bg_color = koala[0x2712]
 
-    sid = load("../data/test.sid")[0x7e:]
+!define swap(x) { (x>>8) | (x<<8) }
+
+    sid = load("../data/test.sid")
+    music_init = swap(word(sid[0xa:0xc]))
+    music_play = swap(word(sid[0xc:0xe]))
+
+    !assert music_init == 0x1000
+
+    music_data = sid[0x7e:]
     !section "music", 0x1000
-    !fill sid
+    !fill music_data
 
     !section "colors", *
 colors:

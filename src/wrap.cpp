@@ -1,5 +1,6 @@
 #include "wrap.h"
 
+#include "defines.h"
 #include "script.h"
 #include <peglib.h>
 
@@ -137,7 +138,8 @@ void ParserWrapper::action(
             throw peg::parse_error(e.what());
         } catch (script_error& e) {
             throw peg::parse_error(e.what());
-
+        } catch (assert_error& e) {
+            throw peg::parse_error(e.what());
         } catch (std::bad_any_cast& e) {
             throw peg::parse_error("Data type error");
         }
