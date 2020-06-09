@@ -8,20 +8,6 @@
 #include <cstdint>
 #include <string>
 
-namespace {
-
-template <typename T>
-T get(const std::vector<uint8_t>&, int)
-{}
-
-template <>
-uint16_t get(const std::vector<uint8_t>& v, int offset)
-{
-    return (unsigned)(v[offset] << 8u) | v[offset + 1];
-}
-
-} // namespace
-
 Symbols loadPng(std::string_view const& name)
 {
     unsigned w{};
@@ -66,28 +52,3 @@ Symbols loadPng(std::string_view const& name)
     return res;
 }
 
-Symbols loadSid(std::string_view const& name)
-{
-    utils::File f{name};
-    auto data = f.readAll();
-
-    // auto version = get<uint16_t>(data, 0x4);
-    auto start = get<uint16_t>(data, 0x6);
-    auto loadAdr = get<uint16_t>(data, 0x8);
-    auto initAdr = get<uint16_t>(data, 0xa);
-    auto playAdr = get<uint16_t>(data, 0xc);
-
-    if (loadAdr == 0) {
-        loadAdr = data[start] | (data[start + 1] << 8);
-        start += 2;
-    }
-
-    Symbols res;
-    res["init"] = (Number)initAdr;
-    res["init"] = (Number)initAdr;
-    res["load"] = (Number)loadAdr;
-    res["play"] = (Number)playAdr;
-    res["data"] = std::vector<uint8_t>(data.begin() + start, data.end());
-
-    return res;
-}

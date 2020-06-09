@@ -26,7 +26,7 @@ target_compile_options(lodepng PRIVATE ${WARN_EXT})
 add_library(badlib STATIC
     src/assembler.cpp src/grammar.cpp src/functions.cpp
     src/machine.cpp src/wrap.cpp src/meta.cpp
-    src/sidload.cpp src/script.cpp)
+    src/png.cpp src/script.cpp)
 
 target_compile_definitions(badlib PUBLIC SOL_USING_CXX_LUA USE_FMT)
 target_compile_options(badlib PRIVATE ${WARN})

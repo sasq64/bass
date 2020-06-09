@@ -56,6 +56,9 @@ void initFunctions(Assembler& a)
     a.registerFunction("word", [](std::vector<uint8_t> const& data) {
         return data[0] | (data[1] << 8);
     });
+    a.registerFunction("big_word", [](std::vector<uint8_t> const& data) {
+        return data[1] | (data[0] << 8);
+    });
 
     a.registerFunction("to_cbm", [](std::vector<uint8_t> const& data) {
         std::vector<uint8_t> res;
