@@ -551,7 +551,6 @@ void Assembler::setupRules()
 
                 auto it = macros.find(i->opcode);
                 if (it != macros.end()) {
-                    LOGI("Found macro %s", it->second.name);
                     Call c{i->opcode};
                     if (i->mode > sixfive::ACC) {
                         c.args.emplace_back(any_num(i->val));
@@ -692,9 +691,9 @@ void Assembler::setupRules()
         return sv[0];
     };
 
-    parser["Index"] = [&](SV& sv) {
+    parser["Index"] = [&](SV& sv) -> std::any {
         trace(sv);
-        auto index = any_cast<Number>(sv[1]);
+        auto index = number<size_t>(sv[1]);
         std::any vec = sv[0];
         if (any_cast<Number>(&vec) != nullptr) {
             return any_num(0);

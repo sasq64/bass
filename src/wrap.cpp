@@ -140,7 +140,7 @@ void ParserWrapper::action(
             throw peg::parse_error(e.what());
         } catch (assert_error& e) {
             throw peg::parse_error(e.what());
-        } catch (std::bad_any_cast& e) {
+        } catch (std::bad_any_cast&) {
             throw peg::parse_error("Data type error");
         }
     };
