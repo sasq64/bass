@@ -27,8 +27,7 @@ class Assembler
 public:
     Assembler();
 
-    std::vector<Error> getErrors();
-    void clearErrors();
+    std::vector<Error> getErrors() const;
 
     bool parse(std::string_view const& source, std::string const& fname = "");
     bool parse_path(utils::path const& p);
@@ -133,7 +132,7 @@ private:
         std::tie(macros, syms, undefined, lastLabel) = t;
     }
 
-    void trace(SVWrap const& sv);
+    void trace(SVWrap const& sv) const;
 
     bool doTrace = false;
 

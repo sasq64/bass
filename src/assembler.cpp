@@ -23,7 +23,7 @@ std::string to_string(std::any const& val)
 {
     if (auto const* n = std::any_cast<Number>(&val)) {
         if (*n == static_cast<int64_t>(*n))
-            return fmt::format("${:x}", (int64_t)*n);
+            return fmt::format("${:x}", *n);
         return fmt::format("{}", *n);
     }
     if (auto const* v = std::any_cast<std::vector<uint8_t>>(&val)) {
@@ -47,7 +47,7 @@ std::string to_string(std::any const& val)
     return val.type().name();
 }
 
-void Assembler::trace(SVWrap const& sv)
+void Assembler::trace(SVWrap const& sv) const
 {
     if (!doTrace) return;
     fmt::print("{} : '{}'\n", sv.name(), sv.token());
@@ -59,8 +59,8 @@ void Assembler::trace(SVWrap const& sv)
 
 void Assembler::debugflags(uint32_t flags)
 {
-    doTrace = flags & DEB_TRACE;
-    passDebug = flags & DEB_PASS;
+    doTrace = (flags & DEB_TRACE) != 0;
+    passDebug = (flags & DEB_PASS) != 0;
 }
 
 std::string_view Assembler::includeFile(std::string_view name)
@@ -176,13 +176,13 @@ Symbols Assembler::runTest(std::string_view name, std::string_view contents)
 {
     Symbols res;
     if (!finalPass) {
-        res["A"] = (Number)0;
-        res["X"] = (Number)0;
-        res["Y"] = (Number)0;
-        res["SR"] = (Number)0;
-        res["SP"] = (Number)0;
-        res["PC"] = (Number)0;
-        res["cycles"] = (Number)0;
+        res["A"] = any_num(0);
+        res["X"] = any_num(0);
+        res["Y"] = any_num(0);
+        res["SR"] = any_num(0);
+        res["SP"] = any_num(0);
+        res["PC"] = any_num(0);
+        res["cycles"] = any_num(0);
         res["ram"] = mach->getRam();
         return res;
     }
@@ -217,14 +217,13 @@ Symbols Assembler::runTest(std::string_view name, std::string_view contents)
     res["ram"] = mach->getRam();
     auto regs = mach->getRegs();
 
-    res["A"] = (Number)std::get<0>(regs);
-    res["X"] = (Number)std::get<1>(regs);
-    res["Y"] = (Number)std::get<2>(regs);
-    res["SR"] = (Number)std::get<3>(regs);
-    res["SP"] = (Number)std::get<4>(regs);
-    res["PC"] = (Number)std::get<5>(regs);
-
-    res["cycles"] = (Number)cycles;
+    res["A"] = any_num(std::get<0>(regs));
+    res["X"] = any_num(std::get<1>(regs));
+    res["Y"] = any_num(std::get<2>(regs));
+    res["SR"] = any_num(std::get<3>(regs));
+    res["SP"] = any_num(std::get<4>(regs));
+    res["PC"] = any_num(std::get<5>(regs));
+    res["cycles"] = any_num(cycles);
 
     mach->restoreState(machSaved);
     restore(saved);
@@ -244,8 +243,8 @@ std::any Assembler::applyDefine(Macro const& fn, Call const& call)
         if (v.has_value()) {
             parser.errors.push_back(
                 {0, 0,
-                 fmt::format("Function '{}' shadows global symbol {}", call.name,
-                             fn.args[i]),
+                 fmt::format("Function '{}' shadows global symbol {}",
+                             call.name, fn.args[i]),
                  ErrLevel::Warning});
             shadowed[args[i]] = v;
             syms.erase(args[i]);
@@ -284,7 +283,7 @@ void Assembler::applyMacro(Call const& call)
 
     for (unsigned i = 0; i < call.args.size(); i++) {
 
-        auto& v = syms.get(args[i]);
+        auto const& v = syms.get(args[i]);
         if (v.has_value()) {
             parser.errors.push_back(
                 {0, 0,
@@ -323,10 +322,10 @@ void Assembler::defineMacro(std::string_view name,
     macros[name] = {name, args, contents};
 }
 void Assembler::addDefine(std::string_view name,
-               std::vector<std::string_view> const& args,
-               std::string_view contents)
+                          std::vector<std::string_view> const& args,
+                          std::string_view contents)
 {
-   definitions[name] = {name, args, contents};
+    definitions[name] = {name, args, contents};
 }
 
 void initMeta(Assembler& ass);
@@ -420,7 +419,7 @@ void Assembler::setupRules()
             }
         }
         // LOGI("Label %s=%x", label, mach->getPC());
-        auto res = syms.set(label, (Number)mach->getPC());
+        auto res = syms.set(label, any_num(mach->getPC()));
         if (res == Symbols::Was::DifferentValue) {
             // If we redefine a label we must make another pass
             // since this label could have been used with an
@@ -489,10 +488,10 @@ void Assembler::setupRules()
         auto call = any_cast<Call>(sv[0]);
         auto name = std::string(call.name);
 
-          auto it0 = definitions.find(name);
-          if(it0 != definitions.end()) {
-              return applyDefine(it0->second, call);
-          }
+        auto it0 = definitions.find(name);
+        if (it0 != definitions.end()) {
+            return applyDefine(it0->second, call);
+        }
 
         auto it = functions.find(name);
         if (it != functions.end()) {
@@ -603,7 +602,7 @@ void Assembler::setupRules()
         if (!val.has_value()) {
             setUndefined(l, sv);
             LOGD("%s undefined atm", l);
-            val = std::any((Number)mach->getPC());
+            val = any_num(mach->getPC());
         }
         return {"", AdressingMode::ABS, any_cast<Number>(val)};
     };
@@ -654,25 +653,17 @@ void Assembler::setupRules()
         else if (ope == "&") result = static_cast<Number>(ires & inum);
         else if (ope == "|") result = static_cast<Number>(ires | inum);
         else if (ope == "^") result = static_cast<Number>(ires ^ inum);
-        else if (ope == "&&") result = ires && inum;
-        else if (ope == "||") result = ires || inum;
+        else if (ope == "&&") result = static_cast<Number>(ires && inum);
+        else if (ope == "||") result = static_cast<Number>(ires || inum);
         else if (ope == "<") result = static_cast<Number>(result < num);
         else if (ope == ">") result = static_cast<Number>(result > num);
         else if (ope == "<=") result = static_cast<Number>(result <= num);
         else if (ope == ">=") result = static_cast<Number>(result >= num);
-        else if (ope == "<=>") result = num>result ? -1 : result > num;
+        else if (ope == "<=>") result = num>result ? -1 : static_cast<Number>(result > num);
         else if (ope == "==") result = static_cast<Number>(result == num);
         else if (ope == "!=") result = static_cast<Number>(result != num);
         // clang-format on
         return std::any(result);
-    };
-
-    parser["List"] = [&](SV& sv) {
-        trace(sv);
-        for (size_t i = 0; i < sv.size(); i++) {
-            LOGD("%s", sv[i].type().name());
-        }
-        return sv.transform<Number>();
     };
 
     parser["Script"] = [&](SV& sv) {
@@ -685,11 +676,11 @@ void Assembler::setupRules()
     parser["Index"] = [&](SV& sv) {
         trace(sv);
         auto index = any_cast<Number>(sv[1]);
-        std::any a = sv[0];
-        if (auto const* n = any_cast<Number>(&a)) {
-            return std::any((Number)0);
+        std::any vec = sv[0];
+        if (any_cast<Number>(&vec) != nullptr) {
+            return any_num(0);
         }
-        if (auto const* v = any_cast<std::vector<uint8_t>>(&a)) {
+        if (auto const* v = any_cast<std::vector<uint8_t>>(&vec)) {
 
             if (sv.size() >= 3) { // Slice
                 size_t a = 0;
@@ -708,10 +699,10 @@ void Assembler::setupRules()
                 return std::any(nv);
             }
 
-            return std::any((Number)(*v)[(int)index]);
+            return any_num((*v)[index]);
         }
-        auto const& v = any_cast<std::vector<Number>>(a);
-        return std::any(v[(int)index]);
+        auto const& v = any_cast<std::vector<Number>>(vec);
+        return any_num(v[index]);
     };
 
     parser["UnOp"] = [&](SV& sv) { return sv.token()[0]; };
@@ -720,17 +711,18 @@ void Assembler::setupRules()
         trace(sv);
         auto ope = any_cast<char>(sv[0]);
         auto num = any_cast<Number>(sv[1]);
+        auto inum = number<int64_t>(num);
         switch (ope) {
         case '~':
             return (Number)(~((uint64_t)num) & 0xffffffff);
         case '-':
             return -num;
         case '!':
-            return !((int64_t)num);
+            return (inum == 0);
         case '<':
-            return (int32_t)num & 0xff;
+            return inum & 0xff;
         case '>':
-            return (int32_t)num >> 8;
+            return inum >> 8;
         default:
             throw parse_error("Unknown unary operator");
         }
@@ -761,21 +753,15 @@ void Assembler::setupRules()
             full = utils::join(parts.begin(), parts.end(), ".");
             setUndefined(full, sv);
             LOGD("%s undefined atm", full);
-            return std::any((Number)mach->getPC());
+            return any_num(mach->getPC());
         }
-        // LOGD("type %s", val.type().name());
         return val;
     };
 }
 
-std::vector<Error> Assembler::getErrors()
+std::vector<Error> Assembler::getErrors() const
 {
     return parser.errors;
-}
-
-void Assembler::clearErrors()
-{
-    parser.errors.clear();
 }
 
 bool Assembler::pass(std::string_view const& source)
@@ -808,8 +794,8 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
 
         for (auto const& s : mach->getSections()) {
             auto& secsyms = syms.at<Symbols>("section").at<Symbols>(s.name);
-            secsyms["start"] = (Number)s.start;
-            secsyms["end"] = (Number)(s.start + s.data.size());
+            secsyms["start"] = any_num(s.start);
+            secsyms["end"] = any_num(s.start + s.data.size());
             secsyms["data"] = s.data;
         }
 
