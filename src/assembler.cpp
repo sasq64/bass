@@ -22,8 +22,7 @@ using sixfive::AdressingMode;
 std::string to_string(std::any const& val)
 {
     if (auto const* n = std::any_cast<Number>(&val)) {
-        if (*n == static_cast<int64_t>(*n))
-            return fmt::format("${:x}", *n);
+        if (*n == static_cast<int64_t>(*n)) return fmt::format("${:x}", *n);
         return fmt::format("{}", *n);
     }
     if (auto const* v = std::any_cast<std::vector<uint8_t>>(&val)) {
@@ -549,6 +548,22 @@ void Assembler::setupRules()
         if (sv.size() > 0 && sv[0].has_value()) {
             auto arg = sv[0];
             if (auto* i = any_cast<Instruction>(&arg)) {
+
+                auto it = macros.find(i->opcode);
+                if (it != macros.end()) {
+                    LOGI("Found macro %s", it->second.name);
+                    Call c{i->opcode};
+                    if (i->mode > sixfive::ACC) {
+                        c.args.emplace_back(any_num(i->val));
+                    }
+                    auto sz = it->second.args.size();
+                    if ((sz == 0 && c.args.empty()) ||
+                        (sz == 1 && c.args.size() == 1)) {
+                        applyMacro(c);
+                        return std::any();
+                    }
+                }
+
                 auto res = mach->assemble(*i);
                 if (res < 0) {
                     throw parse_error(
@@ -613,6 +628,10 @@ void Assembler::setupRules()
 
     parser["Octal"] = [](SV& sv) -> Number {
         return std::stoi(sv.c_str() + 2, nullptr, 8);
+    };
+
+    parser["Multi"] = [](SV& sv) -> Number {
+        return std::stoi(sv.c_str() + 2, nullptr, 4);
     };
 
     parser["Binary"] = [](SV& sv) -> Number {

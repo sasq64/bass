@@ -334,6 +334,9 @@ start:
 
 !test my_test {
     jsr start
+    jmp xxx
+    nop
+xxx:
     lda #4
 }
 

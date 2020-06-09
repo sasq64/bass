@@ -3,6 +3,7 @@
 #include "machine.h"
 
 #include <any>
+#include <coreutils/file.h>
 #include <coreutils/log.h>
 #include <coreutils/split.h>
 #include <coreutils/text.h>
@@ -69,7 +70,6 @@ void initMeta(Assembler& a)
                     ptr = &text[0];
                 } else {
                     auto n = number<uint8_t>(v);
-                    LOGI("%c -> %x", *ptr, n);
                     char_translate[*ptr++] = n;
                 }
             }
@@ -222,16 +222,16 @@ void initMeta(Assembler& a)
         auto args = a.evaluateList(text);
         for (auto const& arg : args) {
             if (auto* l = any_cast<Number>(&arg)) {
-                std::cout << *l;
+                fmt::print("{}", *l);
             } else if (auto* s = any_cast<std::string_view>(&arg)) {
-                std::cout << *s;
+                fmt::print("{}", *s);
             } else if (auto* v = any_cast<std::vector<uint8_t>>(&arg)) {
                 for (auto const& item : *v) {
                     fmt::print("{:02x} ", item);
                 }
             }
         }
-        std::cout << "\n";
+        fmt::print("\n");
     });
 
     a.registerMeta("section", [&](auto const& text, auto const&) {
@@ -253,9 +253,9 @@ void initMeta(Assembler& a)
         uint16_t pc = start;
         int32_t flags = 0;
         if (args.size() > 2) {
-            a.getSymbols()["NO_STORE"] = (Number)0x100000000;
-            a.getSymbols()["TO_PRG"] = (Number)0x200000000;
-            a.getSymbols()["RO"] = (Number)0x400000000;
+            a.getSymbols()["NO_STORE"] = any_num(0x100000000);
+            a.getSymbols()["TO_PRG"] = any_num(0x200000000);
+            a.getSymbols()["RO"] = any_num(0x400000000);
             auto res = number<uint64_t>(args[2]);
             if (res >= 0x100000000) {
                 flags = res >> 32;
@@ -275,6 +275,19 @@ void initMeta(Assembler& a)
         a.evaluateBlock(source, name);
     });
 
+    a.registerMeta("incbin", [&](auto const& text, auto const&) {
+        auto args = a.evaluateList(text);
+        auto name = any_cast<std::string_view>(args[0]);
+        auto p = utils::path(name);
+        if (p.is_relative()) {
+            p = a.getCurrentPath() / p;
+        }
+        utils::File f{p};
+        for (auto const& b : f.readAll()) {
+            mach.writeByte(b);
+        }
+    });
+
     a.registerMeta("rept", [&](auto const& text, auto const& blocks) {
         if (blocks.empty()) {
             throw parse_error("No block for !rept");
@@ -284,10 +297,10 @@ void initMeta(Assembler& a)
         auto* vec = any_cast<std::vector<uint8_t>>(&data);
         size_t count = vec ? vec->size() : number<size_t>(data);
 
-        for (Number i = 0; i < count; i++) {
-            a.getSymbols()["i"] = i;
+        for (size_t i = 0; i < count; i++) {
+            a.getSymbols()["i"] = any_num(i);
             if (vec) {
-                a.getSymbols()["v"] = (*vec)[i];
+                a.getSymbols()["v"] = any_num((*vec)[i]);
             }
             a.evaluateBlock(blocks[0]);
         }

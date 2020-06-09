@@ -18,6 +18,8 @@
 scr_dest = 0x6000
 bitmap_dest = 0x4000
 
+
+
 spritePtrs = scr_dest + 1016
 
     !section "main", 0x801
@@ -99,19 +101,31 @@ $   lda spriteData-1+i*64,x
     }
     rts
 
+!macro iny2() {
+    iny
+    iny
+}
+
+!macro ldxy(v) {
+    ldx v
+    ldy v+1
+}
+
+!macro stxy(v) {
+    stx v
+    sty v+1
+}
+
 update_sprite
-    ldx xy
-    ldy xy+1
+    ldxy xy
     lda sine,x
     inx
     sta $d004    ; Sprite position x++
     lda sine,y
-    iny
-    iny
+    iny2
     sta $d005    ; Sprite position y++
 
-    stx xy
-    sty xy+1
+    stxy xy
 
     lda sine2,x
     adc #(spriteMem-0x4000)/64
