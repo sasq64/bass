@@ -4,7 +4,6 @@
 
 #include <coreutils/file.h>
 #include <coreutils/log.h>
-#include <coreutils/utf8.h>
 #include <cstdint>
 #include <string>
 

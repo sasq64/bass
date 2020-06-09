@@ -334,6 +334,7 @@ void initFunctions(Assembler& ass);
 
 Assembler::Assembler() : parser(grammar6502)
 {
+    parser.packrat();
     mach = std::make_shared<Machine>();
     initFunctions(*this);
     initMeta(*this);

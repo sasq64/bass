@@ -36,7 +36,38 @@
 
     SetVReg(0)
     SetVAdr($0000 | INC_1)
+    jsr copy_image
 
+    lda #0
+    sta L1_TILEBASE
+    lda #4 | 3
+    sta L1_CONFIG
+
+vbl:
+
+
+    WaitLine(10)
+
+    ;jsr scale_effect
+    ;ldx #20
+    ;sta HSCALE
+
+    WaitLine(400)
+    lda #5
+    sta BORDER
+
+    WaitLine(432)
+    lda #0
+    sta BORDER
+
+    jmp vbl
+
+
+; ---------------------------------------------------------------------------
+
+
+; Copy image data to VRAM
+copy_image:
     lda #0
     sta BANK_SELECT
 .loop2
@@ -57,33 +88,7 @@
     lda #8
     cmp BANK_SELECT
     bne .loop2
-
-    lda #0
-    sta L1_TILEBASE
-    lda #4 | 3
-    sta L1_CONFIG
-
-
-vbl:
-
-
-    WaitLine(10)
-
-    ;jsr scale_effect
-    ;ldx #20
-    ;sta HSCALE
-
-
-
-    WaitLine(400)
-    lda #5
-    sta BORDER
-
-    WaitLine(432)
-    lda #0
-    sta BORDER
-
-    jmp vbl
+    rts
 
 scale_effect:
     inc sinptr

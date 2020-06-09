@@ -12,12 +12,18 @@
 
 using namespace std::string_literals;
 
-static uint8_t translate(uint8_t c)
-{
+static uint8_t char_translate[256];
 
-    if (c >= 'a' && c <= 'z') return c - 'a' + 1;
-    if (c >= 'A' && c <= 'Z') return c - 'A' + 0x41;
-    return c;
+static void resetTranslate()
+{
+    for (int i = 0; i < 256; i++) {
+        auto c = i;
+        if (c >= 'a' && c <= 'z')
+            c = c - 'a' + 1;
+        else if (c >= 'A' && c <= 'Z')
+            c = c - 'A' + 0x41;
+        char_translate[i] = c;
+    }
 }
 
 static void evalIf(Assembler& a, bool cond,
@@ -46,8 +52,28 @@ void initMeta(Assembler& a)
     });
 
     a.registerMeta("define", [&](auto const& text, auto const& blocks) {
-      auto def = a.evaluateDefinition(text);
-      a.addDefine(def.name, def.args, blocks[0]);
+        auto def = a.evaluateDefinition(text);
+        a.addDefine(def.name, def.args, blocks[0]);
+    });
+
+    a.registerMeta("chartrans", [&](auto const& text, auto const&) {
+        if (text.empty()) {
+            resetTranslate();
+        } else {
+            auto list = a.evaluateList(text);
+            std::string text;
+            char* ptr = nullptr;
+            for (auto const& v : list) {
+                if (auto* s = any_cast<std::string_view>(&v)) {
+                    text = *s;
+                    ptr = &text[0];
+                } else {
+                    auto n = number<uint8_t>(v);
+                    LOGI("%c -> %x", *ptr, n);
+                    char_translate[*ptr++] = n;
+                }
+            }
+        }
     });
 
     a.registerMeta("text", [&](auto const& text, auto const&) {
@@ -55,7 +81,7 @@ void initMeta(Assembler& a)
         for (auto const& v : list) {
             if (auto* s = any_cast<std::string_view>(&v)) {
                 for (auto c : *s) {
-                    c = translate(c);
+                    c = char_translate[c];
                     mach.writeByte(c);
                 }
             } else {
