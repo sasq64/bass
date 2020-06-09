@@ -15,10 +15,23 @@
     sta $d018
 }
 
+!macro iny2() {
+    iny
+    iny
+}
+
+!macro ldxy(v) {
+    ldx v
+    ldy v+1
+}
+
+!macro stxy(v) {
+    stx v
+    sty v+1
+}
+
 scr_dest = 0x6000
 bitmap_dest = 0x4000
-
-
 
 spritePtrs = scr_dest + 1016
 
@@ -84,7 +97,7 @@ spriteMem = 0x7000
 
 init_sprite
     ; Enable sprite 2
-    lda #$04 
+    lda #$04
     sta $d015
 
     ; Set sprite 2 pointer
@@ -93,28 +106,13 @@ init_sprite
 
     ; Copy sprite data
     !rept 8 {
-    ldx #3*21
-$   lda spriteData-1+i*64,x
-    sta spriteMem-1+i*64,x
-    dex
-    bne -
+        ldx #3*21
+    $   lda spriteData-1+i*64,x
+        sta spriteMem-1+i*64,x
+        dex
+        bne -
     }
     rts
-
-!macro iny2() {
-    iny
-    iny
-}
-
-!macro ldxy(v) {
-    ldx v
-    ldy v+1
-}
-
-!macro stxy(v) {
-    stx v
-    sty v+1
-}
 
 update_sprite
     ldxy xy
@@ -134,10 +132,6 @@ update_sprite
     rts
 
 xy: !byte 0,0
-
-!define msin(x) { x*x }
-
-ARNE = msin(9) + 3
 
 sine:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }
