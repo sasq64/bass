@@ -1,11 +1,19 @@
-; C64 Example source
+;----------------------------------------------------------
+; badass -- C64 Example source
+; Koala screen, animated sprite and music
+; sasq - 2020
+;----------------------------------------------------------
 
+
+; Set the 16k VIC area. Can only point
+; to $0000, $4000, $8000 or $c000
 !macro VicAdr(adr) {
     !assert (adr & 0x3fff) == 0
     lda #((~adr)&0xffff)>>14
     sta $dd00
 }
 
+; Set the Bitmap and Screen offsets within VIC
 !macro BitmapAndScreen(bm_offs, scr_offs) {
     !assert (bm_offs & 0xdfff) == 0
     !assert (scr_offs & 0xc3ff) == 0
@@ -15,11 +23,7 @@
     sta $d018
 }
 
-!macro iny2() {
-    iny
-    iny
-}
-
+; Silly short hand macros
 !macro ldxy(v) {
     ldx v
     ldy v+1
@@ -30,43 +34,54 @@
     sty v+1
 }
 
-scr_dest = 0x6000
-bitmap_dest = 0x4000
+    ; Koala offsets
+    !enum Koala {
+        bitmap = $2
+        screen = $1f42
+        colors = $232a
+        bg = $2712
+        end = $2713
+    }
 
-spritePtrs = scr_dest + 1016
+musicLocation = 0x1000
+
+screenMem = 0x6000
+bitmapMem = 0x4000
+spriteMem = 0x7000
+spritePtrs = screenMem + 1016
 
     !section "main", 0x801
-    !byte $0b, $08,$01,$00,$9e,str(start)," BY SASQ", $00,$00,$00
+    !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
 start:
 
     sei
 
     ; Copy colors and screen data
     ldx #$00
--   lda colors,x
+$   lda colors,x
     sta $d800,x
     lda colors+$100,x
     sta $d900,x
     lda colors+$200,x
-    sta $dA00,x
+    sta $da00,x
     lda colors+$2e8,x
     sta $dae8,x 
 
-    !if screen != scr_dest {
+    !if screen != screenMem {
         lda screen,x
-        sta scr_dest,x
+        sta screenMem,x
         lda screen+$100,x
-        sta scr_dest+$100,x
+        sta screenMem+$100,x
         lda screen+$200,x
-        sta scr_dest+$200,x
+        sta screenMem+$200,x
         lda screen+$2e8,x
-        sta scr_dest+$2E8,x
+        sta screenMem+$2E8,x
     }
     inx
     bne -
 
     VicAdr(0x4000)
-    BitmapAndScreen(0x0000, scr_dest-0x4000)
+    BitmapAndScreen(bitmapMem-0x4000, screenMem-0x4000)
 
     jsr init_sprite
 
@@ -81,7 +96,7 @@ start:
     sta $d021
 
     jsr $1000
-loop
+
 $   lda #100
     cmp $d012
     bne -
@@ -91,9 +106,8 @@ $   lda #100
     lda #bg_color
     sta $d020
     jsr update_sprite
-    jmp loop
+    jmp -
 
-spriteMem = 0x7000
 
 init_sprite
     ; Enable sprite 2
@@ -107,7 +121,7 @@ init_sprite
     ; Copy sprite data
     !rept 8 {
         ldx #3*21
-    $   lda spriteData-1+i*64,x
+    $:  lda spriteData-1+i*64,x
         sta spriteMem-1+i*64,x
         dex
         bne -
@@ -116,16 +130,17 @@ init_sprite
 
 update_sprite
     ldxy xy
-    lda sine,x
+    lda sine_xy,x
     inx
     sta $d004    ; Sprite position x++
-    lda sine,y
-    iny2
+    lda sine_xy,y
+    iny
+    iny
     sta $d005    ; Sprite position y++
 
     stxy xy
 
-    lda sine2,x
+    lda sine_frame,x
     adc #(spriteMem-0x4000)/64
 
     sta spritePtrs+2
@@ -133,10 +148,10 @@ update_sprite
 
 xy: !byte 0,0
 
-sine:
+sine_xy:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }
 
-sine2:
+sine_frame:
     !rept 256 { !byte (sin(i*Math.Pi*2/96)+1) * 3.5 }
 
 %{
@@ -160,11 +175,7 @@ function circle(target, width, xp, yp, radius)
     return target
 end
 
-
-
 }%
-
-circle_sprite = circle(zeroes(3*21), 3, 12, 10, 10)
 
 spriteData:
     !rept 8 {
@@ -175,21 +186,26 @@ spriteData:
     ; Koala Image
 
     koala = load("../data/oys.koa")
-    bitmap = koala[2:0x1f42]
-    screen_ram = koala[0x1f42:0x232a]
-    color_ram = koala[0x232a:0x2712]
-    bg_color = koala[0x2712]
+    bitmap = koala[Koala.bitmap : Koala.screen]
+    screen_ram = koala[Koala.screen : Koala.colors]
+    color_ram = koala[Koala.colors : Koala.bg]
+    bg_color = koala[Koala.bg]
 
-!define swap(x) { (x>>8) | (x<<8) }
+    ; Music
+
+    !define swap(x) { (x>>8) | (x<<8) }
 
     sid = load("../data/test.sid")
     music_init = swap(word(sid[0xa:0xc]))
     music_play = swap(word(sid[0xc:0xe]))
 
-    !assert music_init == 0x1000
+    !assert music_init == musicLocation
 
     music_data = sid[0x7e:]
-    !section "music", 0x1000
+
+    ; Data layout
+
+    !section "music", musicLocation
     !fill music_data
 
     !section "colors", *
@@ -200,5 +216,5 @@ colors:
 screen:
     !fill screen_ram
 
-    !section "koala", 0x4000
+    !section "koala", bitmapMem
     !fill bitmap
