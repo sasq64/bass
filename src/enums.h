@@ -22,5 +22,6 @@ enum AdressingMode : uint8_t
     ABS,
     ABSX,
     ABSY,
+    ZP_REL,
 };
 }

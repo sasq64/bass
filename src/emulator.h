@@ -17,7 +17,8 @@ static constexpr inline int opSize(AdressingMode am)
     return am >= IND ? 3 : (am >= IMM ? 2 : 1);
 }
 
-template <typename POLICY> struct Machine;
+template <typename POLICY>
+struct Machine;
 
 enum EmulatedMemoryAccess
 {
@@ -48,7 +49,8 @@ struct DefaultPolicy
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
 };
 
-template <typename POLICY = DefaultPolicy> struct Machine
+template <typename POLICY = DefaultPolicy>
+struct Machine
 {
     using Adr = uint16_t;
     using Word = uint8_t;
@@ -191,7 +193,7 @@ template <typename POLICY = DefaultPolicy> struct Machine
             op.op(*this);
             cycles += op.cycles;
         }
-        if(realCycles != 0) {
+        if (realCycles != 0) {
             cycles = realCycles;
             realCycles = 0;
         }
@@ -202,7 +204,6 @@ template <typename POLICY = DefaultPolicy> struct Machine
     auto regs() { return std::tie(a, x, y, sr, sp, pc); }
 
 private:
-
     enum REGNAME
     {
         A = 20,
@@ -212,7 +213,11 @@ private:
         SR
     };
 
-    template <int MODE> constexpr static bool IsReg() { return MODE >= A; }
+    template <int MODE>
+    constexpr static bool IsReg()
+    {
+        return MODE >= A;
+    }
 
     // The 6502 registers
     unsigned pc;
@@ -248,7 +253,6 @@ private:
     std::array<Word (*)(const Machine&, uint16_t), 256> rcallbacks;
     std::array<void (*)(Machine&, uint16_t, Word), 256> wcallbacks;
 
-
     std::array<Opcode, 256> jumpTable_normal;
     std::array<Opcode, 256> jumpTable_bcd;
 
@@ -262,7 +266,8 @@ private:
         return m.rbank[adr >> 8][adr & 0xff];
     }
 
-    template <int REG> constexpr auto& Reg() const
+    template <int REG>
+    constexpr auto& Reg() const
     {
         if constexpr (REG == A) return a;
         if constexpr (REG == X) return x;
@@ -270,7 +275,8 @@ private:
         if constexpr (REG == SP) return sp;
     }
 
-    template <int REG> constexpr auto& Reg()
+    template <int REG>
+    constexpr auto& Reg()
     {
         if constexpr (REG == A) return a;
         if constexpr (REG == X) return x;
@@ -317,7 +323,8 @@ private:
         return sr | ((result | (result >> 2)) & 0x80) | (!(result & 0xff) << 1);
     }
 
-    template <bool DEC> void setDec()
+    template <bool DEC>
+    void setDec()
     {
         if constexpr (DEC)
             jumpTable = &jumpTable_bcd[0];
@@ -338,7 +345,8 @@ private:
         sr = (s & ~SZ) | 0x30;
     }
 
-    template <int BITS> void set(int res, int arg = 0)
+    template <int BITS>
+    void set(int res, int arg = 0)
     {
         result = res;
 
@@ -353,7 +361,8 @@ private:
 
     constexpr unsigned carry() const { return sr & 1; }
 
-    template <int FLAG, bool v> constexpr bool check() const
+    template <int FLAG, bool v>
+    constexpr bool check() const
     {
         if constexpr (FLAG == ZERO) return result & 0xff ? !v : v;
         if constexpr (FLAG == SIGN)
@@ -418,7 +427,8 @@ private:
     }
 
     // Read operand from PC and create effective adress depeding on 'MODE'
-    template <int MODE> unsigned ReadEA()
+    template <int MODE>
+    unsigned ReadEA()
     {
         if constexpr (MODE == IMM) return pc++;
         if constexpr (MODE == ZP) return ReadPC8();
@@ -432,9 +442,17 @@ private:
         if constexpr (MODE == IND) return Read16(ReadPC16());
     }
 
-    template <int MODE> void StoreEA(unsigned v) { Write(ReadEA<MODE>(), v); }
+    template <int MODE>
+    void StoreEA(unsigned v)
+    {
+        Write(ReadEA<MODE>(), v);
+    }
 
-    template <int MODE> unsigned LoadEA() { return Read(ReadEA<MODE>()); }
+    template <int MODE>
+    unsigned LoadEA()
+    {
+        return Read(ReadEA<MODE>());
+    }
 
     /////////////////////////////////////////////////////////////////////////
     ///
@@ -443,24 +461,34 @@ private:
     /////////////////////////////////////////////////////////////////////////
 
     // Set flags, except for Z and S
-    template <int FLAG, bool ON> static constexpr void Set(Machine& m)
+    template <int FLAG, bool ON>
+    static constexpr void Set(Machine& m)
     {
         if constexpr (FLAG == DECIMAL) m.setDec<ON>();
         m.sr = (m.sr & ~(1 << FLAG)) | (ON << FLAG);
     }
 
-    template <int REG, int MODE> static constexpr void Store(Machine& m)
+    template <int REG, int MODE>
+    static constexpr void Store(Machine& m)
     {
         m.StoreEA<MODE>(m.Reg<REG>());
     }
 
-    template <int REG, int MODE> static constexpr void Load(Machine& m)
+    template <int MODE>
+    static constexpr void Store0(Machine& m)
+    {
+        m.StoreEA<MODE>(0);
+    }
+
+    template <int REG, int MODE>
+    static constexpr void Load(Machine& m)
     {
         m.Reg<REG>() = m.LoadEA<MODE>();
         m.set<SZ>(m.Reg<REG>());
     }
 
-    template <int FLAG, bool ON> static constexpr void Branch(Machine& m)
+    template <int FLAG, bool ON>
+    static constexpr void Branch(Machine& m)
     {
         auto pc = m.pc;
         int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++);
@@ -470,8 +498,17 @@ private:
         }
         m.pc = pc;
     }
+    static constexpr void Branch(Machine& m)
+    {
+        auto pc = m.pc;
+        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++);
+        pc += diff;
+        m.cycles++;
+        m.pc = pc;
+    }
 
-    template <int MODE, int INC> static constexpr void Inc(Machine& m)
+    template <int MODE, int INC>
+    static constexpr void Inc(Machine& m)
     {
         if constexpr (IsReg<MODE>()) {
             m.Reg<MODE>() = (m.Reg<MODE>() + INC) & 0xff;
@@ -486,21 +523,24 @@ private:
 
     // === COMPARE, ADD & SUBTRACT
 
-    template <int MODE> static constexpr void Bit(Machine& m)
+    template <int MODE>
+    static constexpr void Bit(Machine& m)
     {
         unsigned z = m.LoadEA<MODE>();
         m.result = (z & m.a) | ((z & 0x80) << 2);
         m.sr = (m.sr & ~V) | (z & V);
     }
 
-    template <int REG, int MODE> static constexpr void Cmp(Machine& m)
+    template <int REG, int MODE>
+    static constexpr void Cmp(Machine& m)
     {
         unsigned z = (~m.LoadEA<MODE>()) & 0xff;
         unsigned rc = m.Reg<REG>() + z + 1;
         m.set<SZC>(rc);
     }
 
-    template <int MODE, bool DEC = false> static constexpr void Sbc(Machine& m)
+    template <int MODE, bool DEC = false>
+    static constexpr void Sbc(Machine& m)
     {
         if constexpr (DEC) {
             unsigned z = m.LoadEA<MODE>();
@@ -522,7 +562,8 @@ private:
         }
     }
 
-    template <int MODE, bool DEC = false> static constexpr void Adc(Machine& m)
+    template <int MODE, bool DEC = false>
+    static constexpr void Adc(Machine& m)
     {
         unsigned z = m.LoadEA<MODE>();
         unsigned rc = m.a + z + m.carry();
@@ -534,19 +575,22 @@ private:
         m.a = rc & 0xff;
     }
 
-    template <int MODE> static constexpr void And(Machine& m)
+    template <int MODE>
+    static constexpr void And(Machine& m)
     {
         m.a &= m.LoadEA<MODE>();
         m.set<SZ>(m.a);
     }
 
-    template <int MODE> static constexpr void Ora(Machine& m)
+    template <int MODE>
+    static constexpr void Ora(Machine& m)
     {
         m.a |= m.LoadEA<MODE>();
         m.set<SZ>(m.a);
     }
 
-    template <int MODE> static constexpr void Eor(Machine& m)
+    template <int MODE>
+    static constexpr void Eor(Machine& m)
     {
         m.a ^= m.LoadEA<MODE>();
         m.set<SZ>(m.a);
@@ -554,7 +598,8 @@ private:
 
     // === SHIFTS & ROTATES
 
-    template <int MODE> static constexpr void Asl(Machine& m)
+    template <int MODE>
+    static constexpr void Asl(Machine& m)
     {
         if constexpr (MODE == A) {
             int rc = m.a << 1;
@@ -568,7 +613,8 @@ private:
         }
     }
 
-    template <int MODE> static constexpr void Lsr(Machine& m)
+    template <int MODE>
+    static constexpr void Lsr(Machine& m)
     {
         if constexpr (MODE == A) {
             m.sr = (m.sr & 0xfe) | (m.a & 1);
@@ -584,7 +630,8 @@ private:
         }
     }
 
-    template <int MODE> static constexpr void Ror(Machine& m)
+    template <int MODE>
+    static constexpr void Ror(Machine& m)
     {
         if constexpr (MODE == A) {
             unsigned rc = (((m.sr << 8) & 0x100) | m.a) >> 1;
@@ -601,7 +648,8 @@ private:
         }
     }
 
-    template <int MODE> static constexpr void Rol(Machine& m)
+    template <int MODE>
+    static constexpr void Rol(Machine& m)
     {
         if constexpr (MODE == A) {
             unsigned rc = (m.a << 1) | m.carry();
@@ -615,10 +663,73 @@ private:
         }
     }
 
-    template <int FROM, int TO> static constexpr void Transfer(Machine& m)
+    template <int FROM, int TO>
+    static constexpr void Transfer(Machine& m)
     {
         m.Reg<TO>() = m.Reg<FROM>();
         if constexpr (TO != SP) m.set<SZ>(m.Reg<TO>());
+    }
+
+    // 65c02 opcodes
+
+    template <int BIT>
+    static constexpr void Bbr(Machine& m)
+    {
+        auto val = m.LoadEA<ZP>();
+        auto pc = m.pc;
+        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++);
+        if (!(val & 1 << BIT)) {
+            pc += diff;
+            m.cycles++;
+        }
+        m.pc = pc;
+    }
+
+    template <int BIT>
+    static constexpr void Bbs(Machine& m)
+    {
+        auto val = m.LoadEA<ZP>();
+        auto pc = m.pc;
+        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++);
+        if (val & 1 << BIT) {
+            pc += diff;
+            m.cycles++;
+        }
+        m.pc = pc;
+    }
+
+    template <int BIT>
+    static constexpr void Rmb(Machine& m)
+    {
+        auto adr = m.ReadEA<ZP>();
+        auto val = m.Read(adr) & ~(1 << BIT);
+        m.Write(adr, val);
+    }
+
+    template <int BIT>
+    static constexpr void Smb(Machine& m)
+    {
+        auto adr = m.ReadEA<ZP>();
+        auto val = m.Read(adr) | (1 << BIT);
+        m.Write(adr, val);
+    }
+
+    template <int MODE>
+    static constexpr void Trb(Machine& m)
+    {
+        auto adr = m.ReadEA<MODE>();
+        auto val = m.Read(adr);
+        m.set<Z>(val & m.a);
+        m.Write(adr, val & (~m.a));
+    }
+
+    template <int MODE>
+    static constexpr void Tsb(Machine& m)
+    {
+        auto adr = m.ReadEA<MODE>();
+        auto val = m.Read(adr);
+        m.set<Z>(val & m.a);
+        m.Write(adr, val | m.a);
     }
 
     /////////////////////////////////////////////////////////////////////////
@@ -627,10 +738,10 @@ private:
     ///
     /////////////////////////////////////////////////////////////////////////
 
-public:
-    template <bool USE_BCD = false> static const auto& getInstructions()
+    template <bool USE_BCD = false>
+    static std::vector<Instruction> makeInstructionTable()
     {
-        static const  std::vector<Instruction> instructionTable = {
+        std::vector<Instruction> instructionTable = {
 
             { "nop", {{ 0xea, 2, NONE, [](Machine& ) {} }} },
 
@@ -665,10 +776,10 @@ public:
                 { 0x85, 3, ZP, Store<A, ZP>},
                 { 0x95, 4, ZPX, Store<A, ZPX>},
                 { 0x8d, 4, ABS, Store<A, ABS>},
-                { 0x9d, 4, ABSX, Store<A, ABSX>},
-                { 0x99, 4, ABSY, Store<A, ABSY>},
+                { 0x9d, 5, ABSX, Store<A, ABSX>},
+                { 0x99, 5, ABSY, Store<A, ABSY>},
                 { 0x81, 6, INDX, Store<A, INDX>},
-                { 0x91, 5, INDY, Store<A, INDY>},
+                { 0x91, 6, INDY, Store<A, INDY>},
             } },
 
             { "stx", {
@@ -913,6 +1024,76 @@ public:
             } },
 
         };
+
+        std::vector<Instruction> instructions65c02 = {
+            {"phx",
+             {{0xda, 3, NONE, [](Machine& m) { m.stack[m.sp--] = m.x; }}}},
+            {"phy",
+             {{0x5a, 3, NONE, [](Machine& m) { m.stack[m.sp--] = m.y; }}}},
+            {"plx",
+             {{0xfa, 4, NONE, [](Machine& m) { m.x = m.stack[++m.sp]; }}}},
+            {"ply",
+             {{0x7a, 4, NONE, [](Machine& m) { m.y = m.stack[++m.sp]; }}}},
+            {"stz",
+             {{0x64, 3, ZP, Store0<ZP>},
+              {0x74, 4, ZPX, Store0<ZPX>},
+              {0x9c, 4, ABS, Store0<ABS>},
+              {0x9e, 5, ABSX, Store0<ABSX>}}},
+
+            {"trb", {{0x14, 5, ZP, Trb<ZP>}, {0x1c, 6, ABS, Trb<ABS>}}},
+            {"tsb", {{0x04, 5, ZP, Tsb<ZP>}, {0x0c, 6, ABS, Tsb<ABS>}}},
+
+            {"bra", {{0x80, 2, REL, Branch}}},
+
+            {"bbr0", {{0x0f, 5, ZP_REL, Bbr<0>}}},
+            {"bbr1", {{0x1f, 5, ZP_REL, Bbr<1>}}},
+            {"bbr2", {{0x2f, 5, ZP_REL, Bbr<2>}}},
+            {"bbr3", {{0x3f, 5, ZP_REL, Bbr<3>}}},
+            {"bbr4", {{0x4f, 5, ZP_REL, Bbr<4>}}},
+            {"bbr5", {{0x5f, 5, ZP_REL, Bbr<5>}}},
+            {"bbr6", {{0x6f, 5, ZP_REL, Bbr<6>}}},
+            {"bbr7", {{0x7f, 5, ZP_REL, Bbr<7>}}},
+            {"bbs0", {{0x8f, 5, ZP_REL, Bbs<0>}}},
+            {"bbs1", {{0x9f, 5, ZP_REL, Bbs<1>}}},
+            {"bbs2", {{0xaf, 5, ZP_REL, Bbs<2>}}},
+            {"bbs3", {{0xbf, 5, ZP_REL, Bbs<3>}}},
+            {"bbs4", {{0xcf, 5, ZP_REL, Bbs<4>}}},
+            {"bbs5", {{0xdf, 5, ZP_REL, Bbs<5>}}},
+            {"bbs6", {{0xef, 5, ZP_REL, Bbs<6>}}},
+            {"bbs7", {{0xff, 5, ZP_REL, Bbs<7>}}},
+
+            {"rmb0", {{0x07, 5, ZP, Rmb<0>}}},
+            {"rmb1", {{0x17, 5, ZP, Rmb<1>}}},
+            {"rmb2", {{0x27, 5, ZP, Rmb<2>}}},
+            {"rmb3", {{0x37, 5, ZP, Rmb<3>}}},
+            {"rmb4", {{0x47, 5, ZP, Rmb<4>}}},
+            {"rmb5", {{0x57, 5, ZP, Rmb<5>}}},
+            {"rmb6", {{0x67, 5, ZP, Rmb<6>}}},
+            {"rmb7", {{0x77, 5, ZP, Rmb<7>}}},
+            {"smb0", {{0x87, 5, ZP, Smb<0>}}},
+            {"smb1", {{0x97, 5, ZP, Smb<1>}}},
+            {"smb2", {{0xa7, 5, ZP, Smb<2>}}},
+            {"smb3", {{0xb7, 5, ZP, Smb<3>}}},
+            {"smb4", {{0xc7, 5, ZP, Smb<4>}}},
+            {"smb5", {{0xd7, 5, ZP, Smb<5>}}},
+            {"smb6", {{0xe7, 5, ZP, Smb<6>}}},
+            {"smb7", {{0xf7, 5, ZP, Smb<7>}}},
+
+        };
+
+        instructionTable.insert(instructionTable.end(),
+                                instructions65c02.begin(),
+                                instructions65c02.end());
+
+        return instructionTable;
+    }
+
+public:
+    template <bool USE_BCD = false>
+    static const auto& getInstructions()
+    {
+        static const std::vector<Instruction> instructionTable =
+            makeInstructionTable<USE_BCD>();
         return instructionTable;
     }
 };

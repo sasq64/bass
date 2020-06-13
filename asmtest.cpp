@@ -389,9 +389,6 @@ TEST_CASE("assembler.errors", "[assembler]")
 
     std::vector<std::pair<std::string, int>> sources = {
         {R"(!org $800
-         for(auto& e : errs) {
-            fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
-        }
             ldz #3
              rts)",
          2},
@@ -399,7 +396,7 @@ TEST_CASE("assembler.errors", "[assembler]")
         {R"(!org $800
         !macro test(x) {
             nop
-            stz x
+            stq x
         }
         test(2)
         rts)",
@@ -408,11 +405,11 @@ TEST_CASE("assembler.errors", "[assembler]")
         {R"(!org $800
         nop
         !if 0 {
-            stz 0
+            stq 0
         }
         !if 1 {
             nop
-            stz 0
+            stq 0
         }
         rts)",
          6},
@@ -444,6 +441,7 @@ a       !byte 3
 
     for (auto const& s : sources) {
         ass.parse(s.first, "test.asm");
+        LOGI("Code:%s", s.first);
         auto const& errs = ass.getErrors();
         REQUIRE(!errs.empty());
         for (auto& e : errs) {
