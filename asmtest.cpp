@@ -482,13 +482,13 @@ $   nop
 
     !section "c", $1000
     !macro dummy(a) {
-$   lda $d012
+.x   lda $d012
     cmp #30
-    bne -
+    bne .x
     lda $c000
-    beq +
-    jmp -
-$   rts
+    beq .y
+    jmp .x
+.y  rts
 }
 $   nop
     dummy(0)

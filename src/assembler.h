@@ -1,6 +1,6 @@
 #include "defines.h"
-#include "wrap.h"
 #include "script.h"
+#include "wrap.h"
 
 #include "any_callable.h"
 #include "symbol_table.h"
@@ -45,9 +45,7 @@ public:
         functions[name] = fn;
     }
 
-    void addScript(utils::path const& p) {
-        scripting.load(p);
-    }
+    void addScript(utils::path const& p) { scripting.load(p); }
 
     using MetaFn = std::function<void(std::string_view,
                                       std::vector<std::string_view> const&)>;
@@ -70,15 +68,16 @@ public:
                      std::vector<std::string_view> const& args,
                      std::string_view contents);
     void addDefine(std::string_view name,
-                     std::vector<std::string_view> const& args,
-                     std::string_view contents);
+                   std::vector<std::string_view> const& args,
+                   std::string_view contents);
 
     Symbols evaluateEnum(std::string_view expr);
     void evaluateBlock(std::string_view block, std::string_view fileName = "");
     Symbols runTest(std::string_view name, std::string_view contents);
 
 
-    enum {
+    enum
+    {
         DEB_TRACE = 1,
         DEB_PASS = 2
     };
@@ -152,6 +151,7 @@ private:
     Parser parser;
 
     int labelNum = 0;
+    int inMacro = 0;
 
     std::any parseResult;
 

@@ -3,41 +3,61 @@ INC_1 = $100000
 INC_2 = $200000
 
 !macro SetVAdr(adr) {
-    lda #(adr & $ff)
-    sta $9f20
-    !if ((adr & 0xff) != ((adr>>8) & 0xff)) {
-        lda #(adr>>8)
+    .LO = adr & $ff
+    .MID = (adr >> 8) & 0xff
+    .HI = adr >> 16
+    !if .LO == 0 {
+        stz $9f20
+    } else {
+        lda #.LO
+        sta $9f20
     }
-    sta $9f21
-    lda #(adr>>16)
-    sta $9f22
+    !if .MID == 0 {
+        stz $9f21
+    } else {
+        lda #.MID
+        sta $9f21
+    }
+    !if .HI == 0 {
+        stz $9f22
+    } else {
+        lda #.HI
+        sta $9f22
+    }
 }
 
 !macro SetVReg(reg) {
-    lda #reg
-    sta $9f25
+    !if reg == 0 {
+        stz $9f25
+    } else {
+        lda #reg
+        sta $9f25
+    }
 }
 
 !macro WaitLine(ypos) {
-    lda #$02 | ((ypos>>1)&$80)
-    sta IEN
     lda #ypos
     sta IRQLINE_L
+    lda #$02 | ((ypos>>1)&$80)
+    sta IEN
+    !if ypos > 255 {
+        lda #2
+    }
 .loop:
-    lda ISR
-    and #$2
+    bit ISR
     beq .loop
     sta ISR
 }
 
 !macro NextLine() {
     inc IRQLINE_L
-    bne .loop
+    bne .skip
     lda #$82
     sta IEN
+.skip
+    lda #2
 .loop
-    lda ISR
-    and #$2
+    bit ISR
     beq .loop
     sta ISR
 }
@@ -63,8 +83,7 @@ INC_2 = $200000
     sta CTRL
     lda #8
     sta DC_HSTART
-    lda #0
-    sta CTRL
+    stz CTRL
 }
 
 

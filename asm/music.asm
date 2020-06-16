@@ -1,12 +1,40 @@
 
+    !section "text", section.main.end
+
     data = load("../data/test.sid")
     sid = sid_parse(data)
+
+!macro print(txt, xpos, ypos) {
+    .LEN = .text_end - .text
+    ldx #.LEN
+.l  dex
+    lda .text,x
+    sta $400+xpos+ypos*40,x
+    bne .l
+    !section "text"
+.text:
+    !fill txt
+.text_end:
+    !section "main"
+}
 
     !section "main", $801
 
     !byte $0b, $08,$01,$00,$9e,$32,$30,$36,$31,$00,$00,$00
 start
+    lda #0
+    sta $d020
+    sta $d021
+    jsr $e544
+    lda #23
+    sta $d018
     sei
+
+    print(sid.title, 1, 1)
+    ;print("Shut up and dance!", 1, 2)
+
+    ;jsr print_text
+
     lda #0
     jsr sid.init
 .loop
@@ -19,7 +47,6 @@ start
     lda #0
     sta $d020
     jmp .loop
-
 
     !section "music", sid.load
 music:

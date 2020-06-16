@@ -293,8 +293,8 @@ void Assembler::applyMacro(Call const& call)
             syms.erase(args[i]);
         }
         syms[args[i]] = call.args[i];
-        LOGD("%s = %x", m.args[i],
-             (int32_t)std::any_cast<Number>(call.args[i]));
+        // LOGD("%s = %x", m.args[i],
+        //     (int32_t)std::any_cast<Number>(call.args[i]));
     }
 
     // LOGI("Parsing '%s'", m.contents);
@@ -302,9 +302,12 @@ void Assembler::applyMacro(Call const& call)
     auto pc = mach->getPC();
     std::string macroLabel = "__macro_"s + std::to_string(pc);
     lastLabel = macroLabel;
+    inMacro++;
     if (!parser.parse(m.contents, fileName.c_str())) {
+        inMacro--;
         throw parse_error("Syntax error in macro");
     }
+    inMacro--;
     // LOGI("Parsing done");
     for (unsigned i = 0; i < call.args.size(); i++) {
         syms.erase(args[i]);
@@ -338,6 +341,34 @@ Assembler::Assembler() : parser(grammar6502)
     initMeta(*this);
     setupRules();
 }
+
+template <typename A, typename B>
+A operation(std::string_view const& ope, A const& a, B const& b)
+{
+    // clang-format off
+    if (ope == "+") return a + b;
+    else if (ope == "-") return a - b;
+    else if (ope == "*") return a * b;
+    else if (ope == "/") return a / b;
+    else if (ope == "\\") return div(a, b);
+    else if (ope == "%") return a % b;
+    else if (ope == ">>") return a >> b;
+    else if (ope == "<<") return a << b;
+    else if (ope == "&") return a & b;
+    else if (ope == "|") return a | b;
+    else if (ope == "^") return a ^ b;
+    else if (ope == "&&") return a && b;
+    else if (ope == "||") return a || b;
+    else if (ope == "<") return a < b;
+    else if (ope == ">") return a > b;
+    else if (ope == "<=") return a <= b;
+    else if (ope == ">=") return a >= b;
+    else if (ope == "==") return a == b;
+    else if (ope == "!=") return a != b;
+    // clang-format on
+    return a;
+}
+
 void Assembler::setUndefined(std::string const& sym, SVWrap const& sv)
 {
     if (utils::find_if(undefined, [&](auto const& u) {
@@ -360,6 +391,7 @@ void Assembler::setupRules()
         return std::pair<std::string_view, std::any>{
             any_cast<std::string_view>(sv[0]), v};
     };
+
     parser["EnumBlock"] = [&](SV& sv) {
         trace(sv);
         Symbols s;
@@ -372,7 +404,7 @@ void Assembler::setupRules()
                 }
                 s[persist(p.first)] = p.second;
                 if (auto* n = any_cast<Number>(&p.second)) {
-                    lastNumber = *n + 1;
+                    lastNumber = *n + 1.0;
                 }
             }
         }
@@ -404,6 +436,7 @@ void Assembler::setupRules()
 
         std::string label;
         if (labelv == "$" || labelv == "-" || labelv == "+") {
+            if (inMacro) throw parse_error("No special labels in macro");
             label = "__special_" + std::to_string(labelNum);
             labelNum++;
         } else {
@@ -609,8 +642,10 @@ void Assembler::setupRules()
         std::any val;
         std::string l = std::string(label);
         if (label == "+") {
+            if (inMacro) throw parse_error("No special labels in macro");
             l = "__special_" + std::to_string(labelNum);
         } else if (label == "-") {
+            if (inMacro) throw parse_error("No special labels in macro");
             l = "__special_" + std::to_string(labelNum - 1);
         }
         val = syms.get(l);
@@ -654,34 +689,11 @@ void Assembler::setupRules()
         if (sv.size() == 1) {
             return sv[0];
         }
-        auto result = any_cast<Number>(sv[0]);
-        LOGD("Expr %f", result);
+
         auto ope = any_cast<std::string_view>(sv[1]);
-        auto num = any_cast<Number>(sv[2]);
-        auto inum = static_cast<uint64_t>(num);
-        auto ires = static_cast<uint64_t>(result);
-        // clang-format off
-        if (ope == "+") result += num;
-        else if (ope == "-") result -= num;
-        else if (ope == "*") result *= num;
-        else if (ope == "/") result /= num;
-        else if (ope == "\\") result = static_cast<Number>(ires / inum);
-        else if (ope == "%") result = static_cast<Number>(ires % inum);
-        else if (ope == ">>") result = static_cast<Number>(ires >> inum);
-        else if (ope == "<<") result = static_cast<Number>(ires << inum);
-        else if (ope == "&") result = static_cast<Number>(ires & inum);
-        else if (ope == "|") result = static_cast<Number>(ires | inum);
-        else if (ope == "^") result = static_cast<Number>(ires ^ inum);
-        else if (ope == "&&") result = static_cast<Number>(ires && inum);
-        else if (ope == "||") result = static_cast<Number>(ires || inum);
-        else if (ope == "<") result = static_cast<Number>(result < num);
-        else if (ope == ">") result = static_cast<Number>(result > num);
-        else if (ope == "<=") result = static_cast<Number>(result <= num);
-        else if (ope == ">=") result = static_cast<Number>(result >= num);
-        else if (ope == "<=>") result = num>result ? -1 : static_cast<Number>(result > num);
-        else if (ope == "==") result = static_cast<Number>(result == num);
-        else if (ope == "!=") result = static_cast<Number>(result != num);
-        // clang-format on
+        auto a = Num(any_cast<Number>(sv[0]));
+        auto b = Num(any_cast<Number>(sv[2]));
+        auto result = (Number)operation(ope, a, b);
         return std::any(result);
     };
 

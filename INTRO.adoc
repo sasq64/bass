@@ -12,15 +12,12 @@ Let's start with a minimal C64 program, a 3 opcode routine to make a rainbow bor
 
 [source,ca65]
 ----
-    !org 0xc000
+    !org $c000
 loop:
-    lda 0xd012
-    sta 0xd020
+    lda $d012
+    sta $d020
     jmp loop
 ----
-
-(note that I used the `0x` prefixes for hilighting purposes. I personally prefer `$`,
-which of course works too).
 
 You should be able to load this into a C64 emulator and start it with `sys 49152`.
 
@@ -28,8 +25,8 @@ But let's add a _basic start_ snippet so we can just run the prg instead:
 
 [source,ca65]
 ----
-    !section "main", 0x801
-    !byte 0x0b, 0x08,0x01,0x00,0x9e,str(start)," BY SASQ", 0x00,0x00,0x00
+    !section "main", $801
+    !byte $0b,$08,$01,$00,$9e,str(start)," BY SASQ",$00,$00,$00
 start:
     lda #3
     sta $d020
@@ -48,7 +45,7 @@ Let's add some more code;
 [source,ca65]
 ----
     !section "main", $801
-    !byte $0b, $08,$01,$00,$9e,str(start)," BY SASQ", $00,$00,$00
+    !byte $0b,$08,$01,$00,$9e,str(start)," BY SASQ",$00,$00,$00
 start:
     jsr $1000
 .loop
@@ -68,7 +65,7 @@ start:
 
 This is a short program that wait for a certain scan line, calls a music routine,
 and loops. The music is expected to reside in the file "music.raw" and must
-be placed at address 0x1000.
+be placed at address $1000.
 
 But what if music is a PRG with 2 bytes load address first. Or a sid file ?
 
@@ -104,7 +101,7 @@ to make sure it is where we want it:
 
 [source,ca65]
 ----
-    musicStart = 0x1000
+    musicStart = $1000
     !assert word(data[0:2]) == musicStart
 ----
 
@@ -112,21 +109,21 @@ Lets put it all together:
 
 [source,ca65]
 ----
-    musicStart = 0x1000
+    musicStart = $1000
 
-    !section "main", 0x801
-    !byte 0x0b, 0x08,0x01,0x00,0x9e,str(start)," BY SASQ", 0x00,0x00,0x00
+    !section "main", $801
+    !byte $0b, $08,$01,$00,$9e,str(start)," BY SASQ", $00,$00,$00
 start:
     jsr musicStart
 .loop
-    lda 0xd012
+    lda $d012
     cmp #100
     bne .loop
     lda #3
-    sta 0xd020
+    sta $d020
     jsr musicStart+3
     lda #0
-    sta 0xd020
+    sta $d020
     jmp .loop
 
     data = load("music.prg")
@@ -145,19 +142,19 @@ easier to work with the VIC:
 ----
 ; Set VIC base address
 !macro VicAdr(adr) {
-    !assert (adr & 0x3fff) == 0
-    lda #((~adr)&0xffff)>>14
-    sta 0xdd00
+    !assert (adr & $3fff) == 0
+    lda #((~adr)&$ffff)>>14
+    sta $dd00
 }
 
 ; Set Bitmap and screen offsets
 !macro BitmapAndScreen(bm_offs, scr_offs) {
-    !assert (bm_offs & 0xdfff) == 0
-    !assert (scr_offs & 0xc3ff) == 0
+    !assert (bm_offs & $dfff) == 0
+    !assert (scr_offs & $c3ff) == 0
     .bits0 = (bm_offs>>10)
     .bits1 = (scr_offs>>6)
     lda #.bits0 | .bits1
-    sta 0xd018
+    sta $d018
 }
 ----
 
@@ -166,21 +163,21 @@ They also make sure that you only specify a legal address/offset.
 
 [source,ca65]
 ----
-    VicAdr(0x4000)
-    BitmapAndScreen(0x2000, 0x000)
+    VicAdr($4000)
+    BitmapAndScreen($2000, $000)
 ----
 
-This means that we need to locate our bitmap data at address `0x6000` and our
-screen data at `0x4000`.
+This means that we need to locate our bitmap data at address `$6000` and our
+screen data at `$4000`.
 Let's import a koala picture:
 
 [source,ca65]
 ----
     koala = load("image.koa")
-    bitmap = koala[2:0x1f42]
-    screen_ram = koala[0x1f42:0x232a]
-    color_ram = koala[0x232a:0x2712]
-    bg_color = koala[0x2712]
+    bitmap = koala[2:$1f42]
+    screen_ram = koala[$1f42:$232a]
+    color_ram = koala[$232a:$2712]
+    bg_color = koala[$2712]
             
     !section "colors", *
 colors:
@@ -190,7 +187,7 @@ colors:
 screen:
     !block screen_ram
 
-    !section "koala", 0x6000
+    !section "koala", $6000
     !block bitmap
 ----
 
@@ -199,13 +196,13 @@ Here we use array slicing again to extract all the parts.
 We also use the `*` symbol which means the current program counter. Using
 it in a `!section` command only for informative purposes.
 
-The bitmap we placed directly at `0x6000`, but the screen and color
+The bitmap we placed directly at `$6000`, but the screen and color
 data needs to be copied.
 
 [source,ca65]
 ----
 
-    scrTarget = 0x4000
+    scrTarget = $4000
 
     lda #$18
     sta $d016
@@ -218,23 +215,23 @@ data needs to be copied.
     sta $d021
 
 $   lda colors,x
-    sta 0xd800,x
-    lda colors+0x100,x
-    sta 0xd900,x
-    lda colors+0x200,x
-    sta 0xdA00,x
-    lda colors+0x2e8,x
-    sta 0xdae8,x 
+    sta $d800,x
+    lda colors+$100,x
+    sta $d900,x
+    lda colors+$200,x
+    sta $dA00,x
+    lda colors+$2e8,x
+    sta $dae8,x 
 
     !if screen != screenTarget {
         lda screen,x
         sta scrTarget,x
-        lda screen+0x100,x
-        sta scrTarget+0x100,x
-        lda screen+0x200,x
-        sta scrTarget+0x200,x
-        lda screen+0x2e8,x
-        sta scrTarget+0x2E8,x
+        lda screen+$100,x
+        sta scrTarget+$100,x
+        lda screen+$200,x
+        sta scrTarget+$200,x
+        lda screen+$2e8,x
+        sta scrTarget+$2E8,x
     }
     inx
     bne -
@@ -250,14 +247,14 @@ Let's add a sprite!.
 [source,ca65]
 ----
 spritePtrs = screenTarget + 1016
-spriteMem = 0x5f80
+spriteMem = $5f80
 
     ; Enable sprite 2
     lda #$04 
     sta $d015
 
     ; Set sprite 2 pointer
-    lda #(spriteMem-0x4000)/64
+    lda #(spriteMem-$4000)/64
     sta spritePtrs+2
 
     ; Copy sprite data
@@ -268,7 +265,7 @@ $   lda spriteData,x
     bne -
 
 spriteData:
-    !rept 3*24 { !byte 0xff }
+    !rept 3*24 { !byte $ff }
 
 ----
 
@@ -365,7 +362,7 @@ frames, and add some code to set the sprite pointer every frame
 [source,ca65]
 ----
     lda sine2,x
-    adc #(spriteMem-0x4000)/64
+    adc #(spriteMem-$4000)/64
 
     sta spritePtrs+2
     rts

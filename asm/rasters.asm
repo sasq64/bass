@@ -61,7 +61,7 @@ rasters:
 
     WaitLine(0)
 
--   NextLine()
+$   NextLine()
     lda raster_lo,y
     sta DATA0
     lda raster_hi,y
@@ -69,7 +69,7 @@ rasters:
     iny
     bne -
 
--   NextLine()
+$   NextLine()
 
     lda raster_lo,y
     sta DATA0

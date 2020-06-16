@@ -8,15 +8,15 @@
 ; Set the 16k VIC area. Can only point
 ; to $0000, $4000, $8000 or $c000
 !macro VicAdr(adr) {
-    !assert (adr & 0x3fff) == 0
-    lda #((~adr)&0xffff)>>14
+    !assert (adr & $3fff) == 0
+    lda #((~adr)&$ffff)>>14
     sta $dd00
 }
 
 ; Set the Bitmap and Screen offsets within VIC
 !macro BitmapAndScreen(bm_offs, scr_offs) {
-    !assert (bm_offs & 0xdfff) == 0
-    !assert (scr_offs & 0xc3ff) == 0
+    !assert (bm_offs & $dfff) == 0
+    !assert (scr_offs & $c3ff) == 0
     .bits0 = (bm_offs>>10)
     .bits1 = (scr_offs>>6)
     lda #.bits0 | .bits1
@@ -43,14 +43,14 @@
         end = $2713
     }
 
-musicLocation = 0x1000
+musicLocation = $1000
 
-screenMem = 0x6000
-bitmapMem = 0x4000
-spriteMem = 0x7000
+screenMem = $6000
+bitmapMem = $4000
+spriteMem = $7000
 spritePtrs = screenMem + 1016
 
-    !section "main", 0x801
+    !section "main", $801
     !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
 start:
 
@@ -80,8 +80,8 @@ $   lda colors,x
     inx
     bne -
 
-    VicAdr(0x4000)
-    BitmapAndScreen(bitmapMem-0x4000, screenMem-0x4000)
+    VicAdr($4000)
+    BitmapAndScreen(bitmapMem-$4000, screenMem-$4000)
 
     jsr init_sprite
 
@@ -115,7 +115,7 @@ init_sprite
     sta $d015
 
     ; Set sprite 2 pointer
-    lda #(spriteMem-0x4000)/64
+    lda #(spriteMem-$4000)/64
     sta spritePtrs+2
 
     ; Copy sprite data
@@ -141,7 +141,7 @@ update_sprite
     stxy xy
 
     lda sine_frame,x
-    adc #(spriteMem-0x4000)/64
+    adc #(spriteMem-$4000)/64
 
     sta spritePtrs+2
     rts
@@ -180,7 +180,7 @@ end
 spriteData:
     !rept 8 {
         !fill circle(zeroes(3*21), 3, 12, 10, i + 3)
-        !byte 0xff
+        !byte $ff
     }
 
     ; Koala Image
@@ -196,12 +196,12 @@ spriteData:
     !define swap(x) { (x>>8) | (x<<8) }
 
     sid = load("../data/test.sid")
-    music_init = swap(word(sid[0xa:0xc]))
-    music_play = swap(word(sid[0xc:0xe]))
+    music_init = swap(word(sid[$a:$c]))
+    music_play = swap(word(sid[$c:$e]))
 
     !assert music_init == musicLocation
 
-    music_data = sid[0x7e:]
+    music_data = sid[$7e:]
 
     ; Data layout
 

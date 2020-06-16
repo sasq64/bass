@@ -47,6 +47,8 @@ void initMeta(Assembler& a)
     using std::any_cast;
     auto& mach = a.getMachine();
 
+    resetTranslate();
+
     a.registerMeta("macro", [&](auto const& text, auto const& blocks) {
         auto def = a.evaluateDefinition(text);
         a.defineMacro(def.name, def.args, blocks[0]);
@@ -127,7 +129,7 @@ void initMeta(Assembler& a)
         if (!a.isFinalPass()) return;
         auto args = a.evaluateList(text);
         auto v = any_cast<Number>(args[0]);
-        if (v == 0) {
+        if (v == 0.0) {
             std::string_view msg = text;
             if (args.size() > 1) {
                 msg = any_cast<std::string_view>(args[1]);
@@ -138,18 +140,41 @@ void initMeta(Assembler& a)
 
     a.registerMeta("fill", [&](auto const& text, auto const& blocks) {
         std::any data = a.evaluateExpression(text);
-        auto* vec = any_cast<std::vector<uint8_t>>(&data);
-        size_t size = vec ? vec->size() : number<size_t>(data);
 
-        for (size_t i = 0; i < size; i++) {
-            uint8_t d = vec ? (*vec)[i] : 0;
-            for (auto const& b : blocks) {
+        if (auto* vec = any_cast<std::vector<uint8_t>>(&data)) {
+            for (size_t i = 0; i < vec->size(); i++) {
+                uint8_t d = (*vec)[i];
                 a.getSymbols()["i"] = (Number)i;
-                a.getSymbols()["v"] = (Number)d;
-                auto res = a.evaluateExpression(b);
-                d = number<uint8_t>(res);
+                for (auto const& b : blocks) {
+                    a.getSymbols()["v"] = (Number)d;
+                    auto res = a.evaluateExpression(b);
+                    d = number<uint8_t>(res);
+                }
+                mach.writeByte(d);
             }
-            mach.writeByte(d);
+        } else if (auto* sv = any_cast<std::string_view>(&data)) {
+            for (size_t i = 0; i < sv->size(); i++) {
+                char d = (*sv)[i];
+                a.getSymbols()["i"] = (Number)i;
+                for (auto const& b : blocks) {
+                    a.getSymbols()["v"] = (Number)d;
+                    auto res = a.evaluateExpression(b);
+                    d = number<uint8_t>(res);
+                }
+                mach.writeByte(char_translate[d]);
+            }
+        } else {
+            size_t size = number<size_t>(data);
+            for (size_t i = 0; i < size; i++) {
+                a.getSymbols()["i"] = (Number)i;
+                uint8_t d = 0;
+                for (auto const& b : blocks) {
+                    a.getSymbols()["v"] = (Number)d;
+                    auto res = a.evaluateExpression(b);
+                    d = number<uint8_t>(res);
+                }
+                mach.writeByte(d);
+            }
         }
     });
 
