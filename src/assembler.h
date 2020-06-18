@@ -28,6 +28,7 @@ class Assembler
 {
 public:
     Assembler();
+    ~Assembler();
 
     std::vector<Error> getErrors() const;
 

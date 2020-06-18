@@ -345,6 +345,11 @@ Assembler::Assembler() : parser(grammar6502), scripting()
     registerLuaFunctions(*this, scripting);
 }
 
+Assembler::~Assembler()
+{
+    mach = nullptr;
+}
+
 template <typename A, typename B>
 A operation(std::string_view const& ope, A const& a, B const& b)
 {

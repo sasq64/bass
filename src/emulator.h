@@ -93,7 +93,9 @@ struct Machine
         for (int i = 0; i < 256; i++) {
             rbank[i] = wbank[i] = &ram[(i * 256) % POLICY::MemSize];
             rcallbacks[i] = &read_bank;
+            rcbdata[i] = this;
             wcallbacks[i] = &write_bank;
+            wcbdata[i] = this;
         }
         for (const auto& i : getInstructions<false>()) {
             for (const auto& o : i.opcodes)
@@ -155,20 +157,22 @@ struct Machine
         }
     }
 
-    void mapReadCallback(uint8_t bank, int len,
-                         uint8_t (*cb)(const Machine&, uint16_t a))
+    void mapReadCallback(uint8_t bank, int len, void* data,
+                         uint8_t (*cb)(uint16_t a, void*))
     {
         while (len > 0) {
-            rcallbacks[bank++] = cb;
-            len -= 256;
+            rcallbacks[bank] = cb;
+            rcbdata[bank++] = data;
+            len--;
         }
     }
-    void mapWriteCallback(uint8_t bank, int len,
-                          void (*cb)(Machine&, uint16_t a, uint8_t v))
+    void mapWriteCallback(uint8_t bank, int len, void* data,
+                          void (*cb)(uint16_t a, uint8_t v, void*))
     {
         while (len > 0) {
-            wcallbacks[bank++] = cb;
-            len -= 256;
+            wcallbacks[bank] = cb;
+            wcbdata[bank++] = data;
+            len--;
         }
     }
 
@@ -260,20 +264,22 @@ private:
     std::array<const Word*, 256> rbank;
     std::array<Word*, 256> wbank;
 
-    std::array<Word (*)(const Machine&, uint16_t), 256> rcallbacks;
-    std::array<void (*)(Machine&, uint16_t, Word), 256> wcallbacks;
+    std::array<Word (*)(uint16_t, void*), 256> rcallbacks;
+    std::array<void*, 256> rcbdata;
+    std::array<void (*)(uint16_t, Word, void*), 256> wcallbacks;
+    std::array<void*, 256> wcbdata;
 
     std::array<Opcode, 256> jumpTable_normal;
     std::array<Opcode, 256> jumpTable_bcd;
 
-    static void write_bank(Machine& m, uint16_t adr, Word v)
+    static void write_bank(uint16_t adr, Word v, void* m)
     {
-        m.wbank[adr >> 8][adr & 0xff] = v & 0xff;
+        ((Machine*)m)->wbank[adr >> 8][adr & 0xff] = v & 0xff;
     }
 
-    static Word read_bank(const Machine& m, uint16_t adr)
+    static Word read_bank(uint16_t adr, void* m)
     {
-        return m.rbank[adr >> 8][adr & 0xff];
+        return ((Machine*)m)->rbank[adr >> 8][adr & 0xff];
     }
 
     template <int REG>
@@ -402,7 +408,7 @@ private:
         else if constexpr (ACCESS_MODE == BANKED)
             return rbank[hi(adr)][lo(adr)];
         else
-            return rcallbacks[hi(adr)](*this, adr);
+            return rcallbacks[hi(adr)](adr, rcbdata[hi(adr)]);
     }
 
     template <int ACCESS_MODE = POLICY::Write_AccessMode>
@@ -413,7 +419,7 @@ private:
         else if constexpr (ACCESS_MODE == BANKED)
             wbank[hi(adr)][lo(adr)] = v;
         else
-            wcallbacks[hi(adr)](*this, adr, v);
+            wcallbacks[hi(adr)](adr, v, wcbdata[hi(adr)]);
     }
 
     unsigned ReadPC() { return Read<POLICY::PC_AccessMode>(pc++); }

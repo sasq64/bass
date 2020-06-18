@@ -15,7 +15,7 @@ endif()
 # Warning level setup #######################################################
 
 # GCC/Clang common warnings
-set(GCC_CLANG_WARNINGS -Werror -Wall -Wextra -Wnon-virtual-dtor -pedantic)
+set(GCC_CLANG_WARNINGS -Wno-unused-parameter -Werror -Wall -Wextra -Wnon-virtual-dtor -pedantic)
 
 set(MSVC_WARNINGS /W3)
 

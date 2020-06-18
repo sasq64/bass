@@ -12,13 +12,13 @@
 class machine_error : public std::exception
 {
 public:
-    explicit machine_error(std::string m = "Target error") : msg(std::move(m)) {}
+    explicit machine_error(std::string m = "Target error") : msg(std::move(m))
+    {}
     const char* what() const noexcept override { return msg.c_str(); }
 
 private:
     std::string msg;
 };
-
 
 namespace sixfive {
 struct DefaultPolicy;
@@ -43,7 +43,11 @@ struct Section
     std::vector<uint8_t> data;
 };
 
-enum class OutFmt { Prg, Raw };
+enum class OutFmt
+{
+    Prg,
+    Raw
+};
 
 class Machine
 {
@@ -73,14 +77,29 @@ public:
     void setOutput(FILE* f);
 
     uint8_t readRam(uint16_t offset) const;
+    void writeRam(uint16_t offset, uint8_t val);
 
     uint32_t run(uint16_t pc);
     std::vector<uint8_t> getRam();
     std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>
     getRegs() const;
 
-private:
+    void setBreakFunction(uint8_t what, std::function<void(uint8_t)> const& fn);
 
+    static void bankWriteFunction(uint16_t adr, uint8_t val, void* data);
+    static uint8_t bankReadFunction(uint16_t adr, void* data);
+
+    void setBankWrite(int bank, int len,
+                      std::function<void(uint16_t, uint8_t)> const& fn);
+    void setBankRead(int bank, int len,
+                     std::function<uint8_t(uint16_t)> const& fn);
+
+private:
+    std::unordered_map<uint8_t, std::function<void(uint8_t)>> break_functions;
+    std::unordered_map<uint8_t, std::function<uint8_t(uint16_t)>>
+        bank_read_functions;
+    std::unordered_map<uint8_t, std::function<void(uint8_t, uint16_t)>>
+        bank_write_functions;
 
     static void breakFunction(int what, void* data);
 

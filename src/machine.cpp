@@ -13,17 +13,30 @@
 Machine::Machine()
 {
     machine = std::make_unique<sixfive::Machine<>>();
-    machine->setBreakFunction(Machine::breakFunction, this);
     addSection("main", 0);
+    machine->setBreakFunction(breakFunction, this);
 }
+
 void Machine::breakFunction(int what, void* data)
 {
     Machine* thiz = static_cast<Machine*>(data);
-    auto [a,x,y,sr,sp,pc] = thiz->getRegs();
-    fmt::print("A:{:x} X:{:x} Y:{:x} {:x}\n", a, x, y, what, thiz->getPC());
+
+    auto it = thiz->break_functions.find(what);
+    if (it != thiz->break_functions.end()) {
+        it->second(what);
+    } else {
+        auto [a, x, y, sr, sp, pc] = thiz->getRegs();
+        fmt::print("A:{:x} X:{:x} Y:{:x} {:x}\n", a, x, y, what, thiz->getPC());
+    }
 }
 
 Machine::~Machine() = default;
+
+void Machine::setBreakFunction(uint8_t what,
+                               std::function<void(uint8_t)> const& fn)
+{
+    break_functions[what] = fn;
+}
 
 Section& Machine::addSection(std::string const& name, uint32_t start)
 {
@@ -167,7 +180,6 @@ void Machine::write(std::string const& name, OutFmt fmt)
         return;
     }
 
-
     if (end > start) {
         fmt::print("Writing {:04x}->{:04x} > {}\n", start, end, name);
         utils::File of{name, utils::File::Mode::Write};
@@ -275,6 +287,36 @@ int Machine::assemble(Instruction const& instr)
 uint8_t Machine::readRam(uint16_t offset) const
 {
     return machine->readMem(offset);
+}
+void Machine::writeRam(uint16_t offset, uint8_t val)
+{
+    machine->writeRam(offset, val);
+}
+
+void Machine::bankWriteFunction(uint16_t adr, uint8_t val, void* data)
+{
+    Machine* thiz = static_cast<Machine*>(data);
+    thiz->bank_write_functions[adr >> 8](adr, val);
+}
+
+uint8_t Machine::bankReadFunction(uint16_t adr, void* data)
+{
+    Machine* thiz = static_cast<Machine*>(data);
+    return thiz->bank_read_functions[adr >> 8](adr);
+}
+
+void Machine::setBankWrite(int bank, int len,
+                           std::function<void(uint16_t, uint8_t)> const& fn)
+{
+    bank_write_functions[bank] = fn;
+    machine->mapWriteCallback(bank, len, this, bankWriteFunction);
+}
+
+void Machine::setBankRead(int bank, int len,
+                          std::function<uint8_t(uint16_t)> const& fn)
+{
+    bank_read_functions[bank] = fn;
+    machine->mapReadCallback(bank, len, this, bankReadFunction);
 }
 
 std::vector<uint8_t> Machine::getRam()
