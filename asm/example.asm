@@ -109,6 +109,14 @@ $   lda #100
     jmp -
 
 
+test_func:
+    brk #2
+    rts
+
+!test my_test {
+    jsr test_func
+}
+
 init_sprite
     ; Enable sprite 2
     lda #$04

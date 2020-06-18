@@ -1,16 +1,16 @@
 
-    !section "text", section.main.end
+    !section "text", $880 ; section.main.end
 
     data = load("../data/test.sid")
     sid = sid_parse(data)
 
 !macro print(txt, xpos, ypos) {
     .LEN = .text_end - .text
-    ldx #.LEN
-.l  dex
-    lda .text,x
+    ldx #.LEN-1
+.l  lda .text,x
     sta $400+xpos+ypos*40,x
-    bne .l
+    dex
+    bpl .l
     !section "text"
 .text:
     !fill txt
@@ -30,10 +30,9 @@ start
     sta $d018
     sei
 
-    print(sid.title, 1, 1)
-    ;print("Shut up and dance!", 1, 2)
-
-    ;jsr print_text
+    print("Playing SID", 1, 1)
+    print(sid.title, 1, 2)
+    print(sid.composer, 1, 3)
 
     lda #0
     jsr sid.init

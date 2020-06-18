@@ -123,13 +123,13 @@ struct Machine
 
     void writeRam(uint16_t org, const uint8_t* data, size_t size)
     {
-        for (int i = 0; i < size; i++)
+        for (size_t i = 0; i < size; i++)
             ram[org + i] = data[i];
     }
 
     void readRam(uint16_t org, uint8_t* data, size_t size) const
     {
-        for (int i = 0; i < size; i++)
+        for (size_t i = 0; i < size; i++)
             data[i] = ram[org + i];
     }
 
@@ -203,6 +203,13 @@ struct Machine
     auto regs() const { return std::make_tuple(a, x, y, sr, sp, pc); }
     auto regs() { return std::tie(a, x, y, sr, sp, pc); }
 
+    typedef void(*BreakFn)(int, void*);
+
+    void setBreakFunction(BreakFn const& fn, void* data) {
+        breakData = data;
+        breakFunction = fn;
+    }
+
 private:
     enum REGNAME
     {
@@ -245,6 +252,9 @@ private:
 
     // 6502 RAM
     std::array<Word, POLICY::MemSize> ram;
+
+    BreakFn breakFunction = nullptr;
+    void* breakData = nullptr;
 
     // Banks normally point to corresponding ram
     std::array<const Word*, 256> rbank;
@@ -988,6 +998,18 @@ private:
                     m.stack[m.sp-2] = m.get_SR();
                     m.sp -= 3;
                     m.pc = m.Read16(m.to_adr(0xfe, 0xff));
+                } },
+                { 0x00, 7, IMM, [](Machine& m) {
+                    auto what = m.ReadPC();
+                    if(m.breakFunction != nullptr) {
+                        m.breakFunction(what, m.breakData);
+                    } else {
+                        m.stack[m.sp] = m.pc >> 8;
+                        m.stack[m.sp-1] = m.pc & 0xff;
+                        m.stack[m.sp-2] = m.get_SR();
+                        m.sp -= 3;
+                        m.pc = m.Read16(m.to_adr(0xfe, 0xff));
+                    }
                 } }
             } },
 
@@ -1096,5 +1118,5 @@ public:
             makeInstructionTable<USE_BCD>();
         return instructionTable;
     }
-};
+}; // namespace sixfive
 } // namespace sixfive

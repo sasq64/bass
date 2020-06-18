@@ -1,3 +1,5 @@
+#pragma once
+
 #include "defines.h"
 #include "script.h"
 #include "wrap.h"
@@ -85,6 +87,15 @@ public:
     void debugflags(uint32_t flags);
 
 private:
+    template <typename T>
+    T& sym(std::string const& s) {
+        return syms.at<T>(s);
+    }
+
+    std::any& sym(std::string& s) {
+        return syms[s];
+    }
+
     bool passDebug = false;
     struct Call
     {
@@ -122,6 +133,7 @@ private:
     void setupRules();
 
     void setUndefined(std::string const& sym, SVWrap const& sv);
+    void setUndefined(std::string const& sym);
 
     auto save() { return std::tuple(macros, syms, undefined, lastLabel); }
 

@@ -90,7 +90,7 @@ ParserWrapper::ParserWrapper(std::string const& s)
 #endif
     p->log = [&](size_t line, size_t col, const std::string& msg) {
         errors.push_back({line, col, msg});
-        fmt::printf("%s (%s) in %d:%d\n", current_error, msg, line, col);
+        //fmt::printf("%s (%s) in %d:%d\n", current_error, msg, line, col);
     };
 }
 ParserWrapper::~ParserWrapper() = default;

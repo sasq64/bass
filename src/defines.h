@@ -78,17 +78,24 @@ using Number = double;
 inline Num div(Num a, Num b)
 {
     return a.i() / b.i();
-};
+}
+
 inline Num pow(Num a, Num b)
 {
     return pow(a.d, b.d);
-};
+}
 
 template <typename T>
 inline T number(std::any const& v)
 {
     return static_cast<T>(std::any_cast<Number>(v));
 }
+
+inline Number number(std::any const& v)
+{
+    return std::any_cast<Number>(v);
+}
+
 
 template <typename T>
 inline std::any any_num(T const& v)

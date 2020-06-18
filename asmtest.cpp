@@ -129,8 +129,6 @@ loop:
 TEST_CASE("assembler.syntax", "[assembler]")
 {
     Assembler ass;
-    auto& syms = ass.getSymbols();
-
     ass.parse(R"(
 ; this is a COMMENT
     rts
@@ -268,7 +266,6 @@ TEST_CASE("assembler.if_macro", "[assembler]")
 {
     using std::any_cast;
     Assembler ass;
-    auto& syms = ass.getSymbols();
     ass.parse(R"(
     !macro SetVAdr(adr) {
         lda #(adr & $ff)
@@ -385,7 +382,6 @@ TEST_CASE("assembler.functions", "[assembler]")
 TEST_CASE("assembler.errors", "[assembler]")
 {
     Assembler ass;
-    auto& syms = ass.getSymbols();
 
     std::vector<std::pair<std::string, int>> sources = {
         {R"(!org $800
@@ -454,7 +450,6 @@ a       !byte 3
 TEST_CASE("assembler.special_labels", "[assembler]")
 {
     Assembler ass;
-    auto& syms = ass.getSymbols();
     ass.parse(R"(
     !section "a", $1000
     nop

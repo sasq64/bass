@@ -80,6 +80,10 @@ public:
     getRegs() const;
 
 private:
+
+
+    static void breakFunction(int what, void* data);
+
     std::unique_ptr<sixfive::Machine<sixfive::DefaultPolicy>> machine;
     std::deque<Section> sections;
     Section* currentSection = nullptr;

@@ -1,7 +1,7 @@
 
     !include "vera.inc"
 
-!macro Print(xpos,ypos,text)
+!macro Print(xpos,ypos,text) {
     SetVAdr(256*ypos + xpos*2 | INC_1);
     ldy #$01
     ldx #0
@@ -13,7 +13,7 @@
 .start
     lda text,x
     bne .loop
-!endm
+}
 
     !section "main", $801
 
@@ -180,7 +180,7 @@ copy:
 
 textpos: !byte 0
 
-text !text 1,2,3,4,5,64,65,66,67,128,129,130,0
+text !byte 1,2,3,4,5,64,65,66,67,128,129,130,0
 
 ypos: !byte 0,0,0
 
@@ -233,10 +233,10 @@ draw_blue:
 raster_lo=$1000
 raster_hi=$1100
 
-!test draw_blue
+!test draw_blue {
     ldx #0
     jsr draw_blue
-!endt
+}
 
 red:
     !byte 0,2,4,8,10,12,13,14,15,15,14,13,12,10,8,4,2,0

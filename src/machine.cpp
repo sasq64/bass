@@ -13,7 +13,14 @@
 Machine::Machine()
 {
     machine = std::make_unique<sixfive::Machine<>>();
+    machine->setBreakFunction(Machine::breakFunction, this);
     addSection("main", 0);
+}
+void Machine::breakFunction(int what, void* data)
+{
+    Machine* thiz = static_cast<Machine*>(data);
+    auto [a,x,y,sr,sp,pc] = thiz->getRegs();
+    fmt::print("A:{:x} X:{:x} Y:{:x} {:x}\n", a, x, y, what, thiz->getPC());
 }
 
 Machine::~Machine() = default;
