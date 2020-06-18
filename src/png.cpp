@@ -1,5 +1,7 @@
 #include "defines.h"
 
+#include <coreutils/bitmap.h>
+
 #include <lodepng.h>
 
 #include <coreutils/file.h>
@@ -45,6 +47,36 @@ Symbols loadPng(std::string_view const& name)
         res.at<Number>("height") = h;
         res["pixels"] = std::vector<uint8_t>(out, out + w * h);
         res["colors"] = pal12;
+
+
+        image::bitmap8 bm{w, h, out};
+
+        std::unordered_map<uint32_t, int> tiles_crc{};
+        std::vector<uint8_t> indexes;
+        std::vector<uint8_t> tiles;
+
+        int count = 0;
+        for(auto const& tile : bm.split(8,8)) {
+            auto crc = tile.crc();
+            auto it = tiles_crc.find(crc);
+            int index = -1;
+            if(it == tiles_crc.end()) {
+                index = count;
+                tiles_crc[crc] = count++;
+                tiles.insert(tiles.end(), tile.data(), tile.data() + 8*8);
+            } else {
+                index = it->second;
+            }
+            indexes.push_back(index & 0xff);
+            indexes.push_back((index >> 8) & 0x3);
+        }
+
+        res["tiles"] = tiles;
+        res["indexes"] = indexes;
+
+        LOGI("%d different tiles (out of %d)", tiles_crc.size(), indexes.size() / 2);
+
+
         free(out);
     }
     lodepng_state_cleanup(&state);
