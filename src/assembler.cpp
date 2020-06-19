@@ -124,12 +124,6 @@ Symbols Assembler::evaluateEnum(std::string_view expr)
         throw parse_error("Not an enum");
     }
 
-    /* std::any_cast<Symbols>(parseResult) */
-    /*     .forAll([](std::string const& name, std::any const& val) { */
-    /*         if (!utils::startsWith(name, "__")) */
-    /*             fmt::print("{} == {}\n", name, to_string(val)); */
-    /*     }); */
-
     return std::any_cast<Symbols>(parseResult);
 }
 
@@ -191,7 +185,7 @@ Symbols Assembler::runTest(std::string_view name, std::string_view contents)
     auto saved = save();
     auto machSaved = mach->saveState();
     auto pc = mach->getPC();
-    LOGI("Testing %s:%s at pc %x", name, contents, pc);
+    LOGD("Testing %s:%s at pc %x", name, contents, pc);
     auto section = mach->getCurrentSection();
     while (true) {
         undefined.clear();
@@ -200,7 +194,7 @@ Symbols Assembler::runTest(std::string_view name, std::string_view contents)
         if (!parser.parse(contents, fileName.c_str())) {
             throw parse_error("Syntax error in test block");
         }
-        LOGI("Parsing done");
+        LOGD("Parsing done");
         auto result = checkUndefined();
         if (result == DONE) break;
         if (result == PASS) continue;
@@ -212,7 +206,7 @@ Symbols Assembler::runTest(std::string_view name, std::string_view contents)
     mach->assemble({"rts", AdressingMode::NONE, 0});
 
     auto cycles = mach->run(pc);
-    fmt::print("Test {} : {} cycles\n", name, cycles);
+    fmt::print("*** Test {} : {} cycles\n", name, cycles);
 
     res["ram"] = mach->getRam();
     auto regs = mach->getRegs();

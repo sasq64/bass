@@ -54,6 +54,7 @@ Symbols loadPng(std::string_view const& name)
         std::unordered_map<uint32_t, int> tiles_crc{};
         std::vector<uint8_t> indexes;
         std::vector<uint8_t> tiles;
+        tiles.resize(8*8, 0);
 
         int count = 0;
         for(auto const& tile : bm.split(8,8)) {
@@ -67,6 +68,7 @@ Symbols loadPng(std::string_view const& name)
             } else {
                 index = it->second;
             }
+            index++;
             indexes.push_back(index & 0xff);
             indexes.push_back((index >> 8) & 0x3);
         }
@@ -74,7 +76,7 @@ Symbols loadPng(std::string_view const& name)
         res["tiles"] = tiles;
         res["indexes"] = indexes;
 
-        LOGI("%d different tiles (out of %d)", tiles_crc.size(), indexes.size() / 2);
+        LOGD("%d different tiles (out of %d)", tiles_crc.size(), indexes.size() / 2);
 
 
         free(out);

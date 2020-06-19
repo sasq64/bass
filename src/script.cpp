@@ -75,7 +75,6 @@ bool Scripting::hasFunction(std::string_view const& name)
 
 std::any Scripting::to_any(sol::object const& obj)
 {
-    printf("to_any\n");
     if (obj.is<Number>()) {
         return std::any(obj.as<Number>());
     }
@@ -95,7 +94,6 @@ std::any Scripting::to_any(sol::object const& obj)
         t.for_each([&](sol::object const& key, sol::object const& val) {
             if (first) {
                 isVec = (key.is<size_t>() && val.is<Number>());
-                printf("isvec %d %d\n", (int)key.get_type(), (int)val.get_type());
                 first = false;
             }
             if (isVec) {
@@ -107,6 +105,7 @@ std::any Scripting::to_any(sol::object const& obj)
                 syms[s] = to_any(val);
             }
         });
+        // TODO: If table was empty it will become symbols
         return isVec ? std::any(vec) : std::any(syms);
     }
     return std::any();

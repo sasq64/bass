@@ -99,7 +99,7 @@ void initMeta(Assembler& a)
             if (auto* s = any_cast<std::string_view>(&v)) {
                 for (auto c : *s) {
                     c = char_translate.at(c);
-                    mach.writeByte(c);
+                    mach.writeChar(c);
                 }
             } else {
                 throw parse_error("Need text");
@@ -112,7 +112,7 @@ void initMeta(Assembler& a)
         for (auto const& v : list) {
             if (auto* s = any_cast<std::string_view>(&v)) {
                 for (auto c : *s) {
-                    mach.writeByte(c);
+                    mach.writeChar(c);
                 }
             } else {
                 auto b = number<uint8_t>(v);

@@ -42,7 +42,7 @@ Section& Machine::addSection(std::string const& name, uint32_t start)
 {
     if (!name.empty()) {
         if (fp != nullptr) {
-            fprintf(fp, "SECTION %s\n", name.c_str());
+            //printf(fp, "SECTION %s\n", name.c_str());
         }
         auto it = std::find_if(sections.begin(), sections.end(),
                                [&](auto const& s) { return s.name == name; });
@@ -209,6 +209,27 @@ void Machine::setOutput(FILE* f)
 
 uint32_t Machine::writeByte(uint8_t w)
 {
+    /* if (fp != nullptr) { */
+    /*     if(!inData) { */
+    /*         fprintf(fp, "%04x : ", currentSection->pc); */
+    /*     } */
+    /*     fprintf(fp, "%02x ", w); */
+    /*     inData = true; */
+    /* } */
+    currentSection->data.push_back(w);
+    currentSection->pc++;
+    return currentSection->pc;
+}
+
+uint32_t Machine::writeChar(uint8_t w)
+{
+    if (fp != nullptr) {
+        if(!inData) {
+            fprintf(fp, "%04x : \"", currentSection->pc);
+        }
+        inData = true;
+        fputc(w, fp);
+    }
     currentSection->data.push_back(w);
     currentSection->pc++;
     return currentSection->pc;
@@ -268,6 +289,10 @@ int Machine::assemble(Instruction const& instr)
     }
 
     if (fp != nullptr) {
+        if(inData) {
+            fputs("\"\n", fp);
+        }
+        inData = false;
         fprintf(fp, "%04x : %s ", currentSection->pc, it0->name);
         fprintf(fp, modeTemplate.at(arg.mode), v);
         fputs("\n", fp);

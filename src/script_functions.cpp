@@ -20,12 +20,10 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
     };
 
     lua["map_bank_write"] = [&](int what, int len,
-                                std::function<void(int, int)> const& fn) {
+                                std::function<void(uint16_t, uint8_t)> const& fn) {
         mach.setBankWrite(what, len, fn);
-        fn(what, 0);
     };
-    lua["map_bank_read"] = [&](int what, int len, std::function<int(int)> const& fn) {
-        fn(what);
+    lua["map_bank_read"] = [&](int what, int len, std::function<uint8_t(uint16_t)> const& fn) {
         mach.setBankRead(what, len, fn);
     };
 }

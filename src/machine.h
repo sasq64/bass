@@ -64,6 +64,7 @@ public:
     void clear();
 
     uint32_t writeByte(uint8_t b);
+    uint32_t writeChar(uint8_t b);
     int assemble(Instruction const& instr);
     Section& addSection(std::string const& name, uint32_t start);
     void setSection(std::string const& name);
@@ -95,10 +96,11 @@ public:
                      std::function<uint8_t(uint16_t)> const& fn);
 
 private:
+    bool inData = false;
     std::unordered_map<uint8_t, std::function<void(uint8_t)>> break_functions;
     std::unordered_map<uint8_t, std::function<uint8_t(uint16_t)>>
         bank_read_functions;
-    std::unordered_map<uint8_t, std::function<void(uint8_t, uint16_t)>>
+    std::unordered_map<uint8_t, std::function<void(uint16_t, uint8_t)>>
         bank_write_functions;
 
     static void breakFunction(int what, void* data);

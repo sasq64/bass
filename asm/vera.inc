@@ -40,6 +40,37 @@ SCALE_2X = 64
 SCALE_3X = 48
 SCALE_4X = 32
 
+!macro SetL1MapBase(adr) {
+    !assert (adr & $1ff) == 0
+    lda #(adr>>9)
+    sta L1_MAPBASE
+}
+!macro SetL1Tiles(adr, width, height) {
+    !assert width == 8 || width == 16
+    !assert height == 8 || height == 16
+    !assert (adr & $7ff) == 0
+    lda #(adr >> 9) | (width>>4) | ((height>>3)&2)
+    sta L1_TILEBASE
+}
+
+MAP_WIDTH_32 = $00
+MAP_WIDTH_64 = $10
+MAP_WIDTH_128 = $20
+MAP_WIDTH_256 = $30
+
+MAP_HEIGHT_32 = $00
+MAP_HEIGHT_64 = $40
+MAP_HEIGHT_128 = $80
+MAP_HEIGHT_256 = $c0
+
+DEPTH_1BPP = 0
+DEPTH_2BPP = 1
+DEPTH_4BPP = 2
+DEPTH_8BPP = 3
+
+BITMAP_MODE = 4
+
+
 
 !macro SetVAdr(adr) {
     .LO = adr & $ff
