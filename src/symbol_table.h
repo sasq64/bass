@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+// Symbols is an unordered_map of string to any, with some extra
+// functionality such as handling of recursive Symbols
 class Symbols
 {
 public:
@@ -165,4 +167,38 @@ public:
 
 private:
     Map data;
+};
+
+
+// SymbolTable for use in DSL. Remembers undefined references
+// and value changes. Handles dot notation.
+struct SymbolTable
+{
+    Symbols syms;
+
+    template <typename T>
+    void set(std::string_view name, T const& val)
+    {
+        auto was = syms.set(name, val);
+    }
+
+    void set(std::string_view name, std::any const& val);
+
+    template <typename T>
+    void set(std::vector<std::string_view> names, T const& v);
+    void set(std::vector<std::string_view> names, std::any const& v)
+    {
+        Symbols* s = &syms;
+        for (size_t i = 0; i < names.size() - 1; i++) {
+            auto const& name = names[i];
+            s = &s->at<Symbols>(name);
+        }
+        auto was = s->set(std::string(names.back()), v);
+    }
+
+
+    // Get a list of symbols that was undefined at first use
+    std::vector<std::string_view> was_undefined();
+
+
 };
