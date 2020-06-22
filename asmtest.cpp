@@ -59,13 +59,13 @@ struct Tester
               typename S = std::enable_if_t<std::is_arithmetic_v<T>>>
     bool haveSymbol(std::string const& name, T v)
     {
-        auto x = number<T>(a->getSymbols()[name]);
+        auto x = a->getSymbols().get<Number>(name);
         return x == v;
     }
 
     bool haveSymbol(std::string const& name, std::string const& v)
     {
-        auto x = std::any_cast<std::string_view>(a->getSymbols()[name]);
+        auto x = a->getSymbols().get<std::string_view>(name);
         return x == v;
     }
 };
@@ -82,7 +82,15 @@ TEST_CASE("assembler.first", "[assembler]")
     REQUIRE(t.noErrors());
     REQUIRE(t.mainSize() == 16);
 
+
+    logging::setLevel(logging::Level::Debug);
     t = "!enum { A = 1\nB\n C = \"xx\" }";
+
+
+    for(auto err : t.a->getErrors()) {
+        LOGI("%d : %s", err.line, err.message);
+    }
+
     REQUIRE(t.noErrors());
     REQUIRE(t.mainSize() == 0);
     REQUIRE(t.haveSymbol("B", 2));
@@ -304,7 +312,7 @@ sine_table:
 )");
 
     auto& mach = ass.getMachine();
-    int sine_table = (int)std::any_cast<Number>(syms["sine_table"]);
+    int sine_table = (int)syms.get<Number>("sine_table");
     for (int i = 0; i < 256; i++) {
         unsigned v = (int)(sin(i * M_PI / 180) * 127);
         REQUIRE(mach.getSection("main").data[sine_table + i - 0x800] ==
@@ -440,10 +448,13 @@ a       !byte 3
         LOGI("Code:%s", s.first);
         auto const& errs = ass.getErrors();
         REQUIRE(!errs.empty());
+        bool ok = false;
         for (auto& e : errs) {
             fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
+            if(e.line == (size_t)s.second)
+                ok = true;
         }
-        REQUIRE(errs.back().line == s.second);
+        REQUIRE(ok);
     }
 }
 

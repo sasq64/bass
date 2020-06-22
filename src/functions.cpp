@@ -13,7 +13,7 @@ void initFunctions(Assembler& a)
 {
     auto& syms = a.getSymbols();
 
-    syms.at<Symbols>("Math").at<Number>("Pi") = M_PI;
+    syms.set("Math.Pi", M_PI);
 
     // Allowed data types:
     // * Any arithmetic type, but they will always be converted to/from double

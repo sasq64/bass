@@ -156,10 +156,13 @@ void initMeta(Assembler& a)
     a.registerMeta("fill", [&](auto const& text, auto const& blocks) {
         std::any data = a.evaluateExpression(text);
 
+        auto& syms = a.getSymbols();
+
         if (auto* vec = any_cast<std::vector<uint8_t>>(&data)) {
             for (size_t i = 0; i < vec->size(); i++) {
                 uint8_t d = (*vec)[i];
-                a.getSymbols().at<Number>("i") = i;
+                syms.erase("i");
+                syms.set("i", i);
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
                     auto res = a.evaluateExpression(b);
@@ -170,7 +173,8 @@ void initMeta(Assembler& a)
         } else if (auto* sv = any_cast<std::string_view>(&data)) {
             for (size_t i = 0; i < sv->size(); i++) {
                 char d = (*sv)[i];
-                a.getSymbols().at<Number>("i") = i;
+                syms.erase("i");
+                syms.set("i", i);
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
                     auto res = a.evaluateExpression(b);
@@ -181,7 +185,8 @@ void initMeta(Assembler& a)
         } else {
             auto size = number<size_t>(data);
             for (size_t i = 0; i < size; i++) {
-                a.getSymbols().at<Number>("i") = i;
+                syms.erase("i");
+                syms.set("i", i);
                 uint8_t d = 0;
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
@@ -215,7 +220,7 @@ void initMeta(Assembler& a)
                 result.push_back(d);
             }
         }
-        a.getSymbols()[name] = result;
+        a.getSymbols().set(name, result);
     });
 
     // TODO: Redundant, use fill
@@ -274,6 +279,9 @@ void initMeta(Assembler& a)
     });
 
     a.registerMeta("section", [&](auto const& text, auto const&) {
+        a.getSymbols().set("NO_STORE", static_cast<Number>(0x100000000));
+        a.getSymbols().set("TO_PRG", static_cast<Number>(0x200000000));
+        a.getSymbols().set("RO", static_cast<Number>(0x400000000));
         auto args = a.evaluateList(text);
         if (args.empty()) {
             throw parse_error("Too few arguments");
@@ -292,9 +300,6 @@ void initMeta(Assembler& a)
         uint16_t pc = start;
         int32_t flags = 0;
         if (args.size() > 2) {
-            a.getSymbols()["NO_STORE"] = any_num(0x100000000);
-            a.getSymbols()["TO_PRG"] = any_num(0x200000000);
-            a.getSymbols()["RO"] = any_num(0x400000000);
             auto res = number<uint64_t>(args[2]);
             if (res >= 0x100000000) {
                 flags = res >> 32;
@@ -337,9 +342,11 @@ void initMeta(Assembler& a)
         size_t count = vec ? vec->size() : number<size_t>(data);
 
         for (size_t i = 0; i < count; i++) {
-            a.getSymbols()["i"] = any_num(i);
+            a.getSymbols().erase("i");
+            a.getSymbols().set("i", any_num(i));
             if (vec) {
-                a.getSymbols()["v"] = any_num((*vec)[i]);
+                a.getSymbols().erase("v");
+                a.getSymbols().set("v", any_num((*vec)[i]));
             }
             a.evaluateBlock(blocks[0]);
         }
@@ -363,10 +370,10 @@ void initMeta(Assembler& a)
         auto s = a.evaluateEnum(blocks[0]);
         if (text.empty()) {
             s.forAll([&](auto const& name, auto const& v) {
-                a.getSymbols()[name] = v;
+                a.getSymbols().set(name, v);
             });
         } else {
-            a.getSymbols()[std::string(text)] = s;
+            a.getSymbols().set<Symbols>(std::string(text), s);
         }
     });
 }

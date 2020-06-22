@@ -31,7 +31,7 @@ public:
             auto dot = p.first.find('.');
             if (dot != std::string::npos) {
                 auto prefix = p.first.substr(0, dot);
-                LOGI("Checking %s vs %s", prefix, name);
+                LOGD("Checking %s vs %s", prefix, name);
                 if (prefix == name) {
                     // rest = one.x
                     auto rest = p.first.substr(dot + 1);
@@ -212,55 +212,78 @@ private:
 // SymbolTable for use in DSL. Remembers undefined references
 // and value changes. Handles dot notation.
 // Setting specific type checks if value changed
-// Setting std::any assumes change
 //
 struct SymbolTable
 {
     std::unordered_map<std::string, std::any> syms;
-
-    std::unordered_set<std::string> undefined;
+    std::unordered_map<std::string, int> undefined;
+    std::unordered_set<std::string> accessed;
 
     bool is_defined(std::string_view name) const
     {
         return syms.find(std::string(name)) != syms.end();
     }
 
+    void set_sym(std::string_view name, Symbols const& symbols)
+    {
+        auto s = std::string(name);
+        for (auto const& p : symbols.getData()) {
+            LOGD("Type %s", p.second.type().name());
+            if (p.second.type() == typeid(Symbols{})) {
+                LOGD("Recurse");
+                set_sym(s + "." + p.first, std::any_cast<Symbols>(p.second));
+            } else {
+                auto key = s + "." + p.first;
+                LOGI("Set %s", key);
+                set(key, p.second);
+            }
+        }
+    }
+
     template <typename T>
     void set(std::string_view name, T const& val)
     {
         auto s = std::string(name);
-        LOGI("setting %s", s);
         if constexpr (std::is_same_v<T, std::any>) {
-            auto it = syms.find(s);
-            if (it == syms.end()) {
-                throw sym_error("Can't redifine std::any");
+            if (val.type() == typeid(Symbols{})) {
+                set_sym(s, std::any_cast<Symbols>(val));
+                return;
             }
-        } else if constexpr (std::is_same_v<T, Symbols>) {
-            auto const& symbols = static_cast<Symbols>(val);
-            for (auto const& p : symbols.getData()) {
-                LOGI("Type %s", p.second.type().name());
-                if (p.second.type() == typeid(val)) {
-                    LOGI("Recurse");
-                    set(s + "." + p.first, std::any_cast<Symbols>(p.second));
-                } else {
-                    auto key = s + "." + p.first;
-                    if (is_defined(key)) {
-                        throw sym_error("Can't redifine structured values");
+            if (accessed.count(s) > 0) {
+                LOGD("%s has been accessed", s);
+                auto it = syms.find(s);
+                if (it != syms.end()) {
+                    LOGD("%s vs %s", it->second.type().name(),
+                         val.type().name());
+                    if (it->second.type() != val.type()) {
+                        throw sym_error("Can not change type");
                     }
-                    syms[key] = p.second;
+                    auto a = std::any_cast<double>(it->second);
+                    auto b = std::any_cast<double>(val);
+                    if (a != b) {
+                        LOGI("Redefined '%s' %f %f", s, a, b);
+                        undefined.insert({s, -1});
+                    }
                 }
             }
+            syms[s] = val;
+        } else if constexpr (std::is_same_v<T, Symbols>) {
+            set_sym(s, static_cast<Symbols>(val));
             return;
         } else {
-            auto it = syms.find(s);
-            if (it != syms.end()) {
-                LOGI("%s vs %s", it->second.type().name(), typeid(val).name());
-                if (it->second.type() != typeid(val)) {
-                    throw sym_error("Can not change type");
-                }
-                if (std::any_cast<T>(it->second) != val) {
-                    LOGI("Redefined '%s'", s);
-                    undefined.insert(s);
+            if (accessed.count(s) > 0) {
+                LOGD("%s has been accessed", s);
+                auto it = syms.find(s);
+                if (it != syms.end()) {
+                    LOGD("%s vs %s", it->second.type().name(),
+                         typeid(val).name());
+                    if (it->second.type() != typeid(val)) {
+                        throw sym_error("Can not change type");
+                    }
+                    if (std::any_cast<T>(it->second) != val) {
+                        LOGD("Redefined '%s'", s);
+                        undefined.insert({s, -1});
+                    }
                 }
             }
             syms[s] = std::any(val);
@@ -274,7 +297,7 @@ struct SymbolTable
             auto dot = p.first.find('.');
             if (dot != std::string::npos) {
                 auto prefix = p.first.substr(0, dot);
-                LOGI("Checking %s vs %s", prefix, name);
+                LOGD("Checking %s vs %s", prefix, name);
                 if (prefix == name) {
                     // rest = one.x
                     auto rest = p.first.substr(dot + 1);
@@ -287,8 +310,9 @@ struct SymbolTable
     }
 
     template <typename T = std::any>
-    T get(std::string_view name)
+    T get(std::string_view name, int line = -1)
     {
+        accessed.insert(std::string(name));
         if constexpr (std::is_same_v<T, Symbols>) {
             auto s = std::string(name);
             auto res = collect(s);
@@ -297,7 +321,12 @@ struct SymbolTable
         auto s = std::string(name);
         auto it = syms.find(s);
         if (it == syms.end()) {
-            undefined.insert(s);
+            LOGI("%s is undefined", name);
+            undefined.insert({s, line});
+            if constexpr (std::is_same_v<T, std::any>) {
+                return std::any((double)0);
+            }
+            LOGD("Returning default (%s)", typeid(T{}).name());
             return T{};
         }
         if constexpr (std::is_same_v<T, std::any>) {
@@ -305,6 +334,36 @@ struct SymbolTable
         }
         return std::any_cast<T>(it->second);
     }
+
+    template <typename T>
+    struct Accessor
+    {
+        SymbolTable& st;
+        std::string_view name;
+
+        Accessor(SymbolTable& st_, std::string_view name_)
+            : st(st_), name(name_)
+        {}
+
+        Accessor& operator=(T const& val)
+        {
+            st.set(name, val);
+            return *this;
+        }
+
+        operator T const() const { return st.get<T>(name); }
+    };
+
+    template <typename T>
+    Accessor<T> at(std::string_view name)
+    {
+        return Accessor<T>(*this, name);
+    }
+
+    /* Accessor<std::any> operator[](std::string_view name) */
+    /* { */
+    /*     return Accessor<std::any>(*this, name); */
+    /* } */
 
     template <typename FN>
     void forAll(FN const& fn) const
@@ -317,12 +376,18 @@ struct SymbolTable
     bool ok()
     {
         for (auto const& u : undefined) {
-            if (syms.find(u) == syms.end()) return false;
+            if (syms.find(u.first) == syms.end()) return false;
         }
         return true;
     }
 
+    void erase(std::string_view name) { syms.erase(std::string(name)); }
+
     bool done() const { return undefined.empty(); }
 
-    void clear_undef() { undefined.clear(); }
+    void clear()
+    {
+        accessed.clear();
+        undefined.clear();
+    }
 };

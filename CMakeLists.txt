@@ -59,6 +59,10 @@ target_link_libraries(badlib PRIVATE lua lodepng fmt coreutils ${THREAD_LIB} PUB
 add_executable(bass main.cpp)
 target_link_libraries(bass PRIVATE coreutils badlib CLI11::CLI11)
 
-add_executable(tester testmain.cpp asmtest.cpp symtest.cpp)
+add_executable(symtest testmain.cpp symtest.cpp)
+target_include_directories(symtest PRIVATE src)
+target_link_libraries(symtest PRIVATE coreutils fmt)
+
+add_executable(tester testmain.cpp asmtest.cpp)
 target_link_libraries(tester PRIVATE coreutils fmt badlib)
 

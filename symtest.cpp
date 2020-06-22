@@ -42,7 +42,7 @@ TEST_CASE("symbol_table.basic", "[symbols]")
 
     st.forAll([](auto const& s, auto const& v) { LOGI("%s", s); });
 
-    REQUIRE(st.get<int>("deep.two.x") == 10);
+    REQUIRE(st.at<int>("deep.two.x") == 10);
     REQUIRE(st.get<int>("deep.one.y") == 2);
 
     REQUIRE_THROWS(st.set("a", "hey"s));
@@ -56,12 +56,12 @@ TEST_CASE("symbol_table.basic", "[symbols]")
     st.set("a", 9);
     REQUIRE(st.undefined.size() == 2);
 
-    st.set("not_here", 5);
+    st.at<int>("not_here") = 5;
 
     REQUIRE(st.ok());
     REQUIRE(!st.done());
 
-    st.clear_undef();
+    st.clear();
 
     st.set("b", 4);
     st.set("c", "hey"s);

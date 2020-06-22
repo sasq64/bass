@@ -36,7 +36,7 @@ public:
     bool parse_path(utils::path const& p);
 
     utils::path getCurrentPath() const { return currentPath; }
-    Symbols& getSymbols();
+    SymbolTable& getSymbols();
     Machine& getMachine();
     void printSymbols();
     std::string_view includeFile(std::string_view fileName);
@@ -90,11 +90,7 @@ public:
 private:
     template <typename T>
     T& sym(std::string const& s) {
-        return syms.at<T>(s);
-    }
-
-    std::any& sym(std::string& s) {
-        return syms[s];
+        return syms.get<T>(s);
     }
 
     bool passDebug = false;
@@ -153,7 +149,7 @@ private:
     std::shared_ptr<Machine> mach;
     std::unordered_map<std::string_view, Macro> macros;
     std::unordered_map<std::string_view, Macro> definitions;
-    Symbols syms;
+    SymbolTable syms;
     std::vector<Undefined> undefined;
     std::string_view lastLabel;
     bool finalPass{false};

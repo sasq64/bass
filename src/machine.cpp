@@ -269,8 +269,8 @@ int Machine::assemble(Instruction const& instr)
                 arg.val >= 0 && arg.val <= 0xff) {
                 arg.mode = AdressingMode::ZP;
             }
-            if (o.mode == AdressingMode::REL &&
-                arg.mode == AdressingMode::ABS && diff <= 127 && diff > -127) {
+            if (o.mode == AdressingMode::REL /* &&
+                arg.mode == AdressingMode::ABS && diff <= 127 && diff > -127 */) {
                 arg.mode = AdressingMode::REL;
                 arg.val = diff;
             }
@@ -286,6 +286,10 @@ int Machine::assemble(Instruction const& instr)
     auto v = arg.val & (sz == 2 ? 0xff : 0xffff);
     if (arg.mode == sixfive::AdressingMode::REL) {
         v = (static_cast<int8_t>(v)) + 2 + currentSection->pc;
+    }
+
+    if(arg.mode == AdressingMode::REL && (diff > 127 || diff < -128)) {
+        LOGW("Opcode currently does not fit!");
     }
 
     if (fp != nullptr) {

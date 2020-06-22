@@ -137,33 +137,38 @@ void Assembler::evaluateBlock(std::string_view block, std::string_view fn)
 
 int Assembler::checkUndefined()
 {
-    if (undefined.empty()) {
-        return DONE;
+    if(syms.done()) return DONE;
+    for(auto const& u : syms.undefined) {
+        LOGI("Undef %s", u.first);
     }
+    return syms.ok() ? PASS : ERROR;
+    /* if (undefined.empty()) { */
+    /*     return DONE; */
+    /* } */
 
-    auto it = undefined.begin();
-    while (it != undefined.end()) {
-        // auto full = utils::join(it->parts.begin(), it->parts.end(), ".");
-        std::vector<std::string> parts = utils::split(it->name, ".");
-        bool erased = false;
-        if (passDebug)
-            fmt::print("Symbol '{}' was (re)defined after use\n", it->name);
-        if (syms.get(parts).has_value()) {
-            it = undefined.erase(it);
-            erased = true;
-        }
-        if (it != undefined.end() && syms.get(it->name).has_value()) {
-            it = undefined.erase(it);
-            erased = true;
-        }
-        if (!erased) {
-            it++;
-        }
-    }
-    if (undefined.empty()) {
-        return PASS;
-    }
-    return ERROR;
+    /* auto it = undefined.begin(); */
+    /* while (it != undefined.end()) { */
+    /*     // auto full = utils::join(it->parts.begin(), it->parts.end(), "."); */
+    /*     std::vector<std::string> parts = utils::split(it->name, "."); */
+    /*     bool erased = false; */
+    /*     if (passDebug) */
+    /*         fmt::print("Symbol '{}' was (re)defined after use\n", it->name); */
+    /*     if (syms.get(parts).has_value()) { */
+    /*         it = undefined.erase(it); */
+    /*         erased = true; */
+    /*     } */
+    /*     if (it != undefined.end() && syms.get(it->name).has_value()) { */
+    /*         it = undefined.erase(it); */
+    /*         erased = true; */
+    /*     } */
+    /*     if (!erased) { */
+    /*         it++; */
+    /*     } */
+    /* } */
+    /* if (undefined.empty()) { */
+    /*     return PASS; */
+    /* } */
+    /* return ERROR; */
 }
 
 Symbols Assembler::runTest(std::string_view name, std::string_view contents)
@@ -185,10 +190,11 @@ Symbols Assembler::runTest(std::string_view name, std::string_view contents)
     auto saved = save();
     auto machSaved = mach->saveState();
     auto pc = mach->getPC();
-    LOGD("Testing %s:%s at pc %x", name, contents, pc);
+    LOGI("Testing %s:%s at pc %x", name, contents, pc);
     auto section = mach->getCurrentSection();
     while (true) {
         undefined.clear();
+        syms.clear();
         mach->getCurrentSection() = section;
         lastLabel = "__test_" + std::to_string(pc);
         if (!parser.parse(contents, fileName.c_str())) {
@@ -233,17 +239,17 @@ std::any Assembler::applyDefine(Macro const& fn, Call const& call)
     }
 
     for (unsigned i = 0; i < call.args.size(); i++) {
-        auto const& v = syms.get(args[i]);
-        if (v.has_value()) {
+        //auto const& v = syms.get(args[i]);
+        if (syms.is_defined(args[i])) {
             parser.errors.push_back(
                 {0, 0,
                  fmt::format("Function '{}' shadows global symbol {}",
                              call.name, fn.args[i]),
                  ErrLevel::Warning});
-            shadowed[args[i]] = v;
+            shadowed[args[i]] = syms.get(args[i]);
             syms.erase(args[i]);
         }
-        syms[args[i]] = call.args[i];
+        syms.set(args[i], call.args[i]);
         LOGD("%s = %x", fn.args[i],
              (int32_t)std::any_cast<Number>(call.args[i]));
     }
@@ -254,7 +260,7 @@ std::any Assembler::applyDefine(Macro const& fn, Call const& call)
         syms.erase(args[i]);
     }
     for (auto const& shadow : shadowed) {
-        syms[shadow.first] = shadow.second;
+        syms.set(shadow.first, shadow.second);
     }
     return res;
 }
@@ -277,17 +283,16 @@ void Assembler::applyMacro(Call const& call)
 
     for (unsigned i = 0; i < call.args.size(); i++) {
 
-        auto const& v = syms.get(args[i]);
-        if (v.has_value()) {
+        if (syms.is_defined(args[i])) {
             parser.errors.push_back(
                 {0, 0,
                  fmt::format("Macro '{}' shadows global symbol {}", call.name,
                              m.args[i]),
                  ErrLevel::Warning});
-            shadowed[args[i]] = v;
+            shadowed[args[i]] = syms.get(args[i]);
             syms.erase(args[i]);
         }
-        syms[args[i]] = call.args[i];
+        syms.set(args[i], call.args[i]);
         // LOGD("%s = %x", m.args[i],
         //     (int32_t)std::any_cast<Number>(call.args[i]));
     }
@@ -308,7 +313,7 @@ void Assembler::applyMacro(Call const& call)
         syms.erase(args[i]);
     }
     for (auto const& shadow : shadowed) {
-        syms[shadow.first] = shadow.second;
+        syms.set(shadow.first, shadow.second);
     }
     lastLabel = ll;
 }
@@ -431,12 +436,8 @@ void Assembler::setupRules()
             if (sym[0] == '.') {
                 sym = std::string(lastLabel) + sym;
             }
-            LOGD("Symbol:%s", sym);
-            auto res = syms.set(sym, sv[1]);
-            if (res == Symbols::Was::DifferentValue ||
-                res == Symbols::Was::DifferentType) {
-                setUndefined(sym, sv);
-            }
+            LOGI("Symbol:%s", sym);
+            syms.set(sym, sv[1]);
         } else if (sv.size() == 1) {
             mach->getCurrentSection().pc = number<uint16_t>(sv[0]);
         }
@@ -463,17 +464,8 @@ void Assembler::setupRules()
                 lastLabel = labelv;
             }
         }
-        // LOGI("Label %s=%x", label, mach->getPC());
-        auto res = syms.set(label, any_num(mach->getPC()));
-        if (res == Symbols::Was::DifferentValue ||
-            res == Symbols::Was::DifferentType) {
-            // If we redefine a label we must make another pass
-            // since this label could have been used with an
-            // incorrect value
-            // TODO: Detect used symbols to avoid this
-            setUndefined(label, sv);
-            // LOGI("Symbol %s changed value", label);
-        }
+        LOGI("Label %s=%x", label, mach->getPC());
+        syms.set(label, static_cast<Number>(mach->getPC()));
         return sv[0];
     };
 
@@ -580,7 +572,8 @@ void Assembler::setupRules()
         auto contents = any_cast<std::string_view>(sv[1]);
         auto name = any_cast<std::string_view>(sv[0]);
         auto res = runTest(name, contents);
-        syms.at<Symbols>("tests").at<Symbols>(name) = res;
+        //syms.at<Symbols>("tests").at<Symbols>(name) = res;
+        syms.set("tests."s + name, res);
         return sv[0];
     };
 
@@ -771,29 +764,16 @@ void Assembler::setupRules()
 
     parser["Variable"] = [&](SV& sv) {
         std::any val;
-        std::vector<std::string> parts;
         std::string full;
 
         if (sv.token()[0] == '.') {
-            parts = {std::string(lastLabel) + sv.token()};
-            val = syms.get(parts[0]);
+            full = std::string(lastLabel) + sv.token();
         } else {
-            for (auto const& p : sv.transform<std::string_view>()) {
-                parts.emplace_back(p);
-            }
-            val = syms.get(parts);
-            if (!val.has_value()) {
-                // LOGD("Dot %s failed, try joined symbol", s);
-                full = utils::join(parts.begin(), parts.end(), ".");
-                val = syms.get(full);
-            }
-        }
-        if (!val.has_value()) {
+            auto parts = sv.transform<std::string_view>();
             full = utils::join(parts.begin(), parts.end(), ".");
-            setUndefined(full, sv);
-            LOGD("%s undefined atm", full);
-            return any_num(mach->getPC());
         }
+
+        val = syms.get(full, sv.line_info().first);
         return val;
     };
 }
@@ -808,6 +788,7 @@ bool Assembler::pass(std::string_view const& source)
     labelNum = 0;
     mach->clear();
     undefined.clear();
+    syms.clear();
     parser.errors.clear();
     return parser.parse(source, fileName.c_str());
 }
@@ -835,20 +816,16 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         }
 
         for (auto const& s : mach->getSections()) {
-            auto& secsyms = syms.at<Symbols>("section").at<Symbols>(s.name);
+            //auto& secsyms = syms.at<Symbols>("section").at<Symbols>(s.name);
+
+            auto prefix = "section."s + std::string(s.name);
 
             auto start = static_cast<Number>(s.start);
             auto end = static_cast<Number>(s.start + s.data.size());
-            auto res0 = secsyms.set("start", start);
-            auto res1 = secsyms.set("end", end);
-            if (res0 != Symbols::Was::Same) {
-                //setUndefined("section."s + s.name + ".start"s);
-            }
-            if (res1 != Symbols::Was::Same) {
-                //setUndefined("section."s + s.name + ".end"s);
-            }
 
-            secsyms["data"] = s.data;
+            syms.set(prefix + ".start", start);
+            syms.set(prefix + ".end", end);
+            syms.set(prefix + ".data", s.data);
         }
 
         auto result = checkUndefined();
@@ -859,19 +836,19 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         if (result == PASS) {
             continue;
         }
-        for (auto const& u : undefined) {
+        for (auto const& u : syms.undefined) {
             parser.errors.push_back(
-                {u.line_info.first, u.line_info.second,
-                 fmt::format("Undefined symbol: '{}'", u.name)});
-            return false;
+                { (size_t)u.second, 0, // u.line_info.first, u.line_info.second,
+                 fmt::format("Undefined symbol: '{}'", u.first)});
         }
+        return false;
     }
     finalPass = true;
     fmt::print("* FINAL PASS\n");
     return pass(source);
 }
 
-Symbols& Assembler::getSymbols()
+SymbolTable& Assembler::getSymbols()
 {
     return syms;
 }
