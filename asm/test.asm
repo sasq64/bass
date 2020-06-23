@@ -6,7 +6,7 @@
 
 tileMem = $1e000
 
-USE_BITMAP = 1
+USE_BITMAP = 0
 
     !section "main", $801
 

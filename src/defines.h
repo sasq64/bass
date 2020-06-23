@@ -96,6 +96,13 @@ inline Number number(std::any const& v)
     return std::any_cast<Number>(v);
 }
 
+template <typename T>
+inline Number num(T const& v)
+{
+    return static_cast<Number>(v);
+}
+
+
 
 template <typename T>
 inline std::any any_num(T const& v)

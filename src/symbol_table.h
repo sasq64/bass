@@ -3,6 +3,7 @@
 #include <coreutils/log.h>
 
 #include <any>
+#include <fmt/format.h>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -11,6 +12,8 @@
 
 #include <cassert>
 #define Assert assert
+
+using AnyMap = std::unordered_map<std::string, std::any>;
 
 // Symbols is an unordered_map of string to any, with some extra
 // functionality such as handling of recursive Symbols
@@ -224,19 +227,42 @@ struct SymbolTable
         return syms.find(std::string(name)) != syms.end();
     }
 
-    void set_sym(std::string_view name, Symbols const& symbols)
+    void set_sym(std::string_view name, AnyMap const& symbols)
     {
         auto s = std::string(name);
-        for (auto const& p : symbols.getData()) {
-            LOGD("Type %s", p.second.type().name());
+        for (auto const& p : symbols) {
+            //LOGI("%s %s=%s", s, p.first, p.second.type().name());
+            //LOGD("Type %%s", p.second.type().name());
             if (p.second.type() == typeid(Symbols{})) {
-                LOGD("Recurse");
-                set_sym(s + "." + p.first, std::any_cast<Symbols>(p.second));
+                //LOGD("Recurse");
+                set_sym(s + "." + p.first,
+                        std::any_cast<Symbols>(p.second).getData());
+            } else if (p.second.type() == typeid(AnyMap{})) {
+                set_sym(s + "." + p.first, std::any_cast<AnyMap>(p.second));
             } else {
                 auto key = s + "." + p.first;
-                LOGI("Set %s", key);
+                //LOGI("Set %s", key);
                 set(key, p.second);
             }
+        }
+    }
+
+    void set(std::string_view name, std::any const& val)
+    {
+        auto s = std::string(name);
+        if (val.type() == typeid(Symbols{})) {
+            set(name, std::any_cast<Symbols>(val).getData());
+        } else if (val.type() == typeid(AnyMap{})) {
+            set(name, std::any_cast<AnyMap>(val));
+        } else if (val.type() == typeid(double)) {
+            set(name, std::any_cast<double>(val));
+        } else {
+            if (accessed.count(s) > 0) {
+                throw sym_error(
+                    fmt::format("Can not redefine generic any type {} ({})", s,
+                                val.type().name()));
+            }
+            syms[s] = val;
         }
     }
 
@@ -244,42 +270,30 @@ struct SymbolTable
     void set(std::string_view name, T const& val)
     {
         auto s = std::string(name);
-        if constexpr (std::is_same_v<T, std::any>) {
-            if (val.type() == typeid(Symbols{})) {
-                set_sym(s, std::any_cast<Symbols>(val));
-                return;
-            }
-            if (accessed.count(s) > 0) {
-                LOGD("%s has been accessed", s);
-                auto it = syms.find(s);
-                if (it != syms.end()) {
-                    LOGD("%s vs %s", it->second.type().name(),
-                         val.type().name());
-                    if (it->second.type() != val.type()) {
-                        throw sym_error("Can not change type");
-                    }
-                    auto a = std::any_cast<double>(it->second);
-                    auto b = std::any_cast<double>(val);
-                    if (a != b) {
-                        LOGI("Redefined '%s' %f %f", s, a, b);
-                        undefined.insert({s, -1});
-                    }
-                }
-            }
-            syms[s] = val;
-        } else if constexpr (std::is_same_v<T, Symbols>) {
-            set_sym(s, static_cast<Symbols>(val));
+        if constexpr (std::is_same_v<T, Symbols>) {
+            set_sym(s, static_cast<Symbols>(val).getData());
             return;
+        } else if constexpr (std::is_same_v<T, AnyMap>) {
+            set_sym(s, static_cast<AnyMap>(val));
+            return;
+        /* } else if constexpr (std::is_arithmetic_v<T>) { */
+        /*     double nv = static_cast<double>(val); */
+        /*     if (accessed.count(s) > 0) { */
+        /*         LOGD("%s has been accessed", s); */
+        /*         auto it = syms.find(s); */
+        /*         if (it != syms.end()) { */
+        /*             if (std::any_cast<double>(it->second) != nv) { */
+        /*                 LOGD("Redefined '%s'", s); */
+        /*                 undefined.insert({s, -1}); */
+        /*             } */
+        /*         } */
+        /*     } */
+        /*     syms[s] = std::any(nv); */
         } else {
             if (accessed.count(s) > 0) {
                 LOGD("%s has been accessed", s);
                 auto it = syms.find(s);
                 if (it != syms.end()) {
-                    LOGD("%s vs %s", it->second.type().name(),
-                         typeid(val).name());
-                    if (it->second.type() != typeid(val)) {
-                        throw sym_error("Can not change type");
-                    }
                     if (std::any_cast<T>(it->second) != val) {
                         LOGD("Redefined '%s'", s);
                         undefined.insert({s, -1});
@@ -321,7 +335,7 @@ struct SymbolTable
         auto s = std::string(name);
         auto it = syms.find(s);
         if (it == syms.end()) {
-            LOGI("%s is undefined", name);
+            LOGD("%s is undefined", name);
             undefined.insert({s, line});
             if constexpr (std::is_same_v<T, std::any>) {
                 return std::any((double)0);
@@ -332,6 +346,9 @@ struct SymbolTable
         if constexpr (std::is_same_v<T, std::any>) {
             return it->second;
         }
+        /* if constexpr (std::is_arithmetic_v<T>) { */
+        /*     return std::any_cast<double>(it->second); */
+        /* } */
         return std::any_cast<T>(it->second);
     }
 
@@ -381,7 +398,10 @@ struct SymbolTable
         return true;
     }
 
-    void erase(std::string_view name) { syms.erase(std::string(name)); }
+    void erase(std::string_view name) { 
+        syms.erase(std::string(name));
+        accessed.erase(std::string(name));
+    }
 
     bool done() const { return undefined.empty(); }
 

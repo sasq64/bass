@@ -359,11 +359,13 @@ void initMeta(Assembler& a)
 
     a.registerMeta("ifdef", [&](auto const& text,
                                 std::vector<std::string_view> const& blocks) {
-        evalIf(a, a.getSymbols().get(std::string(text)).has_value(), blocks);
+        auto rc = a.getSymbols().is_defined(text);
+        evalIf(a, rc, blocks);
     });
 
     a.registerMeta("ifndef", [&](auto const& text, auto const& blocks) {
-        evalIf(a, !a.getSymbols().get(std::string(text)).has_value(), blocks);
+        auto rc = a.getSymbols().is_defined(text);
+        evalIf(a, !rc, blocks);
     });
 
     a.registerMeta("enum", [&](auto const& text, auto const& blocks) {

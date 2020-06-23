@@ -64,6 +64,7 @@ public:
         std::vector<std::string_view> args;
     };
 
+
     std::any evaluateExpression(std::string_view expr);
     Def evaluateDefinition(std::string_view expr);
     std::vector<std::any> evaluateList(std::string_view expr);
@@ -76,7 +77,7 @@ public:
 
     Symbols evaluateEnum(std::string_view expr);
     void evaluateBlock(std::string_view block, std::string_view fileName = "");
-    Symbols runTest(std::string_view name, std::string_view contents);
+    AnyMap runTest(std::string_view name, std::string_view contents);
 
 
     enum
@@ -129,15 +130,12 @@ private:
     bool pass(std::string_view const& source);
     void setupRules();
 
-    void setUndefined(std::string const& sym, SVWrap const& sv);
-    void setUndefined(std::string const& sym);
-
-    auto save() { return std::tuple(macros, syms, undefined, lastLabel); }
+    auto save() { return std::tuple(macros, syms, lastLabel); }
 
     template <class T>
     void restore(T const& t)
     {
-        std::tie(macros, syms, undefined, lastLabel) = t;
+        std::tie(macros, syms, lastLabel) = t;
     }
 
     void trace(SVWrap const& sv) const;
@@ -150,7 +148,6 @@ private:
     std::unordered_map<std::string_view, Macro> macros;
     std::unordered_map<std::string_view, Macro> definitions;
     SymbolTable syms;
-    std::vector<Undefined> undefined;
     std::string_view lastLabel;
     bool finalPass{false};
     int passNo{0};
