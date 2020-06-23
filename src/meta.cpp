@@ -371,11 +371,11 @@ void initMeta(Assembler& a)
     a.registerMeta("enum", [&](auto const& text, auto const& blocks) {
         auto s = a.evaluateEnum(blocks[0]);
         if (text.empty()) {
-            s.forAll([&](auto const& name, auto const& v) {
+            for(auto const& [name, v] : s) {
                 a.getSymbols().set(name, v);
-            });
+            }
         } else {
-            a.getSymbols().set<Symbols>(std::string(text), s);
+           a.getSymbols().set<AnyMap>(std::string(text), s);
         }
     });
 }

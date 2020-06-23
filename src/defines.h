@@ -131,8 +131,8 @@ struct Instruction
     int32_t val;
 };
 
-Symbols loadSid(std::string_view const& name);
-Symbols loadPng(std::string_view const& name);
+AnyMap loadSid(std::string_view const& name);
+AnyMap loadPng(std::string_view const& name);
 
 enum
 {

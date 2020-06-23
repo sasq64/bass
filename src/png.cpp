@@ -9,12 +9,12 @@
 #include <cstdint>
 #include <string>
 
-Symbols loadPng(std::string_view const& name)
+AnyMap loadPng(std::string_view const& name)
 {
     unsigned w{};
     unsigned h{};
     unsigned char* out{};
-    Symbols res;
+    AnyMap res;
 
     utils::File f{name};
     auto data = f.readAll();
@@ -43,8 +43,8 @@ Symbols loadPng(std::string_view const& name)
 
         LOGD("Loaded %dx%d flle, %d colors", w, h, colors);
 
-        res.at<Number>("width") = w;
-        res.at<Number>("height") = h;
+        res["width"] = num(w);
+        res["height"] = num(h);
         res["pixels"] = std::vector<uint8_t>(out, out + w * h);
         res["colors"] = pal12;
 

@@ -75,7 +75,7 @@ public:
                    std::vector<std::string_view> const& args,
                    std::string_view contents);
 
-    Symbols evaluateEnum(std::string_view expr);
+    AnyMap evaluateEnum(std::string_view expr);
     void evaluateBlock(std::string_view block, std::string_view fileName = "");
     AnyMap runTest(std::string_view name, std::string_view contents);
 

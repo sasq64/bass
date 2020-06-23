@@ -87,7 +87,7 @@ std::any Scripting::to_any(sol::object const& obj)
 
     if (obj.is<sol::table>()) {
         sol::table t = obj.as<sol::table>();
-        Symbols syms;
+        AnyMap syms;
         std::vector<uint8_t> vec;
         bool isVec = false;
         bool first = true;
@@ -129,11 +129,12 @@ sol::object Scripting::to_object(std::any const& a)
         }
         return t;
     }
-    if (auto const* at = std::any_cast<Symbols>(&a)) {
+    if (auto const* at = std::any_cast<AnyMap>(&a)) {
         sol::table t = lua.create_table();
-        at->forAll([&](std::string const& name, std::any const& val) {
+        for(auto const& [name, val] : *at) {
+        //at->forAll([&](std::string const& name, std::any const& val) {
             t[name] = to_object(val);
-        });
+        }
         return t;
     }
     return sol::object{};

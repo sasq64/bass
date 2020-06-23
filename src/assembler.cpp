@@ -115,7 +115,7 @@ std::vector<std::any> Assembler::evaluateList(std::string_view expr)
     return std::any_cast<std::vector<std::any>>(parseResult);
 }
 
-Symbols Assembler::evaluateEnum(std::string_view expr)
+AnyMap Assembler::evaluateEnum(std::string_view expr)
 {
     auto s = ":e:"s + std::string(expr);
     auto sv = std::string_view(s);
@@ -124,7 +124,7 @@ Symbols Assembler::evaluateEnum(std::string_view expr)
         throw parse_error("Not an enum");
     }
 
-    return std::any_cast<Symbols>(parseResult);
+    return std::any_cast<AnyMap>(parseResult);
 }
 
 void Assembler::evaluateBlock(std::string_view block, std::string_view fn)
@@ -198,7 +198,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 }
 std::any Assembler::applyDefine(Macro const& fn, Call const& call)
 {
-    Symbols shadowed;
+    AnyMap shadowed;
     std::vector<std::string> args;
     for (auto const& a : fn.args) {
         args.emplace_back(a);
@@ -241,7 +241,7 @@ void Assembler::applyMacro(Call const& call)
     auto saved = save();
 
     auto m = macros[call.name];
-    Symbols shadowed;
+    AnyMap shadowed;
     std::vector<std::string> args;
     for (auto const& a : m.args) {
         args.emplace_back(a);
@@ -357,7 +357,7 @@ void Assembler::setupRules()
 
     parser["EnumBlock"] = [&](SV& sv) {
         trace(sv);
-        Symbols s;
+        AnyMap s;
         Number lastNumber = 0;
         for (size_t i = 0; i < sv.size(); i++) {
             if (sv[i].has_value()) {
@@ -383,7 +383,7 @@ void Assembler::setupRules()
                 sym = std::string(lastLabel) + sym;
             }
             // LOGI("Symbol:%s", sym);
-            syms.set(sym, sv[1]);
+            syms.set(sym, sv[1], sv.line_info().first);
         } else if (sv.size() == 1) {
             mach->getCurrentSection().pc = number<uint16_t>(sv[0]);
         }
@@ -411,7 +411,7 @@ void Assembler::setupRules()
             }
         }
         // LOGI("Label %s=%x", label, mach->getPC());
-        syms.set(label, static_cast<Number>(mach->getPC()));
+        syms.set(label, static_cast<Number>(mach->getPC()), sv.line_info().first);
         return sv[0];
     };
 
@@ -518,7 +518,7 @@ void Assembler::setupRules()
         auto contents = any_cast<std::string_view>(sv[1]);
         auto name = any_cast<std::string_view>(sv[0]);
         auto res = runTest(name, contents);
-        syms.set("tests."s + std::string(name), res);
+        syms.set("tests."s + std::string(name), res, sv.line_info().first);
         return sv[0];
     };
 
@@ -714,6 +714,11 @@ void Assembler::setupRules()
         }
 
         val = syms.get(full, sv.line_info().first);
+        // Set undefined numbers to PC, to increase likelyhood of
+        // correct code generation (less passes)
+        if(val.type() == typeid(Number) && !syms.is_defined(full)) {
+            val = (Number)mach->getPC();
+        }
         return val;
     };
 }
@@ -755,7 +760,7 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         }
 
         for (auto const& s : mach->getSections()) {
-            // auto& secsyms = syms.at<Symbols>("section").at<Symbols>(s.name);
+            // auto& secsyms = syms.at<AnyMap>("section").at<AnyMap>(s.name);
 
             auto prefix = "section."s + std::string(s.name);
 

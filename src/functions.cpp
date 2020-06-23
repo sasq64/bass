@@ -18,7 +18,7 @@ void initFunctions(Assembler& a)
     // Allowed data types:
     // * Any arithmetic type, but they will always be converted to/from double
     // * `std::vector<uint8_t>` for binary data
-    // * `Symbols` for returning struct like things
+    // * `AnyMap` for returning struct like things
     // * `std::vector<std::any> const&` as single argument.
 
     a.registerFunction("sqrt", [](double f) { return std::sqrt(f); });
