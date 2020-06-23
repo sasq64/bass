@@ -159,8 +159,6 @@ techtech_effect:
 
     rts
 
-    UTILS()
-
 
     !align 256
 scales:
@@ -173,7 +171,7 @@ fname_end:
 
 save: !byte 0,0
 
-    !section "indexes", *
+    ;!section "indexes", *
 indexes:
     !fill png.indexes
 indexes_end:
@@ -193,7 +191,7 @@ vram = get_vram()
 
 ;----------------------------------------------------------
 
-    !section "colors", *
+    ;!section "colors", *
 colors:
     !fill png.colors
 

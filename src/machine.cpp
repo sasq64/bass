@@ -171,6 +171,10 @@ void Machine::write(std::string const& name, OutFmt fmt)
         if (section_end > end) {
             end = section_end;
         }
+
+
+        fmt::print("Section {} -> {}:{}\n", section.name, section.start, section_end);
+
         memcpy(&ram[section.start], section.data.data(),
                section_end - section.start);
     }

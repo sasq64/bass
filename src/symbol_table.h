@@ -48,8 +48,7 @@ struct SymbolTable
             // LOGD("Type %%s", p.second.type().name());
             if (p.second.type() == typeid(AnyMap{})) {
                 // LOGD("Recurse");
-                set_sym(s + "." + p.first,
-                        std::any_cast<AnyMap>(p.second));
+                set_sym(s + "." + p.first, std::any_cast<AnyMap>(p.second));
             } else if (p.second.type() == typeid(AnyMap{})) {
                 set_sym(s + "." + p.first, std::any_cast<AnyMap>(p.second));
             } else {
@@ -103,7 +102,10 @@ struct SymbolTable
                         if constexpr (std::is_arithmetic_v<T>) {
                             fmt::print(
                                 "Redefined {} in line {} from  {} to {}\n", s,
-                                line, (int)std::any_cast<T>(it->second), (int)val);
+                                line, (int)std::any_cast<T>(it->second),
+                                (int)val);
+                        } else {
+                            fmt::print("Redefined {} in line {}\n", s, line);
                         }
                         undefined.insert({s, -1});
                     }

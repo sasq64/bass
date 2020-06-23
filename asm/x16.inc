@@ -1,5 +1,5 @@
 
-;    !section "utils", section.main.end
+    !section "utils", section.main.end
 
 !macro LoadFile(fname) {
      LDA #5 ;fname_end-fname
@@ -8,7 +8,6 @@
      jsr kernel_load
  }
 
-!macro UTILS() {
 kernel_load:
         jsr $ffbd     ; call SETNAM
         lda #$01
@@ -24,4 +23,3 @@ kernel_load:
         ;bcs VBL    ; if carry set, a load error has happened
 
         rts
-}
