@@ -132,7 +132,6 @@ sol::object Scripting::to_object(std::any const& a)
     if (auto const* at = std::any_cast<AnyMap>(&a)) {
         sol::table t = lua.create_table();
         for(auto const& [name, val] : *at) {
-        //at->forAll([&](std::string const& name, std::any const& val) {
             t[name] = to_object(val);
         }
         return t;

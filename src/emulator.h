@@ -31,8 +31,8 @@ enum EmulatedMemoryAccess
 // The Policy defines the compile & runtime time settings for the emulator
 struct DefaultPolicy
 {
-    DefaultPolicy() {}
-    DefaultPolicy(Machine<DefaultPolicy>&) {}
+    DefaultPolicy() = default;
+    explicit DefaultPolicy(Machine<DefaultPolicy>&) {}
 
     static constexpr bool ExitOnStackWrap = true;
 

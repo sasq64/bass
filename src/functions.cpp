@@ -85,7 +85,7 @@ void initFunctions(Assembler& a)
     });
 
     a.registerFunction("str", [](double n) {
-        auto s = std::to_string((int64_t)n);
+        auto s = std::to_string(static_cast<int64_t>(n));
         std::string_view sv = s;
         persist(sv);
         return sv;

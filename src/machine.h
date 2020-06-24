@@ -33,6 +33,15 @@ enum SectionFlags
     ReadOnly = 4
 };
 
+enum class AsmResult
+{
+    Ok,
+    Truncated,
+    NoSuchOpcode,
+    IllegalAdressingMode,
+    Failed
+};
+
 struct Section
 {
     Section(std::string const& n, uint16_t s) : name(n), start(s), pc(s) {}
@@ -65,7 +74,7 @@ public:
 
     uint32_t writeByte(uint8_t b);
     uint32_t writeChar(uint8_t b);
-    int assemble(Instruction const& instr);
+    AsmResult assemble(Instruction const& instr);
     Section& addSection(std::string const& name, uint32_t start);
     void setSection(std::string const& name);
     Section const& getSection(std::string const& name) const;

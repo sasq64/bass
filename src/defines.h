@@ -134,8 +134,3 @@ struct Instruction
 AnyMap loadSid(std::string_view const& name);
 AnyMap loadPng(std::string_view const& name);
 
-enum
-{
-    NO_SUCH_OPCODE = -1,
-    ILLEGAL_ADRESSING_MODE = -2
-};

@@ -484,13 +484,13 @@ void Assembler::setupRules()
     };
 
     parser["Call"] = [&](SV& sv) {
+        trace(sv);
         auto name = any_cast<std::string_view>(sv[0]);
         auto args = any_cast<std::vector<std::any>>(sv[1]);
         return Call{name, args};
     };
 
     parser["CallArgs"] = [&](SV& sv) {
-        // LOGD("CallArgs %d %s", sv.size(), sv[0].type().name());
         std::vector<std::any> v;
         for (size_t i = 0; i < sv.size(); i++) {
             v.push_back(sv[i]);
@@ -544,7 +544,11 @@ void Assembler::setupRules()
                 }
 
                 auto res = mach->assemble(*i);
-                if (res < 0) {
+                if(res == AsmResult::Truncated && !finalPass) {
+                    // Accept long branches unless final pass
+                    res = AsmResult::Ok;
+                }
+                if (res != AsmResult::Ok) {
                     throw parse_error(
                         fmt::format("Illegal instruction '{}'", i->opcode));
                 }
@@ -717,7 +721,7 @@ void Assembler::setupRules()
         // Set undefined numbers to PC, to increase likelyhood of
         // correct code generation (less passes)
         if(val.type() == typeid(Number) && !syms.is_defined(full)) {
-            val = (Number)mach->getPC();
+            val = static_cast<Number>(mach->getPC());
         }
         return val;
     };
@@ -782,7 +786,7 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         }
         for (auto const& u : syms.undefined) {
             parser.errors.push_back(
-                {(size_t)u.second, 0, // u.line_info.first, u.line_info.second,
+                {static_cast<size_t>(u.second), 0, // u.line_info.first, u.line_info.second,
                  fmt::format("Undefined symbol: '{}'", u.first)});
         }
         return false;
