@@ -22,6 +22,14 @@ map_bank_read(0x9f, 1, function(adr)
             return (vadr[vsel] >> 8) & 0xff
         elseif offset == 0x22 then
             return (vadr[vsel] >> 16) | (vinc[vsel]<<3)
+        elseif offset == 0x23 then
+            res = vram[vadr[1]+1]
+            vadr[1] = vadr[1] + increments[vinc[1]+1]
+            return res
+        elseif offset == 0x24 then
+            res = vram[vadr[2]+1]
+            vadr[2] = vadr[2] + increments[vinc[2]+1]
+            return res
         end
         res =  vregs[offset-0x20+1]
         return res

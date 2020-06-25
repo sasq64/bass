@@ -34,6 +34,7 @@ struct SymbolTable
     std::unordered_map<std::string, std::any> syms;
     std::unordered_map<std::string, int> undefined;
     std::unordered_set<std::string> accessed;
+    bool trace = false;
 
     bool is_defined(std::string_view name) const
     {
@@ -74,7 +75,7 @@ struct SymbolTable
                     fmt::format("Can not redefine generic any type {} ({})", s,
                                 val.type().name()));
             }
-            if (undefined.find(s) != undefined.end()) {
+            if (trace && undefined.find(s) != undefined.end()) {
                 fmt::print("Defined {}\n", s);
             }
             syms[s] = val;
@@ -99,15 +100,23 @@ struct SymbolTable
                 if (it != syms.end()) {
                     if (std::any_cast<T>(it->second) != val) {
                         LOGD("Redefined '%s' in %d", s, line);
-                        if constexpr (std::is_arithmetic_v<T>) {
-                            fmt::print(
-                                "Redefined {} in line {} from  {} to {}\n", s,
-                                line, (int)std::any_cast<T>(it->second),
-                                (int)val);
-                        } else {
-                            fmt::print("Redefined {} in line {}\n", s, line);
+                        if (trace) {
+                            if constexpr (std::is_arithmetic_v<T>) {
+                                fmt::print("Redefined {} in line {} from ${:x} "
+                                           "to ${:x}\n",
+                                           s, line,
+                                           (int)std::any_cast<T>(it->second),
+                                           (int)val);
+                            } else {
+                                fmt::print("Redefined {} in line {}\n", s,
+                                           line);
+                            }
                         }
                         undefined.insert({s, -1});
+                    }
+                } else {
+                    if(trace) {
+                        fmt::print("Defined {} in line {}\n", s, line);
                     }
                 }
             }
@@ -147,7 +156,9 @@ struct SymbolTable
         auto it = syms.find(s);
         if (it == syms.end()) {
             LOGD("%s is undefined", name);
-            fmt::print("Access undefined '{}' in line {}\n", name, line);
+            if(trace) {
+                fmt::print("Access undefined '{}' in line {}\n", name, line);
+            }
             undefined.insert({s, line});
             if constexpr (std::is_same_v<T, std::any>) {
                 return std::any((double)0);
@@ -189,16 +200,24 @@ struct SymbolTable
         return Accessor<T>(*this, name);
     }
 
-    /* Accessor<std::any> operator[](std::string_view name) */
-    /* { */
-    /*     return Accessor<std::any>(*this, name); */
-    /* } */
+    Accessor<std::any> operator[](std::string_view name)
+    {
+        return Accessor<std::any>(*this, name);
+    }
 
     template <typename FN>
     void forAll(FN const& fn) const
     {
         for (auto const& p : syms) {
             fn(p.first, p.second);
+        }
+    }
+
+    // Remove all undefined that now exists
+    void resolve()
+    {
+        for (auto const& [name, val] : syms) {
+            undefined.erase(name);
         }
     }
 
@@ -217,6 +236,11 @@ struct SymbolTable
     }
 
     bool done() const { return undefined.empty(); }
+
+    std::unordered_map<std::string, int> const& get_undefined()
+    {
+        return undefined;
+    }
 
     void clear()
     {

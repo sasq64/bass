@@ -137,10 +137,12 @@ void Assembler::evaluateBlock(std::string_view block, std::string_view fn)
 
 int Assembler::checkUndefined()
 {
-    if (syms.done()) return DONE;
+    auto const& undef = syms.get_undefined();
+    if (undef.empty()) return DONE;
 
-    if (!syms.ok()) {
-        for (auto const& u : syms.undefined) {
+    syms.resolve();
+    if (!undef.empty()) {
+        for (auto const& u : undef) {
             fmt::format("Undefined symbol {} in line {}", u.first, u.second);
         }
         return ERROR;
@@ -169,14 +171,22 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     while (true) {
         syms.clear();
         mach->getCurrentSection() = section;
+        LOGI("Assembling to %x %x", section.start, section.data.size());
         lastLabel = "__test_" + std::to_string(start);
         if (!parser.parse(contents, fileName.c_str())) {
             throw parse_error("Syntax error in test block");
         }
-        LOGD("Parsing done");
+        LOGI("Parsing done at %x", mach->getCurrentSection().data.size());
         auto result = checkUndefined();
         if (result == DONE) break;
         if (result == PASS) continue;
+        for (auto const& u : syms.undefined) {
+            parser.errors.push_back(
+                {static_cast<size_t>(u.second),
+                 0, // u.line_info.first, u.line_info.second,
+                 fmt::format("Undefined symbol: '{}'", u.first)});
+        }
+        throw parse_error("Undefined symbol in test");
     }
 
     mach->assemble({"rts", AdressingMode::NONE, 0});
@@ -411,7 +421,8 @@ void Assembler::setupRules()
             }
         }
         // LOGI("Label %s=%x", label, mach->getPC());
-        syms.set(label, static_cast<Number>(mach->getPC()), sv.line_info().first);
+        syms.set(label, static_cast<Number>(mach->getPC()),
+                 sv.line_info().first);
         return sv[0];
     };
 
@@ -544,7 +555,7 @@ void Assembler::setupRules()
                 }
 
                 auto res = mach->assemble(*i);
-                if(res == AsmResult::Truncated && !finalPass) {
+                if (res == AsmResult::Truncated && !finalPass) {
                     // Accept long branches unless final pass
                     res = AsmResult::Ok;
                 }
@@ -580,7 +591,9 @@ void Assembler::setupRules()
         {"Acc", AdressingMode::ACC},   {"Imm", AdressingMode::IMM},
     };
     auto buildArg = [](SV& sv) -> std::any {
-        return Instruction{"", modeMap.at(sv.name()), any_cast<Number>(sv[0])};
+        auto mode = modeMap.at(sv.name());
+        return Instruction{
+            "", mode, mode == AdressingMode::ACC ? 0 : any_cast<Number>(sv[0])};
     };
     for (auto const& [name, _] : modeMap) {
         parser[name.c_str()] = buildArg;
@@ -720,7 +733,7 @@ void Assembler::setupRules()
         val = syms.get(full, sv.line_info().first);
         // Set undefined numbers to PC, to increase likelyhood of
         // correct code generation (less passes)
-        if(val.type() == typeid(Number) && !syms.is_defined(full)) {
+        if (val.type() == typeid(Number) && !syms.is_defined(full)) {
             val = static_cast<Number>(mach->getPC());
         }
         return val;
@@ -786,7 +799,8 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         }
         for (auto const& u : syms.undefined) {
             parser.errors.push_back(
-                {static_cast<size_t>(u.second), 0, // u.line_info.first, u.line_info.second,
+                {static_cast<size_t>(u.second),
+                 0, // u.line_info.first, u.line_info.second,
                  fmt::format("Undefined symbol: '{}'", u.first)});
         }
         return false;

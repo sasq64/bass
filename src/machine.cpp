@@ -186,9 +186,6 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
         last_end = section_end;
 
-        fmt::print("Section {} -> {:04x}:{:04x}\n", section.name, section.start,
-                   section_end);
-
         memcpy(&ram[section.start], section.data.data(),
                section_end - section.start);
     }
@@ -371,8 +368,22 @@ std::vector<uint8_t> Machine::getRam()
     return data;
 }
 
-std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>
-Machine::getRegs() const
+
+
+Tuple6 Machine::getRegs() const
 {
     return machine->regs();
 }
+
+void Machine::setRegs(Tuple6 const& regs)
+{
+    auto r = machine->regs();
+    std::get<0>(r) = std::get<0>(regs);
+    std::get<1>(r) = std::get<1>(regs);
+    std::get<2>(r) = std::get<2>(regs);
+    std::get<3>(r) = std::get<3>(regs);
+    std::get<4>(r) = std::get<4>(regs);
+    std::get<5>(r) = std::get<5>(regs);
+}
+
+

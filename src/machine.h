@@ -58,6 +58,8 @@ enum class OutFmt
     Raw
 };
 
+using Tuple6 = std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>;
+
 class Machine
 {
 public:
@@ -91,8 +93,10 @@ public:
 
     uint32_t run(uint16_t pc);
     std::vector<uint8_t> getRam();
-    std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>
-    getRegs() const;
+
+
+    Tuple6 getRegs() const;
+    void setRegs(Tuple6 const& regs);
 
     void setBreakFunction(uint8_t what, std::function<void(uint8_t)> const& fn);
 

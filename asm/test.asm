@@ -4,6 +4,10 @@
 
     png = load_png("../data/face.png")
 
+
+
+    
+
 tileMem = $1e000
 
 USE_BITMAP = 0
@@ -129,6 +133,36 @@ copy_image:
     SetVReg(0)
     SetVAdr($0000 | INC_1)
     jsr copy_image
+}
+
+pixel:
+    stx ADDR_L
+    tax
+    lda mul320_lo,y
+    clc
+    adc ADDR_L
+    sta ADDR_L
+    lda mul320_hi,y
+    adc #0
+    sta ADDR_M
+    stx DATA0
+    rts
+
+mul320_lo:
+mul320_hi:
+    nop
+
+!test pixel {
+    stx ADDR_L
+    tax
+    lda mul320_lo,y
+    clc
+    adc ADDR_L
+    sta ADDR_L
+    lda mul320_hi,y
+    adc #0
+    sta ADDR_M
+    stx DATA0
 }
 
 

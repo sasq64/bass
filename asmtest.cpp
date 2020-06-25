@@ -74,6 +74,9 @@ TEST_CASE("assembler.first", "[assembler]")
 {
     Tester t;
 
+    t = " asl a";
+    REQUIRE(t.noErrors());
+
     t = "!rept 4 { nop }";
     REQUIRE(t.noErrors());
     REQUIRE(t.mainSize() == 4);
