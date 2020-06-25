@@ -66,3 +66,7 @@ target_link_libraries(symtest PRIVATE coreutils fmt)
 add_executable(tester testmain.cpp asmtest.cpp)
 target_link_libraries(tester PRIVATE coreutils fmt badlib)
 
+add_executable(bazz fuzz.cpp)
+target_compile_options(bazz PRIVATE -fsanitize=address,fuzzer)
+target_link_options(bazz PRIVATE -fsanitize=address,fuzzer)
+target_link_libraries(bazz PRIVATE badlib coreutils)

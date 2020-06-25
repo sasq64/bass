@@ -128,14 +128,14 @@ public:
         memcpy(pixels.get(), px, sizeof(T) * width * height);
     }
 
-    basic_bitmap(uint32_t width, uint32_t height, int32_t n, const uint8_t* px)
-        : w(width), h(height)
-    {
-        pixels = std::shared_ptr<T[]>(new T[width * height]);
-        for (int64_t i = 0; i < w * h; i++)
-            (*pixels)[i] = 0xff000000 | px[i * 3] | (px[i * 3 + 1] << 8) |
-                           (px[i * 3 + 2] << 16);
-    }
+    /* basic_bitmap(uint32_t width, uint32_t height, int32_t n, const uint8_t* px) */
+    /*     : w(width), h(height) */
+    /* { */
+    /*     pixels = std::shared_ptr<T[]>(new T[width * height]); */
+    /*     for (int64_t i = 0; i < w * h; i++) */
+    /*         (*pixels)[i] = 0xff000000 | px[i * 3] | (px[i * 3 + 1] << 8) | */
+    /*                        (px[i * 3 + 2] << 16); */
+    /* } */
 
     //! Render another bitmap into this one
     void put(int32_t x, int32_t y, const basic_bitmap& bm)

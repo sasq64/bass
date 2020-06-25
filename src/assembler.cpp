@@ -164,19 +164,20 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     }
 
     auto saved = save();
-    auto machSaved = mach->saveState();
-    auto start = mach->getPC();
-    LOGI("Testing %s:%s at pc %x", name, contents, start);
+
+    auto& oldSection = mach->getCurrentSection();
+    mach->setSection("test");
     auto section = mach->getCurrentSection();
+
+    auto start = mach->getPC();
+    LOGD("Testing %s:%s at pc %x", name, contents, start);
     while (true) {
         syms.clear();
         mach->getCurrentSection() = section;
-        LOGI("Assembling to %x %x", section.start, section.data.size());
         lastLabel = "__test_" + std::to_string(start);
         if (!parser.parse(contents, fileName.c_str())) {
             throw parse_error("Syntax error in test block");
         }
-        LOGI("Parsing done at %x", mach->getCurrentSection().data.size());
         auto result = checkUndefined();
         if (result == DONE) break;
         if (result == PASS) continue;
@@ -201,7 +202,8 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
                   {"SP", num(sp)},         {"PC", num(pc)},
                   {"cycles", num(cycles)}, {"ram", mach->getRam()}};
 
-    mach->restoreState(machSaved);
+    mach->getCurrentSection() = section;
+    mach->setSection(oldSection.name);
     restore(saved);
 
     return res;
