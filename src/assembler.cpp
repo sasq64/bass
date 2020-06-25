@@ -617,26 +617,61 @@ void Assembler::setupRules()
         return {"", AdressingMode::ABS, any_cast<Number>(val)};
     };
 
-    parser["Decimal"] = [](SV& sv) -> Number {
-        return std::stod(sv.c_str(), nullptr);
+    parser["Decimal"] = [&](SV& sv) -> Number {
+        try {
+            return std::stod(sv.c_str(), nullptr);
+        } catch (std::out_of_range& e) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
+        }
     };
 
-    parser["Octal"] = [](SV& sv) -> Number {
-        return std::stoi(sv.c_str() + 2, nullptr, 8);
+    parser["Octal"] = [&](SV& sv) -> Number {
+        try {
+            return std::stoi(sv.c_str() + 2, nullptr, 8);
+        } catch (std::out_of_range& e) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
+        }
     };
 
-    parser["Multi"] = [](SV& sv) -> Number {
-        return std::stoi(sv.c_str() + 2, nullptr, 4);
+    parser["Multi"] = [&](SV& sv) -> Number {
+        try {
+            return std::stoi(sv.c_str() + 2, nullptr, 4);
+        } catch (std::out_of_range& e) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
+        }
     };
 
-    parser["Binary"] = [](SV& sv) -> Number {
-        return std::stoi(sv.c_str() + 2, nullptr, 2);
+    parser["Binary"] = [&](SV& sv) -> Number {
+        try {
+            return std::stoi(sv.c_str() + 2, nullptr, 2);
+        } catch (std::out_of_range& e) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
+        }
     };
 
-    parser["HexNum"] = [](SV& sv) -> Number {
-        const char* ptr = sv.c_str();
-        if (*ptr == '0') ptr++;
-        return std::stoi(ptr + 1, nullptr, 16);
+    parser["HexNum"] = [&](SV& sv) -> Number {
+        try {
+            const char* ptr = sv.c_str();
+            if (*ptr == '0') ptr++;
+            return std::stoi(ptr + 1, nullptr, 16);
+        } catch (std::out_of_range& e) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
+        }
     };
 
     parser["Star"] = [&](SV& sv) -> Number {
@@ -653,8 +688,20 @@ void Assembler::setupRules()
         auto ope = any_cast<std::string_view>(sv[1]);
         auto a = Num(any_cast<Number>(sv[0]));
         auto b = Num(any_cast<Number>(sv[2]));
-        auto result = static_cast<Number>(operation(ope, a, b));
-        return std::any(result);
+        try {
+            auto result = static_cast<Number>(operation(ope, a, b));
+            return std::any(result);
+        } catch (std::out_of_range& e) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return std::any((Number)0);
+        } catch (dbz_error& e) {
+            if (finalPass) {
+                throw parse_error("Division by zero");
+            }
+            return std::any((Number)0);
+        }
     };
 
     parser["Script"] = [&](SV& sv) {
@@ -779,7 +826,8 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         }
 
         for (auto const& s : mach->getSections()) {
-            // auto& secsyms = syms.at<AnyMap>("section").at<AnyMap>(s.name);
+            // auto& secsyms =
+            // syms.at<AnyMap>("section").at<AnyMap>(s.name);
 
             auto prefix = "section."s + std::string(s.name);
 

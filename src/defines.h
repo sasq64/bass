@@ -14,6 +14,7 @@
 
 // using Number = double;
 
+// Update string view so contents is stored persitently
 inline std::string const& persist(std::string_view& sv)
 {
     static std::unordered_set<std::string> persisted;
@@ -21,6 +22,27 @@ inline std::string const& persist(std::string_view& sv)
     sv = res;
     return res;
 }
+
+// Store string and return string_view to it
+inline std::string_view persist(std::string const& s)
+{
+    std::string_view sv(s);
+    persist(sv);
+    return sv;
+}
+
+
+class dbz_error : public std::exception
+{
+public:
+    explicit dbz_error(std::string m = "Division by zero") : msg(std::move(m)) {}
+    const char* what() const noexcept override { return msg.c_str(); }
+
+private:
+    std::string msg;
+};
+
+#define DBZ(x) if(x == 0) throw dbz_error()
 
 struct Num
 {
@@ -33,14 +55,14 @@ struct Num
     Num operator+(Num n) const { return d + n.d; }
     Num operator-(Num n) const { return d - n.d; }
     Num operator*(Num n) const { return d * n.d; }
-    Num operator/(Num n) const { return d / n.d; }
+    Num operator/(Num n) const { DBZ(n.d) ; return d / n.d; }
 
     Num operator|(Num n) const { return i() | n.i(); };
     Num operator&(Num n) const { return i() & n.i(); };
     Num operator^(Num n) const { return i() ^ n.i(); };
     Num operator>>(Num n) const { return i() >> n.i(); };
     Num operator<<(Num n) const { return i() << n.i(); };
-    Num operator%(Num n) const { return i() % n.i(); };
+    Num operator%(Num n) const { DBZ(n.i()) ; return i() % n.i(); };
 
     Num operator&&(Num n) const { return d && n.d; }
     Num operator||(Num n) const { return d || n.d; }
@@ -60,23 +82,20 @@ struct Num
 
 inline std::string_view operator+(std::string_view const& sv, Num n)
 {
-    auto s = std::string_view(std::string(sv) + std::to_string(n.i()));
-    persist(s);
-    return s;
+    return persist(std::string(sv) + std::to_string(n.i()));
 }
 
 inline std::string_view operator+(std::string_view const& sv,
                            std::string_view const& n)
 {
-    auto s = std::string_view(std::string(sv) + std::string(n));
-    persist(s);
-    return s;
+    return persist(std::string(sv) + std::string(n));
 }
 
 using Number = double;
 
 inline Num div(Num a, Num b)
 {
+    DBZ(b.i());
     return a.i() / b.i();
 }
 

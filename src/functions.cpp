@@ -49,8 +49,12 @@ void initFunctions(Assembler& a)
         if (p.is_relative()) {
             p = a.getCurrentPath() / p;
         }
-        utils::File f{p};
-        return f.readAll();
+        try {
+            utils::File f{p};
+            return f.readAll();
+        } catch (utils::io_exception& e) {
+            throw parse_error(fmt::format("Could not load {}", name));
+        }
     });
 
     a.registerFunction("word", [](std::vector<uint8_t> const& data) {

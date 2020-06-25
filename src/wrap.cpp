@@ -1,9 +1,11 @@
 #include "wrap.h"
 
 #include "defines.h"
+#include "machine.h"
 #include "script.h"
 #include <peglib.h>
 
+#include <coreutils/file.h>
 #include <coreutils/log.h>
 #include <iostream>
 #include <string>
@@ -90,7 +92,7 @@ ParserWrapper::ParserWrapper(std::string const& s)
 #endif
     p->log = [&](size_t line, size_t col, const std::string& msg) {
         errors.push_back({line, col, msg});
-        //fmt::printf("%s (%s) in %d:%d\n", current_error, msg, line, col);
+        // fmt::printf("%s (%s) in %d:%d\n", current_error, msg, line, col);
     };
 }
 ParserWrapper::~ParserWrapper() = default;
@@ -132,6 +134,9 @@ void ParserWrapper::action(
         SVWrap s(sv);
         try {
             return fn(s);
+        } catch (dbz_error& e) {
+            LOGW("DBZ");
+            return std::any();
         } catch (parse_error& e) {
             LOGD("Caught %s", e.what());
             current_error = e.what();
@@ -140,8 +145,12 @@ void ParserWrapper::action(
             throw peg::parse_error(e.what());
         } catch (assert_error& e) {
             throw peg::parse_error(e.what());
+        } catch (machine_error& e) {
+            throw peg::parse_error(e.what());
         } catch (std::bad_any_cast& e) {
             throw peg::parse_error("Data type error");
+        } catch (utils::io_exception& e) {
+            throw peg::parse_error(e.what());
         }
     };
 }
