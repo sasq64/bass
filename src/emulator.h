@@ -184,7 +184,7 @@ struct Machine
 
     uint8_t regSR() const { return get_SR(); }
 
-    void setPC(const int16_t& p) { pc = p; }
+    void setPC(const uint16_t& p) { pc = p; }
 
     uint32_t run(uint32_t toCycles = 0x01000000)
     {

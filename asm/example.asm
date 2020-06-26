@@ -50,6 +50,8 @@ bitmapMem = $4000
 spriteMem = $7000
 spritePtrs = screenMem + 1016
 
+    !section "test", $c000
+
     !section "main", $801
     !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
 start:

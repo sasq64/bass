@@ -327,6 +327,7 @@ TEST_CASE("assembler.test", "[assembler]")
 {
     Assembler ass;
     ass.parse(R"(
+    !section "test", $400
     !org $800
 start:
     ldx #0
