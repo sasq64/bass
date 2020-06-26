@@ -19,6 +19,11 @@ set(GCC_CLANG_WARNINGS -Wno-unused-parameter -Wno-unused-variable -Werror -Wall 
 
 set(MSVC_WARNINGS /W3)
 
+if(FUZZ)
+set(CMAKE_CXX_FLAGS  ${CMAKE_CXX_FLAGS} -fsanitize=address)
+set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address)
+endif()
+
 # GCC specific warnings
 set(GCC_WARNINGS
         -Wduplicated-branches
@@ -66,7 +71,9 @@ target_link_libraries(symtest PRIVATE coreutils fmt)
 add_executable(tester testmain.cpp asmtest.cpp)
 target_link_libraries(tester PRIVATE coreutils fmt badlib)
 
+if(FUZZ)
 add_executable(bazz fuzz.cpp)
 target_compile_options(bazz PRIVATE -fsanitize=address,fuzzer)
 target_link_options(bazz PRIVATE -fsanitize=address,fuzzer)
 target_link_libraries(bazz PRIVATE badlib coreutils)
+endif(FUZZ)

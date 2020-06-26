@@ -104,13 +104,23 @@ void ParserWrapper::packrat()
 
 bool ParserWrapper::parse(std::string_view source, const char* file) const
 {
-    return p->parse_n(source.data(), source.length(), file);
+    try {
+        return p->parse_n(source.data(), source.length(), file);
+    } catch (peg::parse_error& e) {
+        fmt::print("Parse error: {}\n", e.what());
+        return false;
+    }
 }
 
 bool ParserWrapper::parse(std::string_view source, std::any& d,
                           const char* file) const
 {
-    return p->parse_n(source.data(), source.length(), d, file);
+    try {
+        return p->parse_n(source.data(), source.length(), d, file);
+    } catch (peg::parse_error& e) {
+        fmt::print("Parse error: {}\n", e.what());
+        return false;
+    }
 }
 
 void ParserWrapper::enter(

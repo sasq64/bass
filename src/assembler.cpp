@@ -695,12 +695,12 @@ void Assembler::setupRules()
             if (finalPass) {
                 throw parse_error("Out of range");
             }
-            return std::any((Number)0);
+            return any_num(0);
         } catch (dbz_error& e) {
             if (finalPass) {
                 throw parse_error("Division by zero");
             }
-            return std::any((Number)0);
+            return any_num(0);
         }
     };
 
@@ -713,6 +713,9 @@ void Assembler::setupRules()
 
     parser["Index"] = [&](SV& sv) {
         trace(sv);
+        if(sv.size() == 1) {
+            return sv[0];
+        }
         auto index = any_cast<Number>(sv[1]);
         std::any vec = sv[0];
         if (any_cast<Number>(&vec) != nullptr) {

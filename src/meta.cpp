@@ -14,6 +14,11 @@ using namespace std::string_literals;
 
 static std::array<uint8_t, 256> char_translate;
 
+void Check(bool v, std::string const& txt)
+{
+    if (!v) throw parse_error(txt);
+}
+
 static void resetTranslate()
 {
     for (int i = 0; i < 256; i++) {
@@ -314,6 +319,7 @@ void initMeta(Assembler& a)
 
     a.registerMeta("include", [&](auto const& text, auto const&) {
         auto args = a.evaluateList(text);
+        Check(args.size() == 1, "Incorrect number of arguments");
         auto name = any_cast<std::string_view>(args[0]);
         auto source = a.includeFile(name);
         a.evaluateBlock(source, name);
@@ -321,6 +327,7 @@ void initMeta(Assembler& a)
 
     a.registerMeta("incbin", [&](auto const& text, auto const&) {
         auto args = a.evaluateList(text);
+        Check(args.size() == 1, "Incorrect number of arguments");
         auto name = any_cast<std::string_view>(args[0]);
         auto p = utils::path(name);
         if (p.is_relative()) {
@@ -371,11 +378,11 @@ void initMeta(Assembler& a)
     a.registerMeta("enum", [&](auto const& text, auto const& blocks) {
         auto s = a.evaluateEnum(blocks[0]);
         if (text.empty()) {
-            for(auto const& [name, v] : s) {
+            for (auto const& [name, v] : s) {
                 a.getSymbols().set(name, v);
             }
         } else {
-           a.getSymbols().set<AnyMap>(std::string(text), s);
+            a.getSymbols().set<AnyMap>(std::string(text), s);
         }
     });
 }

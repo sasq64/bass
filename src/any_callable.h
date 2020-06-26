@@ -9,13 +9,15 @@
 template <int A, typename ARG>
 ARG get_arg(std::vector<std::any> const& vec, std::false_type)
 {
-    return std::any_cast<ARG>(vec[A]);
+    static ARG empty{};
+    return A < vec.size() ? std::any_cast<ARG>(vec[A]) : empty;
 }
 
 template <int A, typename ARG>
 ARG get_arg(std::vector<std::any> const& vec, std::true_type)
 {
-    return static_cast<ARG>(std::any_cast<double>(vec[A]));
+    return A < vec.size() ? static_cast<ARG>(std::any_cast<double>(vec[A]))
+                          : 0.0;
 }
 
 template <int A, typename ARG>
@@ -25,21 +27,22 @@ ARG get_arg(std::vector<std::any> const& vec)
 }
 
 template <typename T>
-std::any make_res(T&& v, std::true_type) {
+std::any make_res(T&& v, std::true_type)
+{
     return std::any((double)v);
 }
 
 template <typename T>
-std::any make_res(T&& v, std::false_type) {
+std::any make_res(T&& v, std::false_type)
+{
     return std::any(v);
 }
 
 template <typename T>
-std::any make_res(T&& v) {
+std::any make_res(T&& v)
+{
     return make_res(std::forward<T>(v), std::is_arithmetic<T>());
 }
-
-
 
 struct FunctionCaller
 {
@@ -51,7 +54,8 @@ template <typename... X>
 struct FunctionCallerImpl;
 
 template <class FX, class R>
-struct FunctionCallerImpl<FX, R (FX::*)(std::vector<std::any> const&) const> : public FunctionCaller
+struct FunctionCallerImpl<FX, R (FX::*)(std::vector<std::any> const&) const>
+    : public FunctionCaller
 {
     explicit FunctionCallerImpl(FX const& f) : fn(f) {}
     FX fn;
@@ -69,7 +73,8 @@ struct FunctionCallerImpl<FX, R (FX::*)(ARGS...) const> : public FunctionCaller
     FX fn;
 
     template <size_t... A>
-    std::any apply(std::vector<std::any> const& vec, std::index_sequence<A...>) const
+    std::any apply(std::vector<std::any> const& vec,
+                   std::index_sequence<A...>) const
     {
         return make_res(fn(get_arg<A, ARGS>(vec)...));
     }
@@ -79,7 +84,6 @@ struct FunctionCallerImpl<FX, R (FX::*)(ARGS...) const> : public FunctionCaller
         return apply(args, std::make_index_sequence<sizeof...(ARGS)>());
     }
 };
-
 
 struct AnyCallable
 {
@@ -111,6 +115,4 @@ struct AnyCallable
         init(f);
         return *this;
     }
-
 };
-
