@@ -52,7 +52,7 @@ void initFunctions(Assembler& a)
         try {
             utils::File f{p};
             return f.readAll();
-        } catch (utils::io_exception& e) {
+        } catch (utils::io_exception&) {
             throw parse_error(fmt::format("Could not load {}", name));
         }
     });

@@ -16,8 +16,8 @@ ARG get_arg(std::vector<std::any> const& vec, std::false_type)
 template <int A, typename ARG>
 ARG get_arg(std::vector<std::any> const& vec, std::true_type)
 {
-    return A < vec.size() ? static_cast<ARG>(std::any_cast<double>(vec[A]))
-                          : 0.0;
+    return static_cast<ARG>(A < vec.size() ? std::any_cast<double>(vec[A])
+                                           : 0.0);
 }
 
 template <int A, typename ARG>

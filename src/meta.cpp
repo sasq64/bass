@@ -218,7 +218,7 @@ void initMeta(Assembler& a)
         for (size_t i = 0; i < size; i++) {
             uint8_t d = vec ? (*vec)[i] : 0;
             for (auto const& b : blocks) {
-                a.getSymbols().at<Number>("i") = i;
+                a.getSymbols().at<Number>("i") = static_cast<Number>(i);
                 a.getSymbols().at<Number>("v") = d;
                 auto res = a.evaluateExpression(b);
                 d = number<uint8_t>(res);
@@ -309,7 +309,7 @@ void initMeta(Assembler& a)
             if (res >= 0x100000000) {
                 flags = res >> 32;
             } else {
-                pc = res;
+                pc = static_cast<uint16_t>(res);
             }
         }
         auto& s = mach.addSection(std::string(name), start);

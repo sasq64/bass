@@ -33,6 +33,8 @@ struct SVWrap
     template <typename T>
     std::vector<T> transform() const;
 
+    int line() const { return static_cast<int>(line_info().first);}
+
     template <typename T>
     T to(size_t i) const
     {

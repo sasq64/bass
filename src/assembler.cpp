@@ -395,7 +395,7 @@ void Assembler::setupRules()
                 sym = std::string(lastLabel) + sym;
             }
             // LOGI("Symbol:%s", sym);
-            syms.set(sym, sv[1], sv.line_info().first);
+            syms.set(sym, sv[1], sv.line());
         } else if (sv.size() == 1) {
             mach->getCurrentSection().pc = number<uint16_t>(sv[0]);
         }
@@ -424,7 +424,7 @@ void Assembler::setupRules()
         }
         // LOGI("Label %s=%x", label, mach->getPC());
         syms.set(label, static_cast<Number>(mach->getPC()),
-                 sv.line_info().first);
+                 sv.line());
         return sv[0];
     };
 
@@ -446,9 +446,8 @@ void Assembler::setupRules()
         auto meta = any_cast<std::string_view>(sv[i++]);
         auto text = any_cast<std::string_view>(sv[i++]);
         // Strip trailing spaces
-        auto p = text.size() - 1;
-        while (text[p] == ' ' || text[p] == '\t') {
-            if (p == 0) break;
+        auto p = (int)text.size() - 1;
+        while (p >= 0 && (text[p] == ' ' || text[p] == '\t')) {
             p--;
         }
         if (text.size() > p) {
@@ -531,7 +530,7 @@ void Assembler::setupRules()
         auto contents = any_cast<std::string_view>(sv[1]);
         auto name = any_cast<std::string_view>(sv[0]);
         auto res = runTest(name, contents);
-        syms.set("tests."s + std::string(name), res, sv.line_info().first);
+        syms.set("tests."s + std::string(name), res, sv.line());
         return sv[0];
     };
 
@@ -620,7 +619,7 @@ void Assembler::setupRules()
     parser["Decimal"] = [&](SV& sv) -> Number {
         try {
             return std::stod(sv.c_str(), nullptr);
-        } catch (std::out_of_range& e) {
+        } catch (std::out_of_range&) {
             if (finalPass) {
                 throw parse_error("Out of range");
             }
@@ -631,7 +630,7 @@ void Assembler::setupRules()
     parser["Octal"] = [&](SV& sv) -> Number {
         try {
             return std::stoi(sv.c_str() + 2, nullptr, 8);
-        } catch (std::out_of_range& e) {
+        } catch (std::out_of_range&) {
             if (finalPass) {
                 throw parse_error("Out of range");
             }
@@ -642,7 +641,7 @@ void Assembler::setupRules()
     parser["Multi"] = [&](SV& sv) -> Number {
         try {
             return std::stoi(sv.c_str() + 2, nullptr, 4);
-        } catch (std::out_of_range& e) {
+        } catch (std::out_of_range&) {
             if (finalPass) {
                 throw parse_error("Out of range");
             }
@@ -653,7 +652,7 @@ void Assembler::setupRules()
     parser["Binary"] = [&](SV& sv) -> Number {
         try {
             return std::stoi(sv.c_str() + 2, nullptr, 2);
-        } catch (std::out_of_range& e) {
+        } catch (std::out_of_range&) {
             if (finalPass) {
                 throw parse_error("Out of range");
             }
@@ -666,7 +665,7 @@ void Assembler::setupRules()
             const char* ptr = sv.c_str();
             if (*ptr == '0') ptr++;
             return std::stoi(ptr + 1, nullptr, 16);
-        } catch (std::out_of_range& e) {
+        } catch (std::out_of_range&) {
             if (finalPass) {
                 throw parse_error("Out of range");
             }
@@ -691,12 +690,12 @@ void Assembler::setupRules()
         try {
             auto result = static_cast<Number>(operation(ope, a, b));
             return std::any(result);
-        } catch (std::out_of_range& e) {
+        } catch (std::out_of_range&) {
             if (finalPass) {
                 throw parse_error("Out of range");
             }
             return any_num(0);
-        } catch (dbz_error& e) {
+        } catch (dbz_error&) {
             if (finalPass) {
                 throw parse_error("Division by zero");
             }
@@ -716,7 +715,7 @@ void Assembler::setupRules()
         if(sv.size() == 1) {
             return sv[0];
         }
-        auto index = any_cast<Number>(sv[1]);
+        auto index = number<size_t>(sv[1]);
         std::any vec = sv[0];
         if (any_cast<Number>(&vec) != nullptr) {
             return any_num(0);
@@ -761,9 +760,9 @@ void Assembler::setupRules()
         case '!':
             return static_cast<Number>(inum == 0);
         case '<':
-            return inum & 0xff;
+            return static_cast<Number>(inum & 0xff);
         case '>':
-            return inum >> 8;
+            return static_cast<Number>(inum >> 8);
         default:
             throw parse_error("Unknown unary operator");
         }
@@ -782,7 +781,7 @@ void Assembler::setupRules()
             full = utils::join(parts.begin(), parts.end(), ".");
         }
 
-        val = syms.get(full, sv.line_info().first);
+        val = syms.get(full, sv.line());
         // Set undefined numbers to PC, to increase likelyhood of
         // correct code generation (less passes)
         if (val.type() == typeid(Number) && !syms.is_defined(full)) {

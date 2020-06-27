@@ -144,7 +144,7 @@ void ParserWrapper::action(
         SVWrap s(sv);
         try {
             return fn(s);
-        } catch (dbz_error& e) {
+        } catch (dbz_error&) {
             LOGW("DBZ");
             return std::any();
         } catch (parse_error& e) {
@@ -157,7 +157,7 @@ void ParserWrapper::action(
             throw peg::parse_error(e.what());
         } catch (machine_error& e) {
             throw peg::parse_error(e.what());
-        } catch (std::bad_any_cast& e) {
+        } catch (std::bad_any_cast&) {
             throw peg::parse_error("Data type error");
         } catch (utils::io_exception& e) {
             throw peg::parse_error(e.what());
