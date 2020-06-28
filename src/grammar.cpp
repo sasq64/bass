@@ -7,7 +7,7 @@ RootDefinition <- ':d:' FnDef
 RootList <- ':a:' CallArgs
 RootEnum <- ':e:' EnumBlock
 
-Program <- ((_? LineComment? EOL) / (Line (EOL / &EOT)))*
+Program <- ((_? WholeLineComment? EOL) / (Line (EOL / &EOT)))*
 Line <- (Script / AssignLine / OpLine / ~Label) _? LineComment?
 AssignLine <- _? ('*' / Assignee) _? '=' (String / Expression)
 Assignee <- DotSymbol _?
@@ -78,6 +78,7 @@ Multi <- '0m' [0-3]+
 Number <-  HexNum / Binary / Octal / Multi / Decimal
 
 LineComment <- ';' (!EOL .)* &EOL
+WholeLineComment <- (';' / '#') (!EOL .)* &EOL
 
 ~_ <- [ \t]*
 
