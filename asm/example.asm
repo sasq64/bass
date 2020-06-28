@@ -34,14 +34,14 @@
     sty v+1
 }
 
-    ; Koala offsets
-    !enum Koala {
-        bitmap = $2
-        screen = $1f42
-        colors = $232a
-        bg = $2712
-        end = $2713
-    }
+; Koala offsets
+!enum Koala {
+    bitmap = $2
+    screen = $1f42
+    colors = $232a
+    bg = $2712
+    end = $2713
+}
 
 musicLocation = $1000
 
@@ -218,11 +218,9 @@ spriteData:
     !section "music", musicLocation
     !fill music_data
 
-    !section "colors", *
 colors:
     !fill color_ram
 
-    !section "screen", *
 screen:
     !fill screen_ram
 

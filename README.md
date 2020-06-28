@@ -7,7 +7,7 @@
 * Unit tests through internal emulator
 * Open and easily extendable source
 
-See [INTRO.md](INTRO.md) for a tutorial / introduction.
+See this [TUTORIAL](http://apone.org/bass/part1.html) for a tutorial / introduction.
 
 ### Invoking
 
@@ -49,7 +49,7 @@ text:
 end:
 ```
 
-See [asm/example.asm](asm/example.asm) for a full example.
+See [example.asm](http://apone.org/bass/example.asm.html) for a full example.
 
 ### Labels
 
@@ -124,22 +124,11 @@ The symbol table supports the following types:
  * Number (double)
  * String (`std::string_view`)
  * Byte Array (`std::vector<uint8_t>`)
- * Symbols (SymbolTable, based on `std::unordered_map<std::string, std::any>`
 
 Only numbers and strings can be assigned directly.
 
 Arrays are returned from functions, such as `bytes(elems...)` which is the basic
 way of creating an array.
-
-A `Symbols` can be created using the `!enum` meta command.
-
-```cpp
-!enum myObj {
-   name = "hey"
-   x = 1
-   y = 3
-}
-```
 
 ### Limitations of the parser
 

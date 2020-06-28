@@ -2,6 +2,8 @@
     !include "vera.inc"
     !include "x16.inc"
 
+    !script "../lua/x16.lua"
+
     png = load_png("../data/face.png")
 
 

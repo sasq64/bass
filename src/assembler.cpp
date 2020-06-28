@@ -253,7 +253,7 @@ void Assembler::applyMacro(Call const& call)
 
     auto const& m = macros[call.name];
 
-    if(m.args.size() != call.args.size()) {
+    if (m.args.size() != call.args.size()) {
         throw parse_error("Wrong number of arguments");
     }
 
@@ -421,8 +421,7 @@ void Assembler::setupRules()
             }
         }
         // LOGI("Label %s=%x", label, mach->getPC());
-        syms.set(label, static_cast<Number>(mach->getPC()),
-                 sv.line());
+        syms.set(label, static_cast<Number>(mach->getPC()), sv.line());
         return sv[0];
     };
 
@@ -592,7 +591,8 @@ void Assembler::setupRules()
     auto buildArg = [](SV& sv) -> std::any {
         auto mode = modeMap.at(sv.name());
         return Instruction{
-            "", mode, mode == AddressingMode::ACC ? 0 : any_cast<Number>(sv[0])};
+            "", mode,
+            mode == AddressingMode::ACC ? 0 : any_cast<Number>(sv[0])};
     };
     for (auto const& [name, _] : modeMap) {
         parser[name.c_str()] = buildArg;
@@ -710,7 +710,7 @@ void Assembler::setupRules()
 
     parser["Index"] = [&](SV& sv) {
         trace(sv);
-        if(sv.size() == 1) {
+        if (sv.size() == 1) {
             return sv[0];
         }
         auto index = number<size_t>(sv[1]);
@@ -732,11 +732,24 @@ void Assembler::setupRules()
                     b = number<size_t>(sv[3]);
                 }
 
+                if (a > b || b >= v->size()) {
+                    if (finalPass) {
+                        throw parse_error("Slice outside array");
+                    }
+                    return any_num(0);
+                }
+
                 // LOGI("Slice %d:%d", a, b);
                 std::vector<uint8_t> nv(v->begin() + a, v->begin() + b);
                 return std::any(nv);
             }
 
+            if (index >= v->size()) {
+                if (finalPass) {
+                    throw parse_error("Index outside array");
+                }
+                return any_num(0);
+            }
             return any_num((*v)[index]);
         }
         auto const& v = any_cast<std::vector<Number>>(vec);

@@ -4,9 +4,8 @@
 ## Intro to the _bass_ (badass) 6502 assembler
 
 ### Part 1
-_bass_ is a new 6502 assembler. It is designed to be powerful (like kickassembler)
+_bass_ is a new 6502 assembler. It is designed to be powerful (like Kickassembler)
 but with a less complex syntax, and more _unified_, _functional_ design.
-
 
 Let's start with a minimal C64 program, a 3 opcode routine to make a rainbow border:
 
@@ -21,7 +20,7 @@ loop:
 
 You should be able to load this into a C64 emulator and start it with `sys 49152`.
 
-But let's add a _basic start_ snippet so we can just run the prg instead:
+Now let's add a _basic start_ snippet so we can just run the prg instead:
 
 [source,ca65]
 ----
@@ -31,7 +30,6 @@ start:
     lda #3
     sta $d020
 ----
-
 
 What happens here ? Well the `!byte` meta command accepts both numbers
 and strings, and for strings it inserts each character one by one.
@@ -76,11 +74,12 @@ can do:
 [source,ca65]
 ----
     data = load("music.bin")
-    !block data[2:]
+    !fill data[2:]
 ----
 
 A few new things here, the `data` symbol now refers to a byte array, and we use
-the `!block` meta command to insert it into memory.
+the `!fill` meta command to insert it into memory.
+
 The `[2:]` part is called _slicing_. To extract a range from a byte array you use
 it like: `data[start:end]` (where start is inclusive and end exclusive).
 
@@ -91,13 +90,14 @@ So what about the load address, can we use it? Sure;
     loadAdr = word(data[0:2])
     !section "music", loadAdr
 music:
-    !block data[2:]
+    !fill data[2:]
 ----
 
 As you may have figured out, the `word()` function decodes a little endian 16-bit word from an array.
 
-Except what if the load address is not compatible with our layout? Better
-to make sure it is where we want it:
+Except what if the load address is not compatible with our layout? If we load another song at a different adress it will probably break our code.
+
+Instead we can just _verify_ the load address:
 
 [source,ca65]
 ----
@@ -130,13 +130,18 @@ start:
     !assert  word(data[0:2]) == musicStart
 
     !section "music", musicStart
-    !block data[2:]
+    !fill data[2:]
 ----
 
 ### Part 2
 
-Let's try to add some graphics. First we add a couple of macros to make it
-easier to work with the VIC:
+In the last part we saw how to create a simple C64 program to play some music.
+We used the `load()` function to load the music into the assembler, and then
+the `!fill` meta command to place it onto memory.
+
+Now it's time to add some graphics.
+
+First we add a couple of macros to make it easier to work with the VIC:
 
 [source,ca65]
 ----
@@ -158,8 +163,14 @@ easier to work with the VIC:
 }
 ----
 
-These macros transforms an address and two offsets into the right bits.
-They also make sure that you only specify a legal address/offset.
+The first macro sets the VIC base address, which can only be located in one of
+16KB offsets of main RAM. We use the `!assert` to verify this, meaning our code
+will not compile if we try to use an incompatible address.
+
+The second macro is similar, but it takes offsets (from the VIC base address)
+and also makes sure the are legal. We use local symbols (starting with a `'.'`)
+to avoid polluting the namespace (yes symbols defined in macros will affect the
+global symbol table).
 
 [source,ca65]
 ----
@@ -167,8 +178,9 @@ They also make sure that you only specify a legal address/offset.
     BitmapAndScreen($2000, $000)
 ----
 
-This means that we need to locate our bitmap data at address `$6000` and our
-screen data at `$4000`.
+Ok, so now this means that we need to locate our bitmap data at address
+`$6000` and our screen data at `$4000`.
+
 Let's import a koala picture:
 
 [source,ca65]
@@ -179,13 +191,10 @@ Let's import a koala picture:
     color_ram = koala[$232a:$2712]
     bg_color = koala[$2712]
             
-    !section "colors", *
 colors:
-    !block color_ram
-
-    !section "screen", *
+    !fill color_ram
 screen:
-    !block screen_ram
+    !fill screen_ram
 
     !section "koala", $6000
     !block bitmap
@@ -193,11 +202,11 @@ screen:
 
 Here we use array slicing again to extract all the parts.
 
-We also use the `*` symbol which means the current program counter. Using
-it in a `!section` command only for informative purposes.
+The bitmap we is placed directly at `$6000` using a `!section` command, but
+the screen and color data needs to be copied.
 
-The bitmap we placed directly at `$6000`, but the screen and color
-data needs to be copied.
+Here is the code to coy our colors to Color RAM, and out screen to `$4000`,
+where we set it up earlier:
 
 [source,ca65]
 ----
@@ -237,12 +246,18 @@ $   lda colors,x
     bne -
 ----
 
-We use an `!if` statement here to avoid the copy just in case we do relocate
-the screen data to the correct position at load time.
+A few new things here: we use an `!if` statement here to avoid the copy
+just in case we do relocate the screen data to the correct position at load time.
+
+We also use the anonymous `$` label to avoid defining labels when we don't
+need to.
 
 ### Part 3
 
-Let's add a sprite!.
+In part 2 we saw how to use macros to set up a C64 graphics screen, `!section` to
+locate the graphics in memory, and some code to copy it to the right place.
+
+Now let's add a sprite!.
 
 [source,ca65]
 ----
@@ -269,8 +284,11 @@ spriteData:
 
 ----
 
-This should create a complete filled box and display it. But of course we want
-to generate something more nice looking. For this we turn to lua scripting;
+The `!rept` command is used to repeat any block of statements a given number
+of times. Here we user it to create a solid rectangle as out sprite.
+
+But of course we want  to generate something more nice looking.
+For this it's time to turn to lua scripting;
 
 [source]
 ----
@@ -295,17 +313,27 @@ end
 }%
 ----
 
-Now we have access to a `circle()` function that renders a circle into a vector of bits.
+You can use `%{` / `}%` at any time to switch to script mode and write
+LUA code, and functions defined in LUA will be callable from the Assembler.
+
+The code above will give us a `circle()` function that renders a circle into a vector of bits (the format used by monochrome sprites).
+
+We can now use this function to generate a ball sprite instead of our ugly rectangle:
 
 
 [source,ca65]
 ----
     circle_sprite = circle(zeroes(3*21), 3, 12, 10, 10)
 spriteData:
-    !block circle_sprite
+    !fill circle_sprite
 ----
 
-Here is some code to make the sprite move in a sine wave:
+The LUA function will take an array as input, and return an array
+with the rendered circle. Just like we did with the graphics and music
+earlier, we can use the `!fill` command to put it into memory.
+
+Let's make ths sprite move. Here is some code to make the
+sprite move in a sine wave:
 
 [source,ca65]
 ----
@@ -329,8 +357,10 @@ sine:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }
 ----
 
+Here we use the `!rept` command again, this time to create a sine table.
+
 So this is all pretty good - but can we take advantage of the fact that we can
-generate circles of different sizes? How about a small animation.
+generate circles of different sizes? How about a small animation?
 
 First, lets generate 8 sprites with different radiuses:
 
@@ -338,12 +368,12 @@ First, lets generate 8 sprites with different radiuses:
 ----
 spriteData:
     !rept 8 {
-        !block circle(zeroes(3*21), 3, 12, 10, i + 3)
+        !fill circle(zeroes(3*21), 3, 12, 10, i + 3)
         !byte 0
     }
 ----
 
-And we need to copy all frames to sprite memory
+And we need to copy all 8 frames to sprite memory:
 
 [source,ca65]
 ----
@@ -357,7 +387,7 @@ $   lda spriteData-1+i*64,x
 ----
 
 Then lets add another sine table with an amplitude that matches the number of
-frames, and add some code to set the sprite pointer every frame
+frames, and add some code to set the sprite pointer every frame:
 
 [source,ca65]
 ----
@@ -370,5 +400,7 @@ frames, and add some code to set the sprite pointer every frame
 sine2:
     !rept 256 { !byte (sin(i*Math.Pi*2/96)+1) * 3.5 }
 ----
+
+This should be enough to make our ball appear to move in all 3 dimensions.
 
 The full example can be found in [asm/example.asm](asm/example.asm)
