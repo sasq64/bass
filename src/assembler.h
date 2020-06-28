@@ -1,6 +1,8 @@
+#pragma once
+
 #include "defines.h"
-#include "wrap.h"
 #include "script.h"
+#include "wrap.h"
 
 #include "any_callable.h"
 #include "symbol_table.h"
@@ -26,6 +28,7 @@ class Assembler
 {
 public:
     Assembler();
+    ~Assembler();
 
     std::vector<Error> getErrors() const;
 
@@ -33,21 +36,20 @@ public:
     bool parse_path(utils::path const& p);
 
     utils::path getCurrentPath() const { return currentPath; }
-    Symbols& getSymbols();
+    SymbolTable& getSymbols();
     Machine& getMachine();
     void printSymbols();
     std::string_view includeFile(std::string_view fileName);
 
     bool isFinalPass() const { return finalPass; }
+    bool isFirstPass() const { return passNo == 0; }
     template <typename FN>
     void registerFunction(std::string const& name, FN const& fn)
     {
         functions[name] = fn;
     }
 
-    void addScript(utils::path const& p) {
-        scripting.load(p);
-    }
+    void addScript(utils::path const& p) { scripting.load(p); }
 
     using MetaFn = std::function<void(std::string_view,
                                       std::vector<std::string_view> const&)>;
@@ -63,6 +65,7 @@ public:
         std::vector<std::string_view> args;
     };
 
+
     std::any evaluateExpression(std::string_view expr);
     Def evaluateDefinition(std::string_view expr);
     std::vector<std::any> evaluateList(std::string_view expr);
@@ -70,15 +73,16 @@ public:
                      std::vector<std::string_view> const& args,
                      std::string_view contents);
     void addDefine(std::string_view name,
-                     std::vector<std::string_view> const& args,
-                     std::string_view contents);
+                   std::vector<std::string_view> const& args,
+                   std::string_view contents);
 
-    Symbols evaluateEnum(std::string_view expr);
+    AnyMap evaluateEnum(std::string_view expr);
     void evaluateBlock(std::string_view block, std::string_view fileName = "");
-    Symbols runTest(std::string_view name, std::string_view contents);
+    AnyMap runTest(std::string_view name, std::string_view contents);
 
 
-    enum {
+    enum
+    {
         DEB_TRACE = 1,
         DEB_PASS = 2
     };
@@ -86,6 +90,11 @@ public:
     void debugflags(uint32_t flags);
 
 private:
+    template <typename T>
+    T& sym(std::string const& s) {
+        return syms.get<T>(s);
+    }
+
     bool passDebug = false;
     struct Call
     {
@@ -122,14 +131,12 @@ private:
     bool pass(std::string_view const& source);
     void setupRules();
 
-    void setUndefined(std::string const& sym, SVWrap const& sv);
-
-    auto save() { return std::tuple(macros, syms, undefined, lastLabel); }
+    auto save() { return std::tuple(macros, syms, lastLabel); }
 
     template <class T>
     void restore(T const& t)
     {
-        std::tie(macros, syms, undefined, lastLabel) = t;
+        std::tie(macros, syms, lastLabel) = t;
     }
 
     void trace(SVWrap const& sv) const;
@@ -141,8 +148,7 @@ private:
     std::shared_ptr<Machine> mach;
     std::unordered_map<std::string_view, Macro> macros;
     std::unordered_map<std::string_view, Macro> definitions;
-    Symbols syms;
-    std::vector<Undefined> undefined;
+    SymbolTable syms;
     std::string_view lastLabel;
     bool finalPass{false};
     int passNo{0};
@@ -152,6 +158,7 @@ private:
     Parser parser;
 
     int labelNum = 0;
+    int inMacro = 0;
 
     std::any parseResult;
 

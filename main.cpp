@@ -48,8 +48,11 @@ int main(int argc, char** argv)
     app.add_option("source", sourceFiles, "Sources to compile")
         ->check(CLI::ExistingFile);
 
-    CLI11_PARSE(app, argc, argv);
-
+    try {
+        app.parse(argc, argv);
+    } catch(const CLI::ParseError &e) {
+        app.exit(e);
+    }
     Assembler ass;
     ass.debugflags((showUndef ? Assembler::DEB_PASS : 0) |
                    (showTrace ? Assembler::DEB_TRACE : 0));

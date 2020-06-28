@@ -17,12 +17,13 @@
 
 extern const char* grammar6502;
 
-using sixfive::AdressingMode;
+using sixfive::AddressingMode;
 
 std::string to_string(std::any const& val)
 {
     if (auto const* n = std::any_cast<Number>(&val)) {
-        if (*n == static_cast<int64_t>(*n)) return fmt::format("${:x}", *n);
+        auto in = static_cast<int64_t>(*n);
+        if (*n == in) return fmt::format("${:x}", in);
         return fmt::format("{}", *n);
     }
     if (auto const* v = std::any_cast<std::vector<uint8_t>>(&val)) {
@@ -50,7 +51,7 @@ void Assembler::trace(SVWrap const& sv) const
 {
     if (!doTrace) return;
     fmt::print("{} : '{}'\n", sv.name(), sv.token());
-    for (int i = 0; i < sv.size(); i++) {
+    for (size_t i = 0; i < sv.size(); i++) {
         std::any v = sv[i];
         fmt::print("  {}: {}\n", i, to_string(v));
     }
@@ -60,6 +61,7 @@ void Assembler::debugflags(uint32_t flags)
 {
     doTrace = (flags & DEB_TRACE) != 0;
     passDebug = (flags & DEB_PASS) != 0;
+    syms.trace = passDebug;
 }
 
 std::string_view Assembler::includeFile(std::string_view name)
@@ -114,7 +116,7 @@ std::vector<std::any> Assembler::evaluateList(std::string_view expr)
     return std::any_cast<std::vector<std::any>>(parseResult);
 }
 
-Symbols Assembler::evaluateEnum(std::string_view expr)
+AnyMap Assembler::evaluateEnum(std::string_view expr)
 {
     auto s = ":e:"s + std::string(expr);
     auto sv = std::string_view(s);
@@ -123,13 +125,7 @@ Symbols Assembler::evaluateEnum(std::string_view expr)
         throw parse_error("Not an enum");
     }
 
-    /* std::any_cast<Symbols>(parseResult) */
-    /*     .forAll([](std::string const& name, std::any const& val) { */
-    /*         if (!utils::startsWith(name, "__")) */
-    /*             fmt::print("{} == {}\n", name, to_string(val)); */
-    /*     }); */
-
-    return std::any_cast<Symbols>(parseResult);
+    return std::any_cast<AnyMap>(parseResult);
 }
 
 void Assembler::evaluateBlock(std::string_view block, std::string_view fn)
@@ -142,113 +138,97 @@ void Assembler::evaluateBlock(std::string_view block, std::string_view fn)
 
 int Assembler::checkUndefined()
 {
-    if (undefined.empty()) {
-        return DONE;
-    }
+    auto const& undef = syms.get_undefined();
+    if (undef.empty()) return DONE;
 
-    auto it = undefined.begin();
-    while (it != undefined.end()) {
-        // auto full = utils::join(it->parts.begin(), it->parts.end(), ".");
-        std::vector<std::string> parts = utils::split(it->name, ".");
-        bool erased = false;
-        if (passDebug)
-            fmt::print("Symbol '{}' was (re)defined after use\n", it->name);
-        if (syms.get(parts).has_value()) {
-            it = undefined.erase(it);
-            erased = true;
+    syms.resolve();
+    if (!undef.empty()) {
+        for (auto const& u : undef) {
+            fmt::format("Undefined symbol {} in line {}", u.first, u.second);
         }
-        if (it != undefined.end() && syms.get(it->name).has_value()) {
-            it = undefined.erase(it);
-            erased = true;
-        }
-        if (!erased) {
-            it++;
-        }
+        return ERROR;
     }
-    if (undefined.empty()) {
-        return PASS;
-    }
-    return ERROR;
+    return PASS;
 }
 
-Symbols Assembler::runTest(std::string_view name, std::string_view contents)
+Number operator"" _N(unsigned long long a)
 {
-    Symbols res;
+    return static_cast<Number>(a);
+}
+
+AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
+{
     if (!finalPass) {
-        res["A"] = any_num(0);
-        res["X"] = any_num(0);
-        res["Y"] = any_num(0);
-        res["SR"] = any_num(0);
-        res["SP"] = any_num(0);
-        res["PC"] = any_num(0);
-        res["cycles"] = any_num(0);
-        res["ram"] = mach->getRam();
-        return res;
+        return {
+            {"A", 0_N},  {"X", 0_N},  {"Y", 0_N},      {"SR", 0_N},
+            {"SP", 0_N}, {"PC", 0_N}, {"cycles", 0_N}, {"ram", mach->getRam()}};
     }
-    // setTarget(true);
-    // mach->startTest();
+
     auto saved = save();
-    auto machSaved = mach->saveState();
-    auto pc = mach->getPC();
-    LOGI("Testing %s:%s at pc %x", name, contents, pc);
+
+    auto& oldSection = mach->getCurrentSection();
+    mach->setSection("test");
     auto section = mach->getCurrentSection();
+
+    auto start = mach->getPC();
+    LOGD("Testing %s:%s at pc %x", name, contents, start);
     while (true) {
-        undefined.clear();
+        syms.clear();
         mach->getCurrentSection() = section;
-        lastLabel = "__test_" + std::to_string(pc);
+        lastLabel = "__test_" + std::to_string(start);
         if (!parser.parse(contents, fileName.c_str())) {
             throw parse_error("Syntax error in test block");
         }
-        LOGI("Parsing done");
         auto result = checkUndefined();
         if (result == DONE) break;
         if (result == PASS) continue;
-        for (auto const& u : undefined) {
-            throw parse_error(fmt::format("'{}' undefined in test", u.name));
+        for (auto const& u : syms.undefined) {
+            parser.errors.push_back(
+                {static_cast<size_t>(u.second),
+                 0, // u.line_info.first, u.line_info.second,
+                 fmt::format("Undefined symbol: '{}'", u.first)});
         }
+        throw parse_error("Undefined symbol in test");
     }
 
-    mach->assemble({"rts", AdressingMode::NONE, 0});
+    mach->assemble({"rts", AddressingMode::NONE, 0});
 
-    auto cycles = mach->run(pc);
-    fmt::print("Test {} : {} cycles\n", name, cycles);
+    auto cycles = mach->run(start);
+    fmt::print("*** Test {} : {} cycles\n", name, cycles);
 
-    res["ram"] = mach->getRam();
-    auto regs = mach->getRegs();
+    auto [a, x, y, sr, sp, pc] = mach->getRegs();
 
-    res["A"] = any_num(std::get<0>(regs));
-    res["X"] = any_num(std::get<1>(regs));
-    res["Y"] = any_num(std::get<2>(regs));
-    res["SR"] = any_num(std::get<3>(regs));
-    res["SP"] = any_num(std::get<4>(regs));
-    res["PC"] = any_num(std::get<5>(regs));
-    res["cycles"] = any_num(cycles);
+    AnyMap res = {{"A", num(a)},           {"X", num(x)},
+                  {"Y", num(y)},           {"SR", num(sr)},
+                  {"SP", num(sp)},         {"PC", num(pc)},
+                  {"cycles", num(cycles)}, {"ram", mach->getRam()}};
 
-    mach->restoreState(machSaved);
+    mach->getCurrentSection() = section;
+    mach->setSection(oldSection.name);
     restore(saved);
 
     return res;
 }
 std::any Assembler::applyDefine(Macro const& fn, Call const& call)
 {
-    Symbols shadowed;
+    AnyMap shadowed;
     std::vector<std::string> args;
     for (auto const& a : fn.args) {
         args.emplace_back(a);
     }
 
     for (unsigned i = 0; i < call.args.size(); i++) {
-        auto const& v = syms.get(args[i]);
-        if (v.has_value()) {
+        // auto const& v = syms.get(args[i]);
+        if (syms.is_defined(args[i])) {
             parser.errors.push_back(
                 {0, 0,
                  fmt::format("Function '{}' shadows global symbol {}",
                              call.name, fn.args[i]),
                  ErrLevel::Warning});
-            shadowed[args[i]] = v;
+            shadowed[args[i]] = syms.get(args[i]);
             syms.erase(args[i]);
         }
-        syms[args[i]] = call.args[i];
+        syms.set(args[i], call.args[i]);
         LOGD("%s = %x", fn.args[i],
              (int32_t)std::any_cast<Number>(call.args[i]));
     }
@@ -259,7 +239,7 @@ std::any Assembler::applyDefine(Macro const& fn, Call const& call)
         syms.erase(args[i]);
     }
     for (auto const& shadow : shadowed) {
-        syms[shadow.first] = shadow.second;
+        syms.set(shadow.first, shadow.second);
     }
     return res;
 }
@@ -271,30 +251,26 @@ void Assembler::applyMacro(Call const& call)
         throw parse_error(fmt::format("Undefined macro {}", call.name));
     }
 
-    auto saved = save();
+    auto const& m = macros[call.name];
 
-    auto m = macros[call.name];
-    Symbols shadowed;
-    std::vector<std::string> args;
-    for (auto const& a : m.args) {
-        args.emplace_back(a);
+    if(m.args.size() != call.args.size()) {
+        throw parse_error("Wrong number of arguments");
     }
+
+    std::unordered_map<std::string_view, std::any> shadowed;
 
     for (unsigned i = 0; i < call.args.size(); i++) {
 
-        auto const& v = syms.get(args[i]);
-        if (v.has_value()) {
+        if (syms.is_defined(m.args[i])) {
             parser.errors.push_back(
                 {0, 0,
                  fmt::format("Macro '{}' shadows global symbol {}", call.name,
                              m.args[i]),
                  ErrLevel::Warning});
-            shadowed[args[i]] = v;
-            syms.erase(args[i]);
+            shadowed[m.args[i]] = syms.get(m.args[i]);
+            syms.erase(m.args[i]);
         }
-        syms[args[i]] = call.args[i];
-        LOGD("%s = %x", m.args[i],
-             (int32_t)std::any_cast<Number>(call.args[i]));
+        syms.set(m.args[i], call.args[i]);
     }
 
     // LOGI("Parsing '%s'", m.contents);
@@ -302,15 +278,18 @@ void Assembler::applyMacro(Call const& call)
     auto pc = mach->getPC();
     std::string macroLabel = "__macro_"s + std::to_string(pc);
     lastLabel = macroLabel;
+    inMacro++;
     if (!parser.parse(m.contents, fileName.c_str())) {
+        inMacro--;
         throw parse_error("Syntax error in macro");
     }
+    inMacro--;
     // LOGI("Parsing done");
     for (unsigned i = 0; i < call.args.size(); i++) {
-        syms.erase(args[i]);
+        syms.erase(m.args[i]);
     }
     for (auto const& shadow : shadowed) {
-        syms[shadow.first] = shadow.second;
+        syms.set(shadow.first, shadow.second);
     }
     lastLabel = ll;
 }
@@ -329,23 +308,48 @@ void Assembler::addDefine(std::string_view name,
 
 void initMeta(Assembler& ass);
 void initFunctions(Assembler& ass);
+void registerLuaFunctions(Assembler& a, Scripting& s);
 
-Assembler::Assembler() : parser(grammar6502)
+Assembler::Assembler() : parser(grammar6502), scripting()
 {
     parser.packrat();
     mach = std::make_shared<Machine>();
     initFunctions(*this);
     initMeta(*this);
     setupRules();
+    registerLuaFunctions(*this, scripting);
 }
-void Assembler::setUndefined(std::string const& sym, SVWrap const& sv)
+
+Assembler::~Assembler()
 {
-    if (utils::find_if(undefined, [&](auto const& u) {
-            return u.name == sym;
-        }) != undefined.end()) {
-        return;
-    }
-    undefined.push_back({sym, sv.line_info()});
+    mach = nullptr;
+}
+
+template <typename A, typename B>
+A operation(std::string_view const& ope, A const& a, B const& b)
+{
+    // clang-format off
+    if (ope == "+") return a + b;
+    if (ope == "-") return a - b;
+    if (ope == "*") return a * b;
+    if (ope == "/") return a / b;
+    if (ope == "\\") return div(a, b);
+    if (ope == "%") return a % b;
+    if (ope == ">>") return a >> b;
+    if (ope == "<<") return a << b;
+    if (ope == "&") return a & b;
+    if (ope == "|") return a | b;
+    if (ope == "^") return a ^ b;
+    if (ope == "&&") return a && b;
+    if (ope == "||") return a || b;
+    if (ope == "<") return a < b;
+    if (ope == ">") return a > b;
+    if (ope == "<=") return a <= b;
+    if (ope == ">=") return a >= b;
+    if (ope == "==") return a == b;
+    if (ope == "!=") return a != b;
+    // clang-format on
+    return a;
 }
 
 void Assembler::setupRules()
@@ -360,11 +364,12 @@ void Assembler::setupRules()
         return std::pair<std::string_view, std::any>{
             any_cast<std::string_view>(sv[0]), v};
     };
+
     parser["EnumBlock"] = [&](SV& sv) {
         trace(sv);
-        Symbols s;
+        AnyMap s;
         Number lastNumber = 0;
-        for (int i = 0; i < sv.size(); i++) {
+        for (size_t i = 0; i < sv.size(); i++) {
             if (sv[i].has_value()) {
                 auto p = any_cast<std::pair<std::string_view, std::any>>(sv[i]);
                 if (!p.second.has_value()) {
@@ -372,7 +377,7 @@ void Assembler::setupRules()
                 }
                 s[persist(p.first)] = p.second;
                 if (auto* n = any_cast<Number>(&p.second)) {
-                    lastNumber = *n + 1;
+                    lastNumber = *n + 1.0;
                 }
             }
         }
@@ -387,11 +392,8 @@ void Assembler::setupRules()
             if (sym[0] == '.') {
                 sym = std::string(lastLabel) + sym;
             }
-            LOGD("Symbol:%s", sym);
-            auto res = syms.set(sym, sv[1]);
-            if (res == Symbols::Was::DifferentValue) {
-                setUndefined(sym, sv);
-            }
+            // LOGI("Symbol:%s", sym);
+            syms.set(sym, sv[1], sv.line());
         } else if (sv.size() == 1) {
             mach->getCurrentSection().pc = number<uint16_t>(sv[0]);
         }
@@ -404,6 +406,7 @@ void Assembler::setupRules()
 
         std::string label;
         if (labelv == "$" || labelv == "-" || labelv == "+") {
+            if (inMacro != 0) throw parse_error("No special labels in macro");
             label = "__special_" + std::to_string(labelNum);
             labelNum++;
         } else {
@@ -418,15 +421,8 @@ void Assembler::setupRules()
             }
         }
         // LOGI("Label %s=%x", label, mach->getPC());
-        auto res = syms.set(label, any_num(mach->getPC()));
-        if (res == Symbols::Was::DifferentValue) {
-            // If we redefine a label we must make another pass
-            // since this label could have been used with an
-            // incorrect value
-            // TODO: Detect used symbols to avoid this
-            setUndefined(label, sv);
-            // LOGI("Symbol %s changed value", label);
-        }
+        syms.set(label, static_cast<Number>(mach->getPC()),
+                 sv.line());
         return sv[0];
     };
 
@@ -444,25 +440,22 @@ void Assembler::setupRules()
 
     parser["Meta"] = [&](SV& sv) {
         trace(sv);
-        // LOGI("%s (%d) '%s'", sv.name(), sv.size(), sv.token());
-        int i = 0;
+        size_t i = 0;
         auto meta = any_cast<std::string_view>(sv[i++]);
         auto text = any_cast<std::string_view>(sv[i++]);
         // Strip trailing spaces
-        auto p = text.size() - 1;
+        auto p = (int)text.size() - 1;
         while (p >= 0 && (text[p] == ' ' || text[p] == '\t')) {
             p--;
         }
-        if (text.size() > p) {
+        if ((int)text.size() > p) {
             text.remove_suffix(text.size() - 1 - p);
         }
 
-        // LOGI("Meta %d %s '%s'", sv.size(), meta, text);
         std::vector<std::string_view> blocks;
 
         while (i < sv.size()) {
             blocks.push_back(any_cast<std::string_view>(sv[i++]));
-            // LOGI("Block '%s'", blocks.back());
         }
 
         auto it = metaFunctions.find(std::string(meta));
@@ -470,11 +463,7 @@ void Assembler::setupRules()
             (it->second)(text, blocks);
             return sv[0];
         }
-
-        // throw parse_error(fmt::format("Unknown meta command '{}'", meta));
         throw parse_error(fmt::format("Unknown meta command '{}'", meta));
-
-        // return sv[0];
     };
 
     parser["MacroCall"] = [&](SV& sv) {
@@ -483,7 +472,7 @@ void Assembler::setupRules()
     };
 
     parser["FnCall"] = [&](SV& sv) {
-        LOGD("MCALL %s %d", sv[0].type().name(), sv.size());
+        trace(sv);
         auto call = any_cast<Call>(sv[0]);
         auto name = std::string(call.name);
 
@@ -505,13 +494,13 @@ void Assembler::setupRules()
     };
 
     parser["Call"] = [&](SV& sv) {
+        trace(sv);
         auto name = any_cast<std::string_view>(sv[0]);
         auto args = any_cast<std::vector<std::any>>(sv[1]);
         return Call{name, args};
     };
 
     parser["CallArgs"] = [&](SV& sv) {
-        // LOGD("CallArgs %d %s", sv.size(), sv[0].type().name());
         std::vector<std::any> v;
         for (size_t i = 0; i < sv.size(); i++) {
             v.push_back(sv[i]);
@@ -539,7 +528,7 @@ void Assembler::setupRules()
         auto contents = any_cast<std::string_view>(sv[1]);
         auto name = any_cast<std::string_view>(sv[0]);
         auto res = runTest(name, contents);
-        syms.at<Symbols>("tests").at<Symbols>(name) = res;
+        syms.set("tests."s + std::string(name), res, sv.line());
         return sv[0];
     };
 
@@ -551,7 +540,8 @@ void Assembler::setupRules()
 
                 auto it = macros.find(i->opcode);
                 if (it != macros.end()) {
-                    Call c{i->opcode};
+                    LOGD("Found macro %s", it->second.name);
+                    Call c{i->opcode, {}};
                     if (i->mode > sixfive::ACC) {
                         c.args.emplace_back(any_num(i->val));
                     }
@@ -564,7 +554,11 @@ void Assembler::setupRules()
                 }
 
                 auto res = mach->assemble(*i);
-                if (res < 0) {
+                if (res == AsmResult::Truncated && !finalPass) {
+                    // Accept long branches unless final pass
+                    res = AsmResult::Ok;
+                }
+                if (res != AsmResult::Ok) {
                     throw parse_error(
                         fmt::format("Illegal instruction '{}'", i->opcode));
                 }
@@ -579,7 +573,7 @@ void Assembler::setupRules()
         trace(sv);
         auto opcode = std::string(any_cast<std::string_view>(sv[0]));
         opcode = utils::toLower(opcode);
-        Instruction instruction{opcode, AdressingMode::NONE, 0};
+        Instruction instruction{opcode, AddressingMode::NONE, 0};
         if (sv.size() > 1) {
             auto arg = any_cast<Instruction>(sv[1]);
             instruction.mode = arg.mode;
@@ -589,14 +583,16 @@ void Assembler::setupRules()
     };
 
     // Set up the 'Instruction' parsing rules
-    static const std::unordered_map<std::string, AdressingMode> modeMap = {
-        {"Abs", AdressingMode::ABS},   {"AbsX", AdressingMode::ABSX},
-        {"AbsY", AdressingMode::ABSY}, {"Ind", AdressingMode::IND},
-        {"IndX", AdressingMode::INDX}, {"IndY", AdressingMode::INDY},
-        {"Acc", AdressingMode::ACC},   {"Imm", AdressingMode::IMM},
+    static const std::unordered_map<std::string, AddressingMode> modeMap = {
+        {"Abs", AddressingMode::ABS},   {"AbsX", AddressingMode::ABSX},
+        {"AbsY", AddressingMode::ABSY}, {"Ind", AddressingMode::IND},
+        {"IndX", AddressingMode::INDX}, {"IndY", AddressingMode::INDY},
+        {"Acc", AddressingMode::ACC},   {"Imm", AddressingMode::IMM},
     };
     auto buildArg = [](SV& sv) -> std::any {
-        return Instruction{"", modeMap.at(sv.name()), any_cast<Number>(sv[0])};
+        auto mode = modeMap.at(sv.name());
+        return Instruction{
+            "", mode, mode == AddressingMode::ACC ? 0 : any_cast<Number>(sv[0])};
     };
     for (auto const& [name, _] : modeMap) {
         parser[name.c_str()] = buildArg;
@@ -608,39 +604,71 @@ void Assembler::setupRules()
         std::any val;
         std::string l = std::string(label);
         if (label == "+") {
+            if (inMacro != 0) throw parse_error("No special labels in macro");
             l = "__special_" + std::to_string(labelNum);
         } else if (label == "-") {
+            if (inMacro != 0) throw parse_error("No special labels in macro");
             l = "__special_" + std::to_string(labelNum - 1);
         }
         val = syms.get(l);
-        if (!val.has_value()) {
-            setUndefined(l, sv);
-            LOGD("%s undefined atm", l);
-            val = any_num(mach->getPC());
+        return {"", AddressingMode::ABS, any_cast<Number>(val)};
+    };
+
+    parser["Decimal"] = [&](SV& sv) -> Number {
+        try {
+            return std::stod(sv.c_str(), nullptr);
+        } catch (std::out_of_range&) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
         }
-        return {"", AdressingMode::ABS, any_cast<Number>(val)};
     };
 
-    parser["Decimal"] = [](SV& sv) -> Number {
-        return std::stod(sv.c_str(), nullptr);
+    parser["Octal"] = [&](SV& sv) -> Number {
+        try {
+            return std::stoi(sv.c_str() + 2, nullptr, 8);
+        } catch (std::out_of_range&) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
+        }
     };
 
-    parser["Octal"] = [](SV& sv) -> Number {
-        return std::stoi(sv.c_str() + 2, nullptr, 8);
+    parser["Multi"] = [&](SV& sv) -> Number {
+        try {
+            return std::stoi(sv.c_str() + 2, nullptr, 4);
+        } catch (std::out_of_range&) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
+        }
     };
 
-    parser["Multi"] = [](SV& sv) -> Number {
-        return std::stoi(sv.c_str() + 2, nullptr, 4);
+    parser["Binary"] = [&](SV& sv) -> Number {
+        try {
+            return std::stoi(sv.c_str() + 2, nullptr, 2);
+        } catch (std::out_of_range&) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
+        }
     };
 
-    parser["Binary"] = [](SV& sv) -> Number {
-        return std::stoi(sv.c_str() + 2, nullptr, 2);
-    };
-
-    parser["HexNum"] = [](SV& sv) -> Number {
-        const char* ptr = sv.c_str();
-        if (*ptr == '0') ptr++;
-        return std::stoi(ptr + 1, nullptr, 16);
+    parser["HexNum"] = [&](SV& sv) -> Number {
+        try {
+            const char* ptr = sv.c_str();
+            if (*ptr == '0') ptr++;
+            return std::stoi(ptr + 1, nullptr, 16);
+        } catch (std::out_of_range&) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return 0;
+        }
     };
 
     parser["Star"] = [&](SV& sv) -> Number {
@@ -653,35 +681,24 @@ void Assembler::setupRules()
         if (sv.size() == 1) {
             return sv[0];
         }
-        auto result = any_cast<Number>(sv[0]);
-        LOGD("Expr %f", result);
+
         auto ope = any_cast<std::string_view>(sv[1]);
-        auto num = any_cast<Number>(sv[2]);
-        auto inum = static_cast<uint64_t>(num);
-        auto ires = static_cast<uint64_t>(result);
-        // clang-format off
-        if (ope == "+") result += num;
-        else if (ope == "-") result -= num;
-        else if (ope == "*") result *= num;
-        else if (ope == "/") result /= num;
-        else if (ope == "\\") result = static_cast<Number>(ires / inum);
-        else if (ope == "%") result = static_cast<Number>(ires % inum);
-        else if (ope == ">>") result = static_cast<Number>(ires >> inum);
-        else if (ope == "<<") result = static_cast<Number>(ires << inum);
-        else if (ope == "&") result = static_cast<Number>(ires & inum);
-        else if (ope == "|") result = static_cast<Number>(ires | inum);
-        else if (ope == "^") result = static_cast<Number>(ires ^ inum);
-        else if (ope == "&&") result = static_cast<Number>(ires && inum);
-        else if (ope == "||") result = static_cast<Number>(ires || inum);
-        else if (ope == "<") result = static_cast<Number>(result < num);
-        else if (ope == ">") result = static_cast<Number>(result > num);
-        else if (ope == "<=") result = static_cast<Number>(result <= num);
-        else if (ope == ">=") result = static_cast<Number>(result >= num);
-        else if (ope == "<=>") result = num>result ? -1 : static_cast<Number>(result > num);
-        else if (ope == "==") result = static_cast<Number>(result == num);
-        else if (ope == "!=") result = static_cast<Number>(result != num);
-        // clang-format on
-        return std::any(result);
+        auto a = Num(any_cast<Number>(sv[0]));
+        auto b = Num(any_cast<Number>(sv[2]));
+        try {
+            auto result = static_cast<Number>(operation(ope, a, b));
+            return std::any(result);
+        } catch (std::out_of_range&) {
+            if (finalPass) {
+                throw parse_error("Out of range");
+            }
+            return any_num(0);
+        } catch (dbz_error&) {
+            if (finalPass) {
+                throw parse_error("Division by zero");
+            }
+            return any_num(0);
+        }
     };
 
     parser["Script"] = [&](SV& sv) {
@@ -691,8 +708,11 @@ void Assembler::setupRules()
         return sv[0];
     };
 
-    parser["Index"] = [&](SV& sv) -> std::any {
+    parser["Index"] = [&](SV& sv) {
         trace(sv);
+        if(sv.size() == 1) {
+            return sv[0];
+        }
         auto index = number<size_t>(sv[1]);
         std::any vec = sv[0];
         if (any_cast<Number>(&vec) != nullptr) {
@@ -728,19 +748,19 @@ void Assembler::setupRules()
     parser["Unary"] = [&](SV& sv) -> Number {
         trace(sv);
         auto ope = any_cast<char>(sv[0]);
-        auto num = any_cast<Number>(sv[1]);
+        auto num = number(sv[1]);
         auto inum = number<int64_t>(num);
         switch (ope) {
         case '~':
-            return (Number)(~((uint64_t)num) & 0xffffffff);
+            return static_cast<Number>(~(inum)&0xffffffff);
         case '-':
             return -num;
         case '!':
-            return (inum == 0);
+            return static_cast<Number>(inum == 0);
         case '<':
-            return inum & 0xff;
+            return static_cast<Number>(inum & 0xff);
         case '>':
-            return inum >> 8;
+            return static_cast<Number>(inum >> 8);
         default:
             throw parse_error("Unknown unary operator");
         }
@@ -750,28 +770,20 @@ void Assembler::setupRules()
 
     parser["Variable"] = [&](SV& sv) {
         std::any val;
-        std::vector<std::string> parts;
         std::string full;
 
         if (sv.token()[0] == '.') {
-            parts = {std::string(lastLabel) + sv.token()};
-            val = syms.get(parts[0]);
+            full = std::string(lastLabel) + sv.token();
         } else {
-            for (auto const& p : sv.transform<std::string_view>()) {
-                parts.emplace_back(p);
-            }
-            val = syms.get(parts);
-            if (!val.has_value()) {
-                // LOGD("Dot %s failed, try joined symbol", s);
-                full = utils::join(parts.begin(), parts.end(), ".");
-                val = syms.get(full);
-            }
-        }
-        if (!val.has_value()) {
+            auto parts = sv.transform<std::string_view>();
             full = utils::join(parts.begin(), parts.end(), ".");
-            setUndefined(full, sv);
-            LOGD("%s undefined atm", full);
-            return any_num(mach->getPC());
+        }
+
+        val = syms.get(full, sv.line());
+        // Set undefined numbers to PC, to increase likelyhood of
+        // correct code generation (less passes)
+        if (val.type() == typeid(Number) && !syms.is_defined(full)) {
+            val = static_cast<Number>(mach->getPC());
         }
         return val;
     };
@@ -786,7 +798,7 @@ bool Assembler::pass(std::string_view const& source)
 {
     labelNum = 0;
     mach->clear();
-    undefined.clear();
+    syms.clear();
     parser.errors.clear();
     return parser.parse(source, fileName.c_str());
 }
@@ -804,6 +816,9 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
 
     fileName = fname;
     while (true) {
+        if (passNo >= 10) {
+            return false;
+        }
         fmt::print("* PASS {}\n", passNo + 1);
         if (!pass(source)) {
             // throw parse_error("Syntax error");
@@ -811,10 +826,17 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         }
 
         for (auto const& s : mach->getSections()) {
-            auto& secsyms = syms.at<Symbols>("section").at<Symbols>(s.name);
-            secsyms["start"] = any_num(s.start);
-            secsyms["end"] = any_num(s.start + s.data.size());
-            secsyms["data"] = s.data;
+            // auto& secsyms =
+            // syms.at<AnyMap>("section").at<AnyMap>(s.name);
+
+            auto prefix = "section."s + std::string(s.name);
+
+            auto start = static_cast<Number>(s.start);
+            auto end = static_cast<Number>(s.start + s.data.size());
+
+            syms.set(prefix + ".start", start);
+            syms.set(prefix + ".end", end);
+            syms.set(prefix + ".data", s.data);
         }
 
         auto result = checkUndefined();
@@ -825,19 +847,20 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         if (result == PASS) {
             continue;
         }
-        for (auto const& u : undefined) {
+        for (auto const& u : syms.undefined) {
             parser.errors.push_back(
-                {u.line_info.first, u.line_info.second,
-                 fmt::format("Undefined symbol: '{}'", u.name)});
-            return false;
+                {static_cast<size_t>(u.second),
+                 0, // u.line_info.first, u.line_info.second,
+                 fmt::format("Undefined symbol: '{}'", u.first)});
         }
+        return false;
     }
     finalPass = true;
     fmt::print("* FINAL PASS\n");
     return pass(source);
 }
 
-Symbols& Assembler::getSymbols()
+SymbolTable& Assembler::getSymbols()
 {
     return syms;
 }

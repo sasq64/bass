@@ -75,7 +75,8 @@ emulator.
 Before running the test code, all sections are placed in the right
 places in memory.
 
-The code is then assembled at the current org/PC and excuted.
+The test code is then assembled into the "test" section.
+
 Results are saved in tests.<name>
 
 The assembled changes are then rolled back.

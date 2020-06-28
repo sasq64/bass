@@ -4,9 +4,8 @@
 
 namespace sixfive {
 
-
-// Adressing modes
-enum AdressingMode : uint8_t
+// Addressing modes
+enum AddressingMode : uint8_t
 {
     BAD,
     NONE,
@@ -22,5 +21,6 @@ enum AdressingMode : uint8_t
     ABS,
     ABSX,
     ABSY,
+    ZP_REL,
 };
-}
+} // namespace sixfive

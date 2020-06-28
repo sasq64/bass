@@ -13,12 +13,12 @@ void initFunctions(Assembler& a)
 {
     auto& syms = a.getSymbols();
 
-    syms.at<Symbols>("Math").at<Number>("Pi") = M_PI;
+    syms.set("Math.Pi", M_PI);
 
     // Allowed data types:
     // * Any arithmetic type, but they will always be converted to/from double
     // * `std::vector<uint8_t>` for binary data
-    // * `Symbols` for returning struct like things
+    // * `AnyMap` for returning struct like things
     // * `std::vector<std::any> const&` as single argument.
 
     a.registerFunction("sqrt", [](double f) { return std::sqrt(f); });
@@ -49,8 +49,12 @@ void initFunctions(Assembler& a)
         if (p.is_relative()) {
             p = a.getCurrentPath() / p;
         }
-        utils::File f{p};
-        return f.readAll();
+        try {
+            utils::File f{p};
+            return f.readAll();
+        } catch (utils::io_exception&) {
+            throw parse_error(fmt::format("Could not load {}", name));
+        }
     });
 
     a.registerFunction("word", [](std::vector<uint8_t> const& data) {
@@ -85,7 +89,7 @@ void initFunctions(Assembler& a)
     });
 
     a.registerFunction("str", [](double n) {
-        auto s = std::to_string((int64_t)n);
+        auto s = std::to_string(static_cast<int64_t>(n));
         std::string_view sv = s;
         persist(sv);
         return sv;

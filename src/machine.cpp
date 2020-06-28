@@ -14,15 +14,35 @@ Machine::Machine()
 {
     machine = std::make_unique<sixfive::Machine<>>();
     addSection("main", 0);
+    machine->setBreakFunction(breakFunction, this);
+}
+
+void Machine::breakFunction(int what, void* data)
+{
+    auto* thiz = static_cast<Machine*>(data);
+
+    auto it = thiz->break_functions.find(what);
+    if (it != thiz->break_functions.end()) {
+        it->second(what);
+    } else {
+        auto [a, x, y, sr, sp, pc] = thiz->getRegs();
+        fmt::print("A:{:x} X:{:x} Y:{:x} {:x}\n", a, x, y, what, thiz->getPC());
+    }
 }
 
 Machine::~Machine() = default;
+
+void Machine::setBreakFunction(uint8_t what,
+                               std::function<void(uint8_t)> const& fn)
+{
+    break_functions[what] = fn;
+}
 
 Section& Machine::addSection(std::string const& name, uint32_t start)
 {
     if (!name.empty()) {
         if (fp != nullptr) {
-            fprintf(fp, "SECTION %s\n", name.c_str());
+            // printf(fp, "SECTION %s\n", name.c_str());
         }
         auto it = std::find_if(sections.begin(), sections.end(),
                                [&](auto const& s) { return s.name == name; });
@@ -74,18 +94,6 @@ void Machine::clear()
     addSection("main", 0);
 }
 
-Machine::State Machine::saveState() const
-{
-    return {currentSection->pc, currentSection->data.size()};
-}
-
-void Machine::restoreState(State const& s)
-{
-
-    currentSection->pc = s.pc;
-    currentSection->data.resize(s.offset);
-}
-
 uint32_t Machine::getPC() const
 {
     if (currentSection == nullptr) {
@@ -122,7 +130,19 @@ void Machine::write(std::string const& name, OutFmt fmt)
     ram.fill(0);
     uint32_t start = 0xffffffff;
     uint32_t end = 0;
+
+    std::sort(sections.begin(), sections.end(),
+              [](auto const& a, auto const& b) {
+                  return a.start < b.start;
+              });
+
+    size_t last_end = 0;
     for (auto const& section : sections) {
+
+        if(section.start < last_end) {
+            throw machine_error(fmt::format("Section {} overlaps previous", section.name));
+        }
+
 
         if (section.data.empty()) {
             continue;
@@ -151,6 +171,9 @@ void Machine::write(std::string const& name, OutFmt fmt)
         if (section_end > end) {
             end = section_end;
         }
+
+        last_end = section_end;
+
         memcpy(&ram[section.start], section.data.data(),
                section_end - section.start);
     }
@@ -159,7 +182,6 @@ void Machine::write(std::string const& name, OutFmt fmt)
         printf("**Warning: No code generated\n");
         return;
     }
-
 
     if (end > start) {
         fmt::print("Writing {:04x}->{:04x} > {}\n", start, end, name);
@@ -195,9 +217,23 @@ uint32_t Machine::writeByte(uint8_t w)
     return currentSection->pc;
 }
 
-int Machine::assemble(Instruction const& instr)
+uint32_t Machine::writeChar(uint8_t w)
 {
-    using sixfive::AdressingMode;
+    if (fp != nullptr) {
+        if (!inData) {
+            fprintf(fp, "%04x : \"", currentSection->pc);
+        }
+        inData = true;
+        fputc(w, fp);
+    }
+    currentSection->data.push_back(w);
+    currentSection->pc++;
+    return currentSection->pc;
+}
+
+AsmResult Machine::assemble(Instruction const& instr)
+{
+    using sixfive::AddressingMode;
 
     auto arg = instr;
     auto opcode = instr.opcode;
@@ -208,48 +244,50 @@ int Machine::assemble(Instruction const& instr)
                             [&](auto const& i) { return i.name == opcode; });
 
     if (it0 == instructions.end()) {
-        return NO_SUCH_OPCODE;
+        return AsmResult::NoSuchOpcode;
     }
 
-    auto diff = arg.val - static_cast<int32_t>(currentSection->pc) - 2;
 
     auto it1 = std::find_if(
         it0->opcodes.begin(), it0->opcodes.end(), [&](auto const& o) {
-            if (o.mode == AdressingMode::ZPX &&
-                arg.mode == AdressingMode::ABSX && arg.val >= 0 &&
+            if (o.mode == AddressingMode::ZPX &&
+                arg.mode == AddressingMode::ABSX && arg.val >= 0 &&
                 arg.val <= 0xff) {
-                arg.mode = AdressingMode::ZPX;
+                arg.mode = AddressingMode::ZPX;
             }
-            if (o.mode == AdressingMode::ZPY &&
-                arg.mode == AdressingMode::ABSY && arg.val >= 0 &&
+            if (o.mode == AddressingMode::ZPY &&
+                arg.mode == AddressingMode::ABSY && arg.val >= 0 &&
                 arg.val <= 0xff) {
-                arg.mode = AdressingMode::ZPY;
+                arg.mode = AddressingMode::ZPY;
             }
-            if (o.mode == AdressingMode::ZP && arg.mode == AdressingMode::ABS &&
+            if (o.mode == AddressingMode::ZP && arg.mode == AddressingMode::ABS &&
                 arg.val >= 0 && arg.val <= 0xff) {
-                arg.mode = AdressingMode::ZP;
+                arg.mode = AddressingMode::ZP;
             }
-            if (o.mode == AdressingMode::REL &&
-                arg.mode == AdressingMode::ABS && diff <= 127 && diff > -127) {
-                arg.mode = AdressingMode::REL;
-                arg.val = diff;
+            if (o.mode == AddressingMode::REL) {
+                arg.mode = AddressingMode::REL;
+                arg.val = arg.val - static_cast<int32_t>(currentSection->pc) - 2;
             }
             return o.mode == arg.mode;
         });
 
     if (it1 == it0->opcodes.end()) {
-        return ILLEGAL_ADRESSING_MODE;
+        return AsmResult::IllegalAdressingMode;
     }
 
     auto sz = opSize(arg.mode);
 
     auto v = arg.val & (sz == 2 ? 0xff : 0xffff);
-    if (arg.mode == sixfive::AdressingMode::REL) {
-        v = (static_cast<int8_t>(v)) + 2 + currentSection->pc;
-    }
 
     if (fp != nullptr) {
+        if (inData) {
+            fputs("\"\n", fp);
+        }
+        inData = false;
         fprintf(fp, "%04x : %s ", currentSection->pc, it0->name);
+        if (arg.mode == sixfive::AddressingMode::REL) {
+            v = (static_cast<int8_t>(v)) + 2 + currentSection->pc;
+        }
         fprintf(fp, modeTemplate.at(arg.mode), v);
         fputs("\n", fp);
     }
@@ -262,12 +300,46 @@ int Machine::assemble(Instruction const& instr)
         writeByte(arg.val >> 8);
     }
 
-    return sz;
+    if (arg.mode == AddressingMode::REL && (arg.val > 127 || arg.val < -128)) {
+        return AsmResult::Truncated;
+    }
+
+    return AsmResult::Ok;
 }
 
 uint8_t Machine::readRam(uint16_t offset) const
 {
     return machine->readMem(offset);
+}
+void Machine::writeRam(uint16_t offset, uint8_t val)
+{
+    machine->writeRam(offset, val);
+}
+
+void Machine::bankWriteFunction(uint16_t adr, uint8_t val, void* data)
+{
+    auto* thiz = static_cast<Machine*>(data);
+    thiz->bank_write_functions[adr >> 8](adr, val);
+}
+
+uint8_t Machine::bankReadFunction(uint16_t adr, void* data)
+{
+    auto* thiz = static_cast<Machine*>(data);
+    return thiz->bank_read_functions[adr >> 8](adr);
+}
+
+void Machine::setBankWrite(int bank, int len,
+                           std::function<void(uint16_t, uint8_t)> const& fn)
+{
+    bank_write_functions[bank] = fn;
+    machine->mapWriteCallback(bank, len, this, bankWriteFunction);
+}
+
+void Machine::setBankRead(int bank, int len,
+                          std::function<uint8_t(uint16_t)> const& fn)
+{
+    bank_read_functions[bank] = fn;
+    machine->mapReadCallback(bank, len, this, bankReadFunction);
 }
 
 std::vector<uint8_t> Machine::getRam()
@@ -277,8 +349,22 @@ std::vector<uint8_t> Machine::getRam()
     return data;
 }
 
-std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>
-Machine::getRegs() const
+
+
+Tuple6 Machine::getRegs() const
 {
     return machine->regs();
 }
+
+void Machine::setRegs(Tuple6 const& regs)
+{
+    auto r = machine->regs();
+    std::get<0>(r) = std::get<0>(regs);
+    std::get<1>(r) = std::get<1>(regs);
+    std::get<2>(r) = std::get<2>(regs);
+    std::get<3>(r) = std::get<3>(regs);
+    std::get<4>(r) = std::get<4>(regs);
+    std::get<5>(r) = std::get<5>(regs);
+}
+
+

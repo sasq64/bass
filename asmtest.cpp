@@ -59,13 +59,13 @@ struct Tester
               typename S = std::enable_if_t<std::is_arithmetic_v<T>>>
     bool haveSymbol(std::string const& name, T v)
     {
-        auto x = number<T>(a->getSymbols()[name]);
+        auto x = a->getSymbols().get<Number>(name);
         return x == v;
     }
 
     bool haveSymbol(std::string const& name, std::string const& v)
     {
-        auto x = std::any_cast<std::string_view>(a->getSymbols()[name]);
+        auto x = a->getSymbols().get<std::string_view>(name);
         return x == v;
     }
 };
@@ -73,6 +73,9 @@ struct Tester
 TEST_CASE("assembler.first", "[assembler]")
 {
     Tester t;
+
+    t = " asl a";
+    REQUIRE(t.noErrors());
 
     t = "!rept 4 { nop }";
     REQUIRE(t.noErrors());
@@ -82,7 +85,15 @@ TEST_CASE("assembler.first", "[assembler]")
     REQUIRE(t.noErrors());
     REQUIRE(t.mainSize() == 16);
 
+
+    logging::setLevel(logging::Level::Debug);
     t = "!enum { A = 1\nB\n C = \"xx\" }";
+
+
+    for(auto err : t.a->getErrors()) {
+        LOGI("%d : %s", err.line, err.message);
+    }
+
     REQUIRE(t.noErrors());
     REQUIRE(t.mainSize() == 0);
     REQUIRE(t.haveSymbol("B", 2));
@@ -129,8 +140,6 @@ loop:
 TEST_CASE("assembler.syntax", "[assembler]")
 {
     Assembler ass;
-    auto& syms = ass.getSymbols();
-
     ass.parse(R"(
 ; this is a COMMENT
     rts
@@ -268,7 +277,6 @@ TEST_CASE("assembler.if_macro", "[assembler]")
 {
     using std::any_cast;
     Assembler ass;
-    auto& syms = ass.getSymbols();
     ass.parse(R"(
     !macro SetVAdr(adr) {
         lda #(adr & $ff)
@@ -307,7 +315,7 @@ sine_table:
 )");
 
     auto& mach = ass.getMachine();
-    int sine_table = (int)std::any_cast<Number>(syms["sine_table"]);
+    int sine_table = (int)syms.get<Number>("sine_table");
     for (int i = 0; i < 256; i++) {
         unsigned v = (int)(sin(i * M_PI / 180) * 127);
         REQUIRE(mach.getSection("main").data[sine_table + i - 0x800] ==
@@ -319,6 +327,7 @@ TEST_CASE("assembler.test", "[assembler]")
 {
     Assembler ass;
     ass.parse(R"(
+    !section "test", $2000
     !org $800
 start:
     ldx #0
@@ -385,13 +394,9 @@ TEST_CASE("assembler.functions", "[assembler]")
 TEST_CASE("assembler.errors", "[assembler]")
 {
     Assembler ass;
-    auto& syms = ass.getSymbols();
 
     std::vector<std::pair<std::string, int>> sources = {
         {R"(!org $800
-         for(auto& e : errs) {
-            fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
-        }
             ldz #3
              rts)",
          2},
@@ -399,7 +404,7 @@ TEST_CASE("assembler.errors", "[assembler]")
         {R"(!org $800
         !macro test(x) {
             nop
-            stz x
+            stq x
         }
         test(2)
         rts)",
@@ -408,11 +413,11 @@ TEST_CASE("assembler.errors", "[assembler]")
         {R"(!org $800
         nop
         !if 0 {
-            stz 0
+            stq 0
         }
         !if 1 {
             nop
-            stz 0
+            stq 0
         }
         rts)",
          6},
@@ -444,19 +449,22 @@ a       !byte 3
 
     for (auto const& s : sources) {
         ass.parse(s.first, "test.asm");
+        LOGI("Code:%s", s.first);
         auto const& errs = ass.getErrors();
         REQUIRE(!errs.empty());
+        bool ok = false;
         for (auto& e : errs) {
             fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
+            if(e.line == (size_t)s.second)
+                ok = true;
         }
-        REQUIRE(errs.back().line == s.second);
+        REQUIRE(ok);
     }
 }
 
 TEST_CASE("assembler.special_labels", "[assembler]")
 {
     Assembler ass;
-    auto& syms = ass.getSymbols();
     ass.parse(R"(
     !section "a", $1000
     nop
@@ -484,13 +492,13 @@ $   nop
 
     !section "c", $1000
     !macro dummy(a) {
-$   lda $d012
+.x   lda $d012
     cmp #30
-    bne -
+    bne .x
     lda $c000
-    beq +
-    jmp -
-$   rts
+    beq .y
+    jmp .x
+.y  rts
 }
 $   nop
     dummy(0)

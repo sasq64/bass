@@ -1,168 +1,235 @@
 #pragma once
 
+#include <coreutils/log.h>
+
 #include <any>
+#include <fmt/format.h>
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
-class Symbols
+#include <cassert>
+#define Assert assert
+
+using AnyMap = std::unordered_map<std::string, std::any>;
+
+class sym_error : public std::exception
 {
 public:
-    using Str = std::string;
-    using Any = std::any;
-    using Map = std::unordered_map<Str, Any>;
+    explicit sym_error(std::string m = "Symbol error") : msg(std::move(m)) {}
+    const char* what() const noexcept override { return msg.c_str(); }
 
-    Any& operator[](Str const& name) { return data[name]; }
+private:
+    std::string msg;
+};
 
-    template <typename T>
-    T& at_(Str const& name)
+// SymbolTable for use in DSL. Remembers undefined references
+// and value changes. Handles dot notation.
+// Setting specific type checks if value changed
+//
+struct SymbolTable
+{
+    std::unordered_map<std::string, std::any> syms;
+    std::unordered_map<std::string, int> undefined;
+    std::unordered_set<std::string> accessed;
+    bool trace = false;
+
+    bool is_defined(std::string_view name) const
     {
-        auto const& aval = data[name];
-        if (!aval.has_value()) {
-            data[name] = T{};
-        }
-        T* t = std::any_cast<T>(&data[name]);
-        if (t == nullptr) throw std::bad_any_cast();
-        return *t;
+        return syms.find(std::string(name)) != syms.end();
     }
 
-    template <typename T>
-    T& at(std::string_view const& name)
+    void set_sym(std::string_view name, AnyMap const& symbols)
     {
-        return at_<T>(std::string(name));
-    }
-
-    void erase(std::string const& name) { data.erase(name); }
-
-    bool is_defined(Str const& name) const
-    {
-        return data.find(name) != data.end();
-    }
-
-    auto begin() { return data.begin(); }
-    auto end() { return data.end(); }
-
-    auto begin() const { return data.begin(); }
-    auto end() const { return data.end(); }
-
-    std::any Undefined;
-
-    // Return value or empty any if doesn't exist.
-    // Record non-existing query
-    std::any const& get(std::string const& name) const
-    {
-        if (is_defined(name)) {
-            return data.at(name);
-        }
-        return Undefined;
-    }
-
-    template <typename FN>
-    void forAll(FN const& fn, std::string const& name, Symbols const* current) const
-    {
-        for (auto const& p : *current) {
-            std::string fullName =
-                name.empty() ? p.first : name + "." + p.first;
-            if (p.second.type() == typeid(Symbols)) {
-                forAll(fn, fullName, std::any_cast<Symbols>(&p.second));
+        auto s = std::string(name);
+        for (auto const& p : symbols) {
+            if (p.second.type() == typeid(AnyMap{})) {
+                set_sym(s + "." + p.first, std::any_cast<AnyMap>(p.second));
             } else {
-                fn(fullName, p.second);
+                auto key = s + "." + p.first;
+                set(key, p.second);
             }
         }
     }
+
+    void set(std::string_view name, std::any const& val, int line = -1)
+    {
+        auto s = std::string(name);
+        if (val.type() == typeid(AnyMap{})) {
+            set(name, std::any_cast<AnyMap>(val), line);
+        } else if (val.type() == typeid(double)) {
+            set(name, std::any_cast<double>(val), line);
+        } else {
+            if (accessed.count(s) > 0) {
+                throw sym_error(
+                    fmt::format("Can not redefine generic any type {} ({})", s,
+                                val.type().name()));
+            }
+            if (trace && undefined.find(s) != undefined.end()) {
+                fmt::print("Defined {}\n", s);
+            }
+            syms[s] = val;
+        }
+    }
+
+    template <typename T>
+    void set(std::string_view name, T const& val, int line = -1)
+    {
+        (void)line;
+        auto s = std::string(name);
+        if constexpr (std::is_same_v<T, AnyMap>) {
+            set_sym(s, static_cast<AnyMap>(val));
+            return;
+        } else {
+            if (accessed.count(s) > 0) {
+                LOGD("%s has been accessed", s);
+                auto it = syms.find(s);
+                if (it != syms.end()) {
+                    if (std::any_cast<T>(it->second) != val) {
+                        LOGD("Redefined '%s' in %d", s, line);
+                        if (trace) {
+                            if constexpr (std::is_arithmetic_v<T>) {
+                                fmt::print("Redefined {} in line {} from ${:x} "
+                                           "to ${:x}\n",
+                                           s, line,
+                                           std::any_cast<T>(it->second), val);
+                            } else {
+                                fmt::print("Redefined {} in line {}\n", s,
+                                           line);
+                            }
+                        }
+                        undefined.insert({s, line});
+                    }
+                } else {
+                    if (trace) {
+                        fmt::print("Defined {} in line {}\n", s, line);
+                    }
+                }
+            }
+            syms[s] = std::any(val);
+        }
+    }
+
+    AnyMap collect(std::string const& name) const
+    {
+        AnyMap s;
+        for (auto const& p : syms) {
+            auto dot = p.first.find('.');
+            if (dot != std::string::npos) {
+                auto prefix = p.first.substr(0, dot);
+                LOGD("Checking %s vs %s", prefix, name);
+                if (prefix == name) {
+                    // rest = one.x
+                    auto rest = p.first.substr(dot + 1);
+                    // Can never be undefined
+                    s[rest] = syms.at(p.first);
+                }
+            }
+        }
+        return s;
+    }
+
+    template <typename T = std::any>
+    T get(std::string_view name, int line = -1)
+    {
+        accessed.insert(std::string(name));
+        if constexpr (std::is_same_v<T, AnyMap>) {
+            auto s = std::string(name);
+            auto res = collect(s);
+            return res;
+        }
+        auto s = std::string(name);
+        auto it = syms.find(s);
+        if (it == syms.end()) {
+            LOGD("%s is undefined", name);
+            if (trace) {
+                fmt::print("Access undefined '{}' in line {}\n", name, line);
+            }
+            undefined.insert({s, line});
+            if constexpr (std::is_same_v<T, std::any>) {
+                return std::any(static_cast<double>(0));
+            }
+            LOGD("Returning default (%s)", typeid(T{}).name());
+            return T{};
+        }
+        if constexpr (std::is_same_v<T, std::any>) {
+            return it->second;
+        }
+        return std::any_cast<T>(it->second);
+    }
+
+    template <typename T>
+    struct Accessor
+    {
+        SymbolTable& st;
+        std::string_view name;
+
+        Accessor(SymbolTable& st_, std::string_view name_)
+            : st(st_), name(name_)
+        {}
+
+        Accessor& operator=(T const& val)
+        {
+            st.set(name, val);
+            return *this;
+        }
+
+        operator T const() const { return st.get<T>(name); } // NOLINT
+    };
+
+    template <typename T>
+    Accessor<T> at(std::string_view name)
+    {
+        return Accessor<T>(*this, name);
+    }
+
+    Accessor<std::any> operator[](std::string_view name)
+    {
+        return Accessor<std::any>(*this, name);
+    }
+
     template <typename FN>
     void forAll(FN const& fn) const
     {
-        forAll(fn, "", this);
-    }
-
-    std::any const& get(std::vector<std::string> const& names) const
-    {
-        Symbols const* s = this;
-        for (size_t i = 0; i < names.size() - 1; i++) {
-            auto const& name = names[i];
-            if (!s->is_defined(name)) {
-                return Undefined;
-            }
-            auto const& v = s->get(name);
-            s = std::any_cast<Symbols>(&v);
-            if(s == nullptr) {
-                // This was not a symbol table
-                return Undefined;
-            }
-        }
-        return s->get(names.back());
-    }
-
-    template <typename T>
-    T const& get_as(std::vector<std::string> const& names) const
-    {
-        auto const& v = get(names);
-        return *std::any_cast<T>(&v);
-    }
-
-    enum class Was
-    {
-        Undefined,
-        DifferentType,
-        DifferentValue,
-        Same,
-        SameType
-    };
-
-    Was set(std::string const& name, std::any const& v)
-    {
-        if (!is_defined(name)) {
-            data[name] = v;
-            return Was::Undefined;
-        }
-        auto old = data[name];
-        if (old.type() == v.type()) {
-            data[name] = v;
-            return Was::SameType;
-        } else {
-            data[name] = v;
-            return Was::DifferentType;
+        for (auto const& p : syms) {
+            fn(p.first, p.second);
         }
     }
 
-    // Record if value was changed
-    template <typename T>
-    Was set(std::string const& name, T const& val)
+    // Remove all undefined that now exists
+    void resolve()
     {
-        auto v = std::any(val);
-        if (!is_defined(name)) {
-            data[name] = v;
-            return Was::Undefined;
-        }
-        auto old = data[name];
-        if (old.type() == v.type()) {
-            auto& target = at<T>(name);
-            if (target != val) {
-                target = val;
-                return Was::DifferentValue;
-            } else {
-                return Was::Same;
-            }
-        } else {
-            data[name] = v;
-            return Was::DifferentType;
+        for (auto const& [name, val] : syms) {
+            undefined.erase(name);
         }
     }
 
-    // Record if value was changed
-    template <typename T>
-    Was set(std::vector<std::string> const& names, T const& val)
+    bool ok() const
     {
-        Symbols* s = this;
-        for (size_t i = 0; i < names.size() - 1; i++) {
-            auto const& name = names[i];
-            s = &s->at<Symbols>(name);
+        for (auto const& u : undefined) {
+            if (syms.find(u.first) == syms.end()) return false;
         }
-        return s->set(names.back(), val);
+        return true;
     }
 
-private:
-    Map data;
+    void erase(std::string_view name)
+    {
+        syms.erase(std::string(name));
+        accessed.erase(std::string(name));
+    }
+
+    bool done() const { return undefined.empty(); }
+
+    std::unordered_map<std::string, int> const& get_undefined() const
+    {
+        return undefined;
+    }
+
+    void clear()
+    {
+        accessed.clear();
+        undefined.clear();
+    }
 };

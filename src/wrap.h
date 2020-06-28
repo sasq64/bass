@@ -33,6 +33,8 @@ struct SVWrap
     template <typename T>
     std::vector<T> transform() const;
 
+    int line() const { return static_cast<int>(line_info().first);}
+
     template <typename T>
     T to(size_t i) const
     {
@@ -71,15 +73,15 @@ struct ParserWrapper
 
     explicit ParserWrapper(std::string const& source);
 
-    void packrat();
+    void packrat() const;
     void action(const char* name,
                 std::function<std::any(SVWrap const&)> const& fn) const;
 
     void enter(const char* name,
-               std::function<void(const char*, size_t, std::any&)> const&);
+               std::function<void(const char*, size_t, std::any&)> const&) const;
     void leave(const char* name,
                std::function<void(const char*, size_t, size_t, std::any&,
-                                  std::any&)> const&);
+                                  std::any&)> const&) const;
     struct ActionSetter
     {
         const char* action;

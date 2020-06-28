@@ -6,7 +6,6 @@
 #include <sol/sol.hpp>
 #include <string>
 
-
 static const char* to_string = R"(
 function table_print (tt, indent, done)
   print("here")
@@ -59,12 +58,20 @@ Scripting::~Scripting() = default;
 
 void Scripting::load(utils::path const& p)
 {
-    lua.do_file(p.string());
+    try {
+        lua.do_file(p.string());
+    } catch (sol::error& e) {
+        throw script_error(e.what());
+    }
 }
 
 void Scripting::add(std::string_view const& code)
 {
-    lua.script(code);
+    try {
+        lua.script(code);
+    } catch (sol::error& e) {
+        throw script_error(e.what());
+    }
 }
 
 bool Scripting::hasFunction(std::string_view const& name)
@@ -87,7 +94,7 @@ std::any Scripting::to_any(sol::object const& obj)
 
     if (obj.is<sol::table>()) {
         sol::table t = obj.as<sol::table>();
-        Symbols syms;
+        AnyMap syms;
         std::vector<uint8_t> vec;
         bool isVec = false;
         bool first = true;
@@ -105,6 +112,7 @@ std::any Scripting::to_any(sol::object const& obj)
                 syms[s] = to_any(val);
             }
         });
+        // TODO: If table was empty it will become symbols
         return isVec ? std::any(vec) : std::any(syms);
     }
     return std::any();
@@ -120,19 +128,19 @@ sol::object Scripting::to_object(std::any const& a)
     }
     if (auto const* av = std::any_cast<std::vector<uint8_t>>(&a)) {
         // TODO: Can we sol make this 'value' conversion?
-        //return sol::make_object(lua, *av);
+        // return sol::make_object(lua, *av);
         sol::table t = lua.create_table();
         size_t i = 1;
-        for(auto v : *av) {
+        for (auto v : *av) {
             t[i++] = v;
         }
         return t;
     }
-    if (auto const* at = std::any_cast<Symbols>(&a)) {
+    if (auto const* at = std::any_cast<AnyMap>(&a)) {
         sol::table t = lua.create_table();
-        at->forAll([&](std::string const& name, std::any const& val) {
+        for (auto const& [name, val] : *at) {
             t[name] = to_object(val);
-        });
+        }
         return t;
     }
     return sol::object{};
@@ -158,4 +166,3 @@ std::any Scripting::call(std::string_view const& name,
     sol::object res = fres;
     return to_any(res);
 }
-
