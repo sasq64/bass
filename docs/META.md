@@ -1,4 +1,10 @@
 
+# Meta Commands
+
+All meta commands take the same basic form; An exclamation mark followed by an identifier, then an optional set of arguments, followed by zero, one or two
+blocks enclosed in curly braces.
+
+
 ## `!section`
 
 1. `!section <name>, <start> [, <flags>] [ { <statements...> } ]`
@@ -82,9 +88,68 @@ Insert 24bit words into memory. Useful for C64 sprites.
 Insert characters into memory. Characters are translated using
 current translation table.
 
+## `!chartrans`
+
+1. `!chartrans <string>, <c0>, <c1>... [<string>, <c0>, <c1>...]`
+2. `!chartrans`
+
+Setup the translation of characters coming from `!text` commands.
+
+1. Each character from the provided _string_ should be translated to each
+   subsequent number, in order. The number of values should be equal to the
+   number of characters in the string.
+2. Reset tranlation to default.
+
+## `!assert`
+
+* `!assert <expression> [,<string>]`
+
+Assert that _expression_ is true. Fail compilation otherwise.
+Asserts are only evaluated in the final pass.
+
+## `!align`
+
+* `!align <bytes>`
+
+Align the _Program Counter_ so it is evenly dividable with _bytes_. Normal use case
+is `!align 256` to ensure page boundry.
+
+##  `!pc`
+
+* `!pc <address>`
+
+Explicitly set the _Program Counter_ to the given address.
+
+## `!ds`
+
+* `!ds <bytes>`
+
+Declare an empty sequence of _size_ bytes. Only increase the _Program Counter_, will not put any data into the current section.
+
+
 ## `!enum`
 
 `!enum [<name>] { <assignments...> }`
 
 Perform the assignments into a symbol table called `name`, or
 directly to the global symbol table if no name is given.
+
+## `!if`
+
+1. `!if <expression> { <statements...> } [ else { <statements...>} ]`
+1. `!ifdef <symbol> { <statements...> } [ else { <statements...>} ]`
+1. `!ifndef <symbol> { <statements...> } [ else { <statements...>} ]`
+
+Conditional parsing of statements.
+
+## `!include`
+
+* `!include <filename>`
+
+## `!incbin`
+
+* `!incbin <filename>`
+
+## `!script`
+
+* `!script <filename>`

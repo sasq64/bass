@@ -11,7 +11,6 @@
 #include <vector>
 
 #include <cassert>
-#define Assert assert
 
 using AnyMap = std::unordered_map<std::string, std::any>;
 

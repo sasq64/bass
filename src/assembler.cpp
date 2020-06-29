@@ -47,6 +47,19 @@ std::string to_string(std::any const& val)
     return val.type().name();
 }
 
+std::string_view rstrip(std::string_view text)
+{
+    auto sz = static_cast<int64_t>(text.size());
+    auto p = sz - 1;
+    while (p >= 0 && (text[p] == ' ' || text[p] == '\t')) {
+        p--;
+    }
+    if (sz > p) {
+        text.remove_suffix(text.size() - 1 - p);
+    }
+    return text;
+}
+
 void Assembler::trace(SVWrap const& sv) const
 {
     if (!doTrace) return;
@@ -93,6 +106,7 @@ std::any Assembler::evaluateExpression(std::string_view expr)
     return parseResult;
 }
 
+// Parse a definition; `name(args1, arg2...)` and return it
 Assembler::Def Assembler::evaluateDefinition(std::string_view expr)
 {
     auto s = ":d:"s + std::string(expr);
@@ -104,6 +118,7 @@ Assembler::Def Assembler::evaluateDefinition(std::string_view expr)
     return std::any_cast<Def>(parseResult);
 }
 
+// Parse a comma separated lists of expressions or strings
 std::vector<std::any> Assembler::evaluateList(std::string_view expr)
 {
     auto s = ":a:"s + std::string(expr);
@@ -116,6 +131,7 @@ std::vector<std::any> Assembler::evaluateList(std::string_view expr)
     return std::any_cast<std::vector<std::any>>(parseResult);
 }
 
+// Parse a set of assignments, one per line
 AnyMap Assembler::evaluateEnum(std::string_view expr)
 {
     auto s = ":e:"s + std::string(expr);
@@ -128,6 +144,7 @@ AnyMap Assembler::evaluateEnum(std::string_view expr)
     return std::any_cast<AnyMap>(parseResult);
 }
 
+// Evaluate the a block of statements
 void Assembler::evaluateBlock(std::string_view block, std::string_view fn)
 {
     if (!parser.parse(block, fn.empty() ? fileName.c_str()
@@ -310,7 +327,7 @@ void initMeta(Assembler& ass);
 void initFunctions(Assembler& ass);
 void registerLuaFunctions(Assembler& a, Scripting& s);
 
-Assembler::Assembler() : parser(grammar6502), scripting()
+Assembler::Assembler() : parser(grammar6502)
 {
     parser.packrat();
     mach = std::make_shared<Machine>();
@@ -443,13 +460,7 @@ void Assembler::setupRules()
         auto meta = any_cast<std::string_view>(sv[i++]);
         auto text = any_cast<std::string_view>(sv[i++]);
         // Strip trailing spaces
-        auto p = (int)text.size() - 1;
-        while (p >= 0 && (text[p] == ' ' || text[p] == '\t')) {
-            p--;
-        }
-        if ((int)text.size() > p) {
-            text.remove_suffix(text.size() - 1 - p);
-        }
+        text = rstrip(text);
 
         std::vector<std::string_view> blocks;
 

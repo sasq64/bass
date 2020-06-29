@@ -30,7 +30,9 @@ start
     sta $d018
     sei
 
-    print("Playing SID", 1, 1)
+    !chartrans "♥", 0x66
+
+    print("Playing SID ♥", 1, 1)
     print(sid.title, 1, 2)
     print(sid.composer, 1, 3)
 

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 // Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
 // See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
@@ -11,7 +12,7 @@
 
 namespace utils {
 
-inline uint32_t decode(uint32_t* state, uint32_t* codep, uint32_t byte)
+inline uint32_t decode(uint32_t* state, uint32_t* codep, char byte)
 {
     static const uint8_t utf8d[] = {
         0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
@@ -55,7 +56,7 @@ inline uint32_t decode(uint32_t* state, uint32_t* codep, uint32_t byte)
         1,   1,   1,   1,   1,   1,   1,   1,   1,   1, // s7..s8
     };
 
-    uint32_t type = utf8d[byte];
+    uint32_t type = utf8d[(unsigned char)byte];
 
     *codep = (*state != UTF8_ACCEPT) ? (byte & 0x3fu) | (*codep << 6)
                                      : (0xff >> type) & (byte);
@@ -79,7 +80,7 @@ inline size_t utf8_decode(const std::string& utf8, uint32_t* target)
     return ptr - target;
 }
 
-inline std::wstring utf8_decode(const std::string& txt)
+inline std::wstring utf8_decode(const std::string_view& txt)
 {
     std::wstring result;
     using C = std::wstring::value_type;
@@ -96,10 +97,10 @@ inline std::wstring utf8_decode(const std::string& txt)
     return result;
 }
 
-inline std::string utf8_encode(const std::string& txt)
+inline std::string utf8_encode(const std::string_view& txt)
 {
     std::string out;
-    const uint8_t* s = (uint8_t*)txt.c_str();
+    const uint8_t* s = (uint8_t*)txt.data();
     for (size_t i = 0; i < txt.length(); i++) {
         uint8_t c = s[i];
         if (c <= 0x7f)

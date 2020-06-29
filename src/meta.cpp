@@ -7,22 +7,25 @@
 #include <coreutils/log.h>
 #include <coreutils/split.h>
 #include <coreutils/text.h>
+#include <coreutils/utf8.h>
 #include <fmt/format.h>
 #include <vector>
 
 using namespace std::string_literals;
 
-static std::array<uint8_t, 256> char_translate;
+static std::unordered_map<uint16_t, uint8_t> char_translate;
 
+// Reset the translation of characters to Petscii/screen code
 static void resetTranslate()
 {
+    char_translate.clear();
     for (int i = 0; i < 256; i++) {
         auto c = i;
         if (c >= 'a' && c <= 'z')
             c = c - 'a' + 1;
         else if (c >= 'A' && c <= 'Z')
             c = c - 'A' + 0x41;
-        char_translate.at(i) = c;
+        char_translate[i] = c;
     }
 }
 
@@ -69,18 +72,20 @@ void initMeta(Assembler& a)
             return;
         }
         auto list = a.evaluateList(args);
-        std::string text;
+        std::wstring text;
         size_t index = 0;
         for (auto const& v : list) {
             if (auto* s = any_cast<std::string_view>(&v)) {
-                text = *s;
+                text = utils::utf8_decode(*s);
                 index = 0;
             } else {
                 Check(!text.empty(),
                       "First argument must be a (non-empty) string");
                 Check(index < text.length(), "Arguments exceed string length");
                 auto n = number<uint8_t>(v);
-                char_translate.at(text[index++]) = n;
+                auto c = text[index++];
+                LOGI("%x %x", n, (uint16_t)c);
+                char_translate[c] = n;
             }
         }
     });
@@ -89,9 +94,12 @@ void initMeta(Assembler& a)
         auto list = a.evaluateList(text);
         for (auto const& v : list) {
             if (auto* s = any_cast<std::string_view>(&v)) {
-                for (auto c : *s) {
-                    c = char_translate.at(c);
-                    mach.writeChar(c);
+                auto ws = utils::utf8_decode(*s);
+                for (auto c : ws) {
+                    LOGI("Lookup %x", (uint16_t)c);
+                    auto b = char_translate.at(c);
+                    LOGI("Became %x", b);
+                    mach.writeChar(b);
                 }
             } else {
                 throw parse_error("Need text");
@@ -163,14 +171,15 @@ void initMeta(Assembler& a)
                 mach.writeByte(d);
             }
         } else if (auto* sv = any_cast<std::string_view>(&data)) {
-            for (size_t i = 0; i < sv->size(); i++) {
-                char d = (*sv)[i];
+            auto text = utils::utf8_decode(*sv);
+            for (size_t i = 0; i < text.size(); i++) {
+                auto d = text[i];
                 syms.erase("i");
                 syms.set("i", i);
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
                     auto res = a.evaluateExpression(b);
-                    d = number<uint8_t>(res);
+                    d = number<wchar_t>(res);
                 }
                 mach.writeByte(char_translate.at(d));
             }
