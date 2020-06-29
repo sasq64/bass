@@ -1,0 +1,158 @@
+:source-highlighter: pygments
+:pygments-linenums-mode: inline
+
+## Intro to the _bass_ (badass) 6502 assembler
+
+### Part 3
+
+In part 2 we saw how to use macros to set up a C64 graphics screen, `!section` to
+locate the graphics in memory, and some code to copy it to the right place.
+
+Now let's add a sprite!.
+
+[source,ca65]
+----
+spritePtrs = screenTarget + 1016
+spriteMem = $5f80
+
+    ; Enable sprite 2
+    lda #$04 
+    sta $d015
+
+    ; Set sprite 2 pointer
+    lda #(spriteMem-$4000)/64
+    sta spritePtrs+2
+
+    ; Copy sprite data
+    ldx #3*21
+$   lda spriteData,x
+    sta spriteMem,x
+    dex
+    bne -
+
+spriteData:
+    !rept 3*24 { !byte $ff }
+
+----
+
+The `!rept` command is used to repeat any block of statements a given number
+of times. Here we user it to create a solid rectangle as out sprite.
+
+But of course we want  to generate something more nice looking.
+For this it's time to turn to lua scripting;
+
+[source]
+----
+%{
+function setPixel(target, width, x, y)
+    offs = width * y + (x>>3) + 1 -- 1-Indexed arrays :(
+    if offs >=1 and offs <= #target then
+        target[offs] = target[offs] | 1<<(7-(x&7))
+    end
+end
+
+function circle(target, width, xp, yp, r)
+    for y=-r,r, 1 do
+        for x=-r,r, 1 do
+            if x*x+y*y <= r*r then
+                setPixel(target, width, xp+x, yp+y)
+            end
+        end
+    end
+    return target
+end
+}%
+----
+
+You can use `%{` / `}%` at any time to switch to script mode and write
+LUA code, and functions defined in LUA will be callable from the Assembler.
+
+The code above will give us a `circle()` function that renders a circle into a vector of bits (the format used by monochrome sprites).
+
+We can now use this function to generate a ball sprite instead of our ugly rectangle:
+
+
+[source,ca65]
+----
+    circle_sprite = circle(zeroes(3*21), 3, 12, 10, 10)
+spriteData:
+    !fill circle_sprite
+----
+
+The LUA function will take an array as input, and return an array
+with the rendered circle. Just like we did with the graphics and music
+earlier, we can use the `!fill` command to put it into memory.
+
+Let's make ths sprite move. Here is some code to make the
+sprite move in a sine wave:
+
+[source,ca65]
+----
+update_sprite
+    ldx xy
+    ldy xy+1
+    inc xy
+    inc xy+1
+    inc xy+1
+
+    lda sine,x
+    sta $d004
+    lda sine,y
+    sta $d005
+
+    rts
+
+xy: !byte 0,0
+
+sine:
+    !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }
+----
+
+Here we use the `!rept` command again, this time to create a sine table.
+
+So this is all pretty good - but can we take advantage of the fact that we can
+generate circles of different sizes? How about a small animation?
+
+First, lets generate 8 sprites with different radiuses:
+
+[source,ca65]
+----
+spriteData:
+    !rept 8 {
+        !fill circle(zeroes(3*21), 3, 12, 10, i + 3)
+        !byte 0
+    }
+----
+
+And we need to copy all 8 frames to sprite memory:
+
+[source,ca65]
+----
+!rept 8 {
+    ldx #3*21
+$   lda spriteData-1+i*64,x
+    sta spriteMem-1+i*64,x
+    dex
+    bne -
+}
+----
+
+Then lets add another sine table with an amplitude that matches the number of
+frames, and add some code to set the sprite pointer every frame:
+
+[source,ca65]
+----
+    lda sine2,x
+    adc #(spriteMem-$4000)/64
+
+    sta spritePtrs+2
+    rts
+
+sine2:
+    !rept 256 { !byte (sin(i*Math.Pi*2/96)+1) * 3.5 }
+----
+
+This should be enough to make our ball appear to move in all 3 dimensions.
+
+link:part2.html[Prev] -- link:part4.html[Next]
+

@@ -58,9 +58,11 @@ void initFunctions(Assembler& a)
     });
 
     a.registerFunction("word", [](std::vector<uint8_t> const& data) {
+        Check(data.size() >= 2, "Need at least 2 bytes");
         return data[0] | (data[1] << 8);
     });
     a.registerFunction("big_word", [](std::vector<uint8_t> const& data) {
+      Check(data.size() >= 2, "Need at least 2 bytes");
         return data[1] | (data[0] << 8);
     });
 

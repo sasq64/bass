@@ -52,6 +52,9 @@ add_library(lodepng STATIC external/lodepng/lodepng)
 target_include_directories(lodepng PUBLIC external/lodepng)
 target_compile_options(lodepng PRIVATE ${WARN_EXT})
 
+add_library(catch INTERFACE)
+target_include_directories(catch INTERFACE external)
+
 add_library(badlib STATIC
     src/assembler.cpp src/grammar.cpp src/functions.cpp
     src/machine.cpp src/wrap.cpp src/meta.cpp
@@ -64,17 +67,17 @@ target_link_libraries(badlib PUBLIC coreutils
         PRIVATE lua lodepng fmt ${THREAD_LIB} PUBLIC sol2::sol2 )
 
 if(FUZZ)
-    add_executable(bazz fuzz.cpp)
+    add_executable(bazz src/fuzz.cpp)
     target_link_libraries(bazz PRIVATE badlib)
 else()
-    add_executable(bass main.cpp)
+    add_executable(bass src/main.cpp)
     target_link_libraries(bass PRIVATE badlib CLI11::CLI11)
 
-    add_executable(symtest testmain.cpp symtest.cpp)
+    add_executable(symtest src/testmain.cpp src/symtest.cpp)
     target_include_directories(symtest PRIVATE src)
-    target_link_libraries(symtest PRIVATE coreutils fmt)
+    target_link_libraries(symtest PRIVATE catch coreutils fmt)
 
-    add_executable(tester testmain.cpp asmtest.cpp)
-    target_link_libraries(tester PRIVATE fmt badlib)
+    add_executable(tester src/testmain.cpp src/asmtest.cpp)
+    target_link_libraries(tester PRIVATE catch fmt badlib)
 
 endif(FUZZ)

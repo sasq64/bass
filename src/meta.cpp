@@ -14,11 +14,6 @@ using namespace std::string_literals;
 
 static std::array<uint8_t, 256> char_translate;
 
-void Check(bool v, std::string const& txt)
-{
-    if (!v) throw parse_error(txt);
-}
-
 static void resetTranslate()
 {
     for (int i = 0; i < 256; i++) {
@@ -57,17 +52,13 @@ void initMeta(Assembler& a)
     resetTranslate();
 
     a.registerMeta("macro", [&](auto const& text, auto const& blocks) {
-        if (blocks.empty()) {
-            throw parse_error("Expected block");
-        }
+        Check(blocks.size() == 1, "Expected block");
         auto def = a.evaluateDefinition(text);
         a.defineMacro(def.name, def.args, blocks[0]);
     });
 
     a.registerMeta("define", [&](auto const& text, auto const& blocks) {
-        if (blocks.empty()) {
-            throw parse_error("Expected block");
-        }
+        Check(blocks.size() == 1, "Expected block");
         auto def = a.evaluateDefinition(text);
         a.addDefine(def.name, def.args, blocks[0]);
     });
@@ -75,25 +66,21 @@ void initMeta(Assembler& a)
     a.registerMeta("chartrans", [&](auto const& args, auto const&) {
         if (args.empty()) {
             resetTranslate();
-        } else {
-            auto list = a.evaluateList(args);
-            std::string text;
-            size_t index = 0;
-            for (auto const& v : list) {
-                if (auto* s = any_cast<std::string_view>(&v)) {
-                    text = *s;
-                    index = 0;
-                } else {
-                    if (text.empty()) {
-                        throw parse_error(
-                            "First argument must be a (non-empty) string");
-                    }
-                    if (index >= text.length()) {
-                        throw parse_error("Arguments exceed string length");
-                    }
-                    auto n = number<uint8_t>(v);
-                    char_translate.at(text[index++]) = n;
-                }
+            return;
+        }
+        auto list = a.evaluateList(args);
+        std::string text;
+        size_t index = 0;
+        for (auto const& v : list) {
+            if (auto* s = any_cast<std::string_view>(&v)) {
+                text = *s;
+                index = 0;
+            } else {
+                Check(!text.empty(),
+                      "First argument must be a (non-empty) string");
+                Check(index < text.length(), "Arguments exceed string length");
+                auto n = number<uint8_t>(v);
+                char_translate.at(text[index++]) = n;
             }
         }
     });
@@ -228,15 +215,6 @@ void initMeta(Assembler& a)
         a.getSymbols().set(name, result);
     });
 
-    // TODO: Redundant, use fill
-    a.registerMeta("block", [&](auto const& text, auto const&) {
-        std::any data = a.evaluateExpression(text);
-        auto const& vec = any_cast<std::vector<uint8_t>>(data);
-        for (auto d : vec) {
-            mach.writeByte(d);
-        }
-    });
-
     a.registerMeta("org", [&](auto const& text, auto const&) {
         auto org = number<int32_t>(a.evaluateExpression(text));
         mach.addSection("", org);
@@ -318,7 +296,7 @@ void initMeta(Assembler& a)
     });
 
     a.registerMeta("script", [&](auto const& text, auto const&) {
-        if(a.isFirstPass()) {
+        if (a.isFirstPass()) {
             auto args = a.evaluateList(text);
             Check(args.size() == 1, "Incorrect number of arguments");
             auto name = any_cast<std::string_view>(args[0]);
@@ -353,9 +331,7 @@ void initMeta(Assembler& a)
     });
 
     a.registerMeta("rept", [&](auto const& text, auto const& blocks) {
-        if (blocks.empty()) {
-            throw parse_error("Expected block");
-        }
+        Check(blocks.size() == 1, "Expected block");
 
         std::any data;
         std::string indexVar = "i";
@@ -397,9 +373,7 @@ void initMeta(Assembler& a)
     });
 
     a.registerMeta("enum", [&](auto const& text, auto const& blocks) {
-        if (blocks.empty()) {
-            throw parse_error("Expected block");
-        }
+        Check(!blocks.empty(), "Expected block");
         auto s = a.evaluateEnum(blocks[0]);
         if (text.empty()) {
             for (auto const& [name, v] : s) {

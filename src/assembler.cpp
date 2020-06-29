@@ -732,7 +732,7 @@ void Assembler::setupRules()
                     b = number<size_t>(sv[3]);
                 }
 
-                if (a > b || b >= v->size()) {
+                if (a >= b || b > v->size()) {
                     if (finalPass) {
                         throw parse_error("Slice outside array");
                     }

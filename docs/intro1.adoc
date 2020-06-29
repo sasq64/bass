@@ -1,0 +1,136 @@
+:source-highlighter: pygments
+:pygments-linenums-mode: inline
+
+## Intro to the _bass_ (badass) 6502 assembler
+
+### Part 1
+_bass_ is a new 6502 assembler. It is designed to be powerful (like Kickassembler)
+but with a less complex syntax, and more _unified_, _functional_ design.
+
+Let's start with a minimal C64 program, a 3 opcode routine to make a rainbow border:
+
+[source,ca65]
+----
+    !org $c000
+loop:
+    lda $d012
+    sta $d020
+    jmp loop
+----
+
+You should be able to load this into a C64 emulator and start it with `sys 49152`.
+
+Now let's add a _basic start_ snippet so we can just run the prg instead:
+
+[source,ca65]
+----
+    !section "main", $801
+    !byte $0b,$08,$01,$00,$9e,str(start)," BY SASQ",$00,$00,$00
+start:
+    lda #3
+    sta $d020
+----
+
+What happens here ? Well the `!byte` meta command accepts both numbers
+and strings, and for strings it inserts each character one by one.
+
+The `str()` function takes a value and converts it to a string. So this
+is how we insert the correct sys adress into the basic, regardless of
+where that `start:` label is placed.
+
+Let's add some more code;
+    
+[source,ca65]
+----
+    !section "main", $801
+    !byte $0b,$08,$01,$00,$9e,str(start)," BY SASQ",$00,$00,$00
+start:
+    jsr $1000
+.loop
+    lda $d012
+    cmp #100
+    bne .loop
+    lda #3
+    sta $d020
+    jsr $1003
+    lda #0
+    sta $d020
+    jmp .loop
+
+    !section "music", $1000
+    !incbin "music.raw"
+----
+
+This is a short program that wait for a certain scan line, calls a music routine,
+and loops. The music is expected to reside in the file "music.raw" and must
+be placed at address $1000.
+
+But what if music is a PRG with 2 bytes load address first. Or a sid file ?
+
+The functional approach of bass lets us manipulate not only numeric data, but also
+byte arrays. So to strip out the 2 first byte of a file and place it in memory we
+can do:
+
+[source,ca65]
+----
+    data = load("music.bin")
+    !fill data[2:]
+----
+
+A few new things here, the `data` symbol now refers to a byte array, and we use
+the `!fill` meta command to insert it into memory.
+
+The `[2:]` part is called _slicing_. To extract a range from a byte array you use
+it like: `data[start:end]` (where start is inclusive and end exclusive).
+
+So what about the load address, can we use it? Sure;
+
+[source,ca65]
+----
+    loadAdr = word(data[0:2])
+    !section "music", loadAdr
+music:
+    !fill data[2:]
+----
+
+As you may have figured out, the `word()` function decodes a little endian 16-bit word from an array.
+
+Except what if the load address is not compatible with our layout? If we load another song at a different adress it will probably break our code.
+
+Instead we can just _verify_ the load address:
+
+[source,ca65]
+----
+    musicStart = $1000
+    !assert word(data[0:2]) == musicStart
+----
+
+Lets put it all together:
+
+[source,ca65]
+----
+    musicStart = $1000
+
+    !section "main", $801
+    !byte $0b, $08,$01,$00,$9e,str(start)," BY SASQ", $00,$00,$00
+start:
+    jsr musicStart
+.loop
+    lda $d012
+    cmp #100
+    bne .loop
+    lda #3
+    sta $d020
+    jsr musicStart+3
+    lda #0
+    sta $d020
+    jmp .loop
+
+    data = load("music.prg")
+    !assert  word(data[0:2]) == musicStart
+
+    !section "music", musicStart
+    !fill data[2:]
+----
+
+link:part2.html[Next]

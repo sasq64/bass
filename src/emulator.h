@@ -91,11 +91,11 @@ struct Machine
         sr = 0x30;
         result = 0;
         for (int i = 0; i < 256; i++) {
-            rbank[i] = wbank[i] = &ram[(i * 256) % POLICY::MemSize];
-            rcallbacks[i] = &read_bank;
-            rcbdata[i] = this;
-            wcallbacks[i] = &write_bank;
-            wcbdata[i] = this;
+            rbank.at(i) = wbank.at(i) = &ram[(i * 256) % POLICY::MemSize];
+            rcallbacks.at(i) = &read_bank;
+            rcbdata.at(i) = this;
+            wcallbacks.at(i) = &write_bank;
+            wcbdata.at(i) = this;
         }
         for (const auto& i : getInstructions<false>()) {
             for (const auto& o : i.opcodes)
@@ -150,7 +150,7 @@ struct Machine
     // Map ROM to a bank
     void mapRom(uint8_t bank, const Word* data, int len)
     {
-        auto end = data + len;
+        auto const *end = data + len;
         while (data < end) {
             rbank[bank++] = const_cast<Word*>(data);
             data += 256;
