@@ -92,6 +92,7 @@ EOT <- !.
 
 Expression  <- Atom (Operator Atom)* {
                          precedence
+                           L :
                            L &&
                            L ||
                            L |
@@ -123,11 +124,12 @@ FnCall <- Call
 Call <- CallName '(' CallArgs ')'
 CallName <- Symbol
 CallArgs <- (CallArg (',' CallArg)*)?
-CallArg <- String / Expression
+CallArg <- (Symbol '=' !'=')? (String / Expression)
 Operator <-  
         '&&' / '||' / '<<' / '>>' / '==' / '!=' /
         '+' / '-' / '*' / '/' / '%' / '\\' /
         '|' / '^' / '&' / '<' / '>'
+
 Variable <- '.'? (Symbol '.')* Symbol
 
 )";

@@ -45,7 +45,8 @@ enum class AsmResult
 
 struct Section
 {
-    Section(std::string const& n, uint16_t s) : name(n), start(s), pc(s) {}
+    Section() = default;
+    Section(std::string const& n, uint32_t s) : name(n), start(s), pc(s) {}
     std::string name;
     uint32_t start = 0;
     uint32_t pc = 0;

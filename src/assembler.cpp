@@ -188,7 +188,6 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     auto section = mach->getCurrentSection();
 
     auto start = mach->getPC();
-    LOGD("Testing %s:%s at pc %x", name, contents, start);
     while (true) {
         syms.clear();
         mach->getCurrentSection() = section;
@@ -365,6 +364,7 @@ A operation(std::string_view const& ope, A const& a, B const& b)
     if (ope == ">=") return a >= b;
     if (ope == "==") return a == b;
     if (ope == "!=") return a != b;
+    if (ope == ":") return (a<<16) | b;
     // clang-format on
     return a;
 }
@@ -517,6 +517,14 @@ void Assembler::setupRules()
         }
         return v;
     };
+
+    parser["CallArg"] = [&](SV& sv) {
+        if(sv.size() == 1) {
+            return sv[0];
+        }
+        return std::any(std::make_pair(std::any_cast<std::string_view>(sv[0]), sv[1]));
+    };
+
     parser["MetaText"] = [&](SV& sv) { return sv.token_view(); };
     parser["ScriptContents"] = [&](SV& sv) { return sv.token_view(); };
 

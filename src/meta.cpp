@@ -96,9 +96,7 @@ void initMeta(Assembler& a)
             if (auto* s = any_cast<std::string_view>(&v)) {
                 auto ws = utils::utf8_decode(*s);
                 for (auto c : ws) {
-                    LOGI("Lookup %x", (uint16_t)c);
                     auto b = char_translate.at(c);
-                    LOGI("Became %x", b);
                     mach.writeChar(b);
                 }
             } else {
@@ -270,35 +268,60 @@ void initMeta(Assembler& a)
         fmt::print("\n");
     });
 
-    a.registerMeta("section", [&](auto const& text, auto const&) {
-        a.getSymbols().set("NO_STORE", static_cast<Number>(0x100000000));
-        a.getSymbols().set("TO_PRG", static_cast<Number>(0x200000000));
-        a.getSymbols().set("RO", static_cast<Number>(0x400000000));
+    a.registerMeta("section", [&](auto const& text, auto const& blocks) {
+        auto& syms = a.getSymbols();
+        syms.set("NO_STORE", num(0x100000000));
+        syms.set("TO_PRG", num(0x200000000));
+        syms.set("RO", num(0x400000000));
         auto args = a.evaluateList(text);
+
+        int32_t offset = -1;
+        int32_t start = -1;
+        std::string name;
+        int32_t pc = -1;
+        int32_t flags = 0;
+        int i = 0;
+
         if (args.empty()) {
             throw parse_error("Too few arguments");
         }
-        auto name = any_cast<std::string_view>(args[0]);
-        uint16_t start = 0;
-        if (args.size() == 1) {
+        for (auto const& a : args) {
+            if (auto* p = any_cast<std::pair<std::string_view, std::any>>(&a)) {
+                if (p->first == "start") {
+                    start = number<int32_t>(p->second);
+                    pc = start;
+                } else if (p->first == "offset") {
+                    offset = number<int32_t>(p->second);
+                }
+            } else {
+                if (i == 0) {
+                    name = any_cast<std::string_view>(a);
+                } else if (i == 1) {
+                    start = number<uint32_t>(a);
+                    pc = start;
+                } else if (i == 2) {
+                    auto res = number<uint64_t>(a);
+                    if (res >= 0x100000000) {
+                        flags = res >> 32;
+                    } else {
+                        pc = static_cast<uint32_t>(res);
+                    }
+                }
+                i++;
+            }
+        }
+
+        auto lastSection = mach.getCurrentSection().name;
+
+        if (start == -1) {
             mach.setSection(std::string(name));
+            if (!blocks.empty()) {
+                a.evaluateBlock(blocks[0]);
+                mach.setSection(lastSection);
+            }
             return;
         }
 
-        if (args.size() > 1) {
-            start = number<uint16_t>(args[1]);
-        }
-        // LOGI("Section %s at %x", name, start);
-        uint16_t pc = start;
-        int32_t flags = 0;
-        if (args.size() > 2) {
-            auto res = number<uint64_t>(args[2]);
-            if (res >= 0x100000000) {
-                flags = res >> 32;
-            } else {
-                pc = static_cast<uint16_t>(res);
-            }
-        }
         auto& s = mach.addSection(std::string(name), start);
         s.pc = pc;
         s.flags = flags;

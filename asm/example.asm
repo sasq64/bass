@@ -112,7 +112,6 @@ $   lda #100
 
 
 test_func:
-    brk #2
     rts
 
 !test my_test {
