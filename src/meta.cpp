@@ -54,6 +54,26 @@ void initMeta(Assembler& a)
 
     resetTranslate();
 
+    a.registerMeta("test", [&](auto const& text, auto const& blocks) {
+        auto args = a.evaluateList(text);
+        std::string testName;
+
+        for (auto const& v : args) {
+            if (auto* s = any_cast<std::string_view>(&v)) {
+                testName = *s;
+            } else if (auto* s = any_cast<Number>(&v)) {
+                a.testLocation = *s;
+            }
+        }
+
+        if (!testName.empty()) {
+        Check(blocks.size() == 1, "Expected block");
+            auto contents = blocks[0];
+            auto res = a.runTest(testName, contents);
+            a.getSymbols().set("tests."s + testName, res, 0);
+        }
+    });
+
     a.registerMeta("macro", [&](auto const& text, auto const& blocks) {
         Check(blocks.size() == 1, "Expected block");
         auto def = a.evaluateDefinition(text);

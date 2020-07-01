@@ -89,6 +89,7 @@ public:
 
     void debugflags(uint32_t flags);
 
+    uint32_t testLocation = 0x400;
 private:
     template <typename T>
     T& sym(std::string const& s) {
@@ -159,6 +160,7 @@ private:
 
     int labelNum = 0;
     int inMacro = 0;
+
 
     std::any parseResult;
 

@@ -183,18 +183,20 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 
     auto saved = save();
 
-    auto& oldSection = mach->getCurrentSection();
-    mach->setSection("test");
-    auto section = mach->getCurrentSection();
+    auto oldSection = mach->getCurrentSection();
+    auto testSection = mach->addSection("test", testLocation);
 
     auto start = mach->getPC();
+    LOGI("Testing at %x", start);
     while (true) {
         syms.clear();
-        mach->getCurrentSection() = section;
+        mach->getCurrentSection() = testSection;
         lastLabel = "__test_" + std::to_string(start);
         if (!parser.parse(contents, fileName.c_str())) {
             throw parse_error("Syntax error in test block");
         }
+        LOGI("Ending at %x", testSection.start + testSection.data.size());
+        LOGI("Size %x", mach->getCurrentSection().data.size());
         auto result = checkUndefined();
         if (result == DONE) break;
         if (result == PASS) continue;
@@ -209,8 +211,13 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 
     mach->assemble({"rts", AddressingMode::NONE, 0});
 
+
+    LOGI("Ending at %x", testSection.start + testSection.data.size());
+
     auto cycles = mach->run(start);
     fmt::print("*** Test {} : {} cycles\n", name, cycles);
+
+    mach->removeSection("test");
 
     auto [a, x, y, sr, sp, pc] = mach->getRegs();
 
@@ -219,7 +226,6 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
                   {"SP", num(sp)},         {"PC", num(pc)},
                   {"cycles", num(cycles)}, {"ram", mach->getRam()}};
 
-    mach->getCurrentSection() = section;
     mach->setSection(oldSection.name);
     restore(saved);
 
@@ -543,6 +549,10 @@ void Assembler::setupRules()
 
     parser["Test"] = [&](SV& sv) {
         trace(sv);
+        if(sv.size() == 1) {
+            testLocation = number<int32_t>(sv[0]);
+            return sv[0];
+        }
         auto contents = any_cast<std::string_view>(sv[1]);
         auto name = any_cast<std::string_view>(sv[0]);
         auto res = runTest(name, contents);

@@ -114,7 +114,7 @@ $   lda #100
 test_func:
     rts
 
-!test my_test {
+!test "my_test" {
     jsr test_func
 }
 

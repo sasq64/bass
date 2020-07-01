@@ -7,6 +7,14 @@
      LDY #>fname
      jsr kernel_load
  }
+!macro SetFileName(name) {
+    lda #.fname_end - .fname
+    ldx #<.fname
+    ldy #>.fname
+    bra .fname_end
+.fname !fill name
+.fname_end
+}
 
 kernel_load:
         jsr $ffbd     ; call SETNAM

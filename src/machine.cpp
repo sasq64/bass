@@ -71,6 +71,15 @@ void Machine::setSection(std::string const& name)
     throw machine_error(fmt::format("Unknown section {}", name));
 }
 
+void Machine::removeSection(std::string const& name)
+{
+    auto it = std::find_if(sections.begin(), sections.end(),
+                           [&](auto const& s) { return s.name == name; });
+    if (it != sections.end()) {
+        sections.erase(it);
+    }
+}
+
 Section const& Machine::getSection(std::string const& name) const
 {
     auto it = std::find_if(sections.begin(), sections.end(),
@@ -126,23 +135,33 @@ constexpr static std::array modeTemplate = {
 
 void Machine::write(std::string const& name, OutFmt fmt)
 {
-    std::array<uint8_t, 64 * 1024> ram{};
-    ram.fill(0);
-    uint32_t start = 0xffffffff;
-    uint32_t end = 0;
-
     std::sort(sections.begin(), sections.end(),
-              [](auto const& a, auto const& b) {
-                  return a.start < b.start;
-              });
+              [](auto const& a, auto const& b) { return a.start < b.start; });
 
-    size_t last_end = 0;
+    int32_t last_end = -1;
+    utils::File outFile{name, utils::File::Mode::Write};
+
+    auto start = sections.front().start;
+    auto end = sections.back().start + sections.back().data.size();
+
+    if (end <= start) {
+        printf("**Warning: No code generated\n");
+        return;
+    }
+
+    if (fmt == OutFmt::Prg) {
+        outFile.write<uint8_t>(start & 0xff);
+        outFile.write<uint8_t>(start >> 8);
+    }
+
+    //bool bankFile = false;
+
     for (auto const& section : sections) {
 
-        if(section.start < last_end) {
-            throw machine_error(fmt::format("Section {} overlaps previous", section.name));
+        if ((int32_t)section.start < last_end) {
+            throw machine_error(
+                fmt::format("Section {} overlaps previous", section.name));
         }
-
 
         if (section.data.empty()) {
             continue;
@@ -154,44 +173,47 @@ void Machine::write(std::string const& name, OutFmt fmt)
             of.write<uint8_t>(section.start >> 8);
             of.write(section.data);
             of.close();
+            continue;
         }
 
         if ((section.flags & NoStorage) != 0) {
             continue;
         }
 
-        if (section.start < start) {
-            start = section.start;
+        auto offset = section.start;
+        auto adr = section.start & 0xffff;
+        auto bank = section.start >> 16;
+
+        if (bank > 0) {
+            if (adr >= 0xa000 & adr + section.data.size() <= 0xc000) {
+                offset = bank * 8192 + adr;
+            } else {
+                throw machine_error("Illegal address");
+            }
         }
-        auto section_end =
-            static_cast<uint32_t>(section.start + section.data.size());
-        if (section_end > 64 * 1024) {
-            section_end = 64 * 1024;
+#if 0
+        if (bank > 0 && !bankFile) {
+            LOGI("Bank");
+            outFile.close();
+            outFile = utils::File("BANKED", utils::File::Mode::Write);
+            outFile.write<uint8_t>(0);
+            outFile.write<uint8_t>(0xa0);
+            last_end = -1;
+            bankFile = true;
         }
-        if (section_end > end) {
-            end = section_end;
+#endif
+        if (last_end >= 0) {
+            LOGI("Padding %d bytes", offset - last_end);
+            while (last_end < (int)offset) {
+                outFile.write<uint8_t>(0);
+                last_end++;
+            }
         }
 
-        last_end = section_end;
+        last_end = static_cast<uint32_t>(offset + section.data.size());
 
-        memcpy(&ram[section.start], section.data.data(),
-               section_end - section.start);
-    }
-
-    if (end <= start) {
-        printf("**Warning: No code generated\n");
-        return;
-    }
-
-    if (end > start) {
-        fmt::print("Writing {:04x}->{:04x} > {}\n", start, end, name);
-        utils::File of{name, utils::File::Mode::Write};
-        if (fmt == OutFmt::Prg) {
-            of.write<uint8_t>(start & 0xff);
-            of.write<uint8_t>(start >> 8);
-        }
-        of.write(&ram[start], end - start);
-        of.close();
+        LOGI("Writing %d bytes", section.data.size());
+        outFile.write(section.data);
     }
 }
 
@@ -247,7 +269,6 @@ AsmResult Machine::assemble(Instruction const& instr)
         return AsmResult::NoSuchOpcode;
     }
 
-
     auto it1 = std::find_if(
         it0->opcodes.begin(), it0->opcodes.end(), [&](auto const& o) {
             if (o.mode == AddressingMode::ZPX &&
@@ -260,13 +281,15 @@ AsmResult Machine::assemble(Instruction const& instr)
                 arg.val <= 0xff) {
                 arg.mode = AddressingMode::ZPY;
             }
-            if (o.mode == AddressingMode::ZP && arg.mode == AddressingMode::ABS &&
-                arg.val >= 0 && arg.val <= 0xff) {
+            if (o.mode == AddressingMode::ZP &&
+                arg.mode == AddressingMode::ABS && arg.val >= 0 &&
+                arg.val <= 0xff) {
                 arg.mode = AddressingMode::ZP;
             }
             if (o.mode == AddressingMode::REL) {
                 arg.mode = AddressingMode::REL;
-                arg.val = arg.val - static_cast<int32_t>(currentSection->pc) - 2;
+                arg.val =
+                    arg.val - static_cast<int32_t>(currentSection->pc) - 2;
             }
             return o.mode == arg.mode;
         });
@@ -349,8 +372,6 @@ std::vector<uint8_t> Machine::getRam()
     return data;
 }
 
-
-
 Tuple6 Machine::getRegs() const
 {
     return machine->regs();
@@ -366,5 +387,4 @@ void Machine::setRegs(Tuple6 const& regs)
     std::get<4>(r) = std::get<4>(regs);
     std::get<5>(r) = std::get<5>(regs);
 }
-
 

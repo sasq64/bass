@@ -15,7 +15,7 @@ Assignee <- DotSymbol _?
 Script <- '%{' ScriptContents '}%'
 ScriptContents <- (!'}%' .)* 
 
-OpLine <- ~Label? _? (MacroCall / Test / Meta / Instruction)
+OpLine <- ~Label? _? (MacroCall / Meta / Instruction)
 
 Instruction <- Opcode Arg?
 MacroCall <- Call
@@ -23,9 +23,6 @@ MacroCall <- Call
 Meta <- MetaName _  MetaText Block? (_ Symbol _ Block)*
 MetaText <- (!(EOL / '}' / '{' / LineComment) .)*
 MetaName <- '!' Symbol
-
-Test <- "!test" _ TestName _ Block
-TestName <- Symbol
 
 FnDef <- FnName '(' FnArgs ')'
 FnName <- Symbol

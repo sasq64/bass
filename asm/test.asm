@@ -14,7 +14,6 @@ tileMem = $1e000
 
 USE_BITMAP = 0
 
-    !section "test", $600
 
     !section "main", $801
 
@@ -133,7 +132,9 @@ copy_image:
     bne .loop2
     rts
 
-!test pixel_copy {
+!test 0x600
+
+!test "pixel_copy" {
     SetVReg(0)
     SetVAdr($0000 | INC_1)
     jsr copy_image
@@ -156,7 +157,7 @@ mul320_lo:
 mul320_hi:
     nop
 
-!test pixel {
+!test "pixel" {
     stx ADDR_L
     tax
     lda mul320_lo,y
@@ -216,7 +217,7 @@ indexes_end:
 
 ;------------------- INDEX COPY UNIT TEST -----------------
 
-!test index_copy {
+!test "index_copy" {
     SetVReg(0)
     SetVAdr(tileMem | INC_1)
     jsr copy_indexes

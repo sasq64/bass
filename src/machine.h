@@ -75,6 +75,7 @@ public:
     uint32_t writeChar(uint8_t b);
     AsmResult assemble(Instruction const& instr);
     Section& addSection(std::string const& name, uint32_t start);
+    void removeSection(std::string const& name);
     void setSection(std::string const& name);
     Section const& getSection(std::string const& name) const;
     Section& getCurrentSection();
