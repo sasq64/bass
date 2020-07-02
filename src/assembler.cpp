@@ -195,7 +195,6 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
         if (!parser.parse(contents, fileName.c_str())) {
             throw parse_error("Syntax error in test block");
         }
-        LOGI("Ending at %x", testSection.start + testSection.data.size());
         LOGI("Size %x", mach->getCurrentSection().data.size());
         auto result = checkUndefined();
         if (result == DONE) break;
@@ -211,8 +210,6 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 
     mach->assemble({"rts", AddressingMode::NONE, 0});
 
-
-    LOGI("Ending at %x", testSection.start + testSection.data.size());
 
     auto cycles = mach->run(start);
     fmt::print("*** Test {} : {} cycles\n", name, cycles);

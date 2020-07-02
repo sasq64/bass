@@ -22,7 +22,8 @@ start:
     lda #0
     sta BANK_SELECT
 
-    LoadFile(fname)
+    SetFileName("IMAGE");
+    jsr kernel_load
 
     lda #0
     sta BANK_SELECT
@@ -203,10 +204,6 @@ techtech_effect:
 scales:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 10}
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 10}
-
-fname:
-    !byte "IMAGE", 0
-fname_end:
 
 save: !byte 0,0
 

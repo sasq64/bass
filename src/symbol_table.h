@@ -90,10 +90,10 @@ struct SymbolTable
                         LOGD("Redefined '%s' in %d", s, line);
                         if (trace) {
                             if constexpr (std::is_arithmetic_v<T>) {
-                                fmt::print("Redefined {} in line {} from ${:x} "
-                                           "to ${:x}\n",
+                                fmt::print("Redefined {} in line {} from {} "
+                                           "to {}\n",
                                            s, line,
-                                           std::any_cast<T>(it->second), val);
+                                           std::any_cast<double>(it->second), val);
                             } else {
                                 fmt::print("Redefined {} in line {}\n", s,
                                            line);

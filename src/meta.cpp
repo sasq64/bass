@@ -61,13 +61,13 @@ void initMeta(Assembler& a)
         for (auto const& v : args) {
             if (auto* s = any_cast<std::string_view>(&v)) {
                 testName = *s;
-            } else if (auto* s = any_cast<Number>(&v)) {
-                a.testLocation = *s;
+            } else if (auto* n = any_cast<Number>(&v)) {
+                a.testLocation = *n;
             }
         }
 
         if (!testName.empty()) {
-        Check(blocks.size() == 1, "Expected block");
+            Check(blocks.size() == 1, "Expected block");
             auto contents = blocks[0];
             auto res = a.runTest(testName, contents);
             a.getSymbols().set("tests."s + testName, res, 0);
@@ -189,9 +189,9 @@ void initMeta(Assembler& a)
                 mach.writeByte(d);
             }
         } else if (auto* sv = any_cast<std::string_view>(&data)) {
-            auto text = utils::utf8_decode(*sv);
-            for (size_t i = 0; i < text.size(); i++) {
-                auto d = text[i];
+            auto utext = utils::utf8_decode(*sv);
+            for (size_t i = 0; i < utext.size(); i++) {
+                auto d = utext[i];
                 syms.erase("i");
                 syms.set("i", i);
                 for (auto const& b : blocks) {
@@ -295,32 +295,34 @@ void initMeta(Assembler& a)
         syms.set("RO", num(0x400000000));
         auto args = a.evaluateList(text);
 
-        int32_t offset = -1;
         int32_t start = -1;
         std::string name;
+        std::string in;
         int32_t pc = -1;
         int32_t flags = 0;
+        int32_t size = -1;
         int i = 0;
 
         if (args.empty()) {
             throw parse_error("Too few arguments");
         }
-        for (auto const& a : args) {
-            if (auto* p = any_cast<std::pair<std::string_view, std::any>>(&a)) {
+        for (auto const& arg : args) {
+            if (auto* p =
+                    any_cast<std::pair<std::string_view, std::any>>(&arg)) {
                 if (p->first == "start") {
                     start = number<int32_t>(p->second);
-                    pc = start;
-                } else if (p->first == "offset") {
-                    offset = number<int32_t>(p->second);
+                } else if (p->first == "size") {
+                    size = number<int32_t>(p->second);
+                } else if (p->first == "in") {
+                    in = any_cast<std::string_view>(p->second);
                 }
             } else {
                 if (i == 0) {
-                    name = any_cast<std::string_view>(a);
+                    name = any_cast<std::string_view>(arg);
                 } else if (i == 1) {
-                    start = number<uint32_t>(a);
-                    pc = start;
+                    start = number<uint32_t>(arg);
                 } else if (i == 2) {
-                    auto res = number<uint64_t>(a);
+                    auto res = number<uint64_t>(arg);
                     if (res >= 0x100000000) {
                         flags = res >> 32;
                     } else {
@@ -331,10 +333,33 @@ void initMeta(Assembler& a)
             }
         }
 
+        if (pc == -1) {
+            pc = start;
+        }
+
         auto lastSection = mach.getCurrentSection().name;
 
+        // Create child section
+        if (!in.empty()) {
+            auto& parent = mach.getSection(in);
+            Check(parent.flags & SectionFlags::NoStorage,
+                  "Parent section must be NoStore");
+            start = parent.pc;
+            auto& s = mach.addSection(std::string(name), start);
+            s.flags = (s.flags & ~SectionFlags::ReadOnly) |
+                      (parent.flags & SectionFlags::ReadOnly);
+            a.evaluateBlock(blocks[0]);
+            parent.pc = s.pc;
+            mach.setSection(lastSection);
+            return;
+        }
+
+        // Open existing section
         if (start == -1) {
-            mach.setSection(std::string(name));
+            auto& s = mach.setSection(std::string(name));
+            if (pc >= 0) {
+                s.pc = pc;
+            }
             if (!blocks.empty()) {
                 a.evaluateBlock(blocks[0]);
                 mach.setSection(lastSection);
@@ -342,6 +367,7 @@ void initMeta(Assembler& a)
             return;
         }
 
+        // Add and set section
         auto& s = mach.addSection(std::string(name), start);
         s.pc = pc;
         s.flags = flags;

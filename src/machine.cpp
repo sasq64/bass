@@ -50,7 +50,11 @@ Section& Machine::addSection(std::string const& name, uint32_t start)
             currentSection = &sections.emplace_back(name, start);
         } else {
             currentSection = &(*it);
-            currentSection->start = currentSection->pc = start;
+            if (!currentSection->data.empty()) {
+                throw machine_error(
+                    fmt::format("Section {} already exists", name));
+            }
+            currentSection->start = start;
         }
     } else {
         currentSection = &sections.emplace_back("", start);
@@ -58,14 +62,14 @@ Section& Machine::addSection(std::string const& name, uint32_t start)
     return *currentSection;
 }
 
-void Machine::setSection(std::string const& name)
+Section& Machine::setSection(std::string const& name)
 {
     if (!name.empty()) {
         auto it = std::find_if(sections.begin(), sections.end(),
                                [&](auto const& s) { return s.name == name; });
         if (it != sections.end()) {
             currentSection = &(*it);
-            return;
+            return *currentSection;
         }
     }
     throw machine_error(fmt::format("Unknown section {}", name));
@@ -80,7 +84,7 @@ void Machine::removeSection(std::string const& name)
     }
 }
 
-Section const& Machine::getSection(std::string const& name) const
+Section& Machine::getSection(std::string const& name)
 {
     auto it = std::find_if(sections.begin(), sections.end(),
                            [&](auto const& s) { return s.name == name; });
@@ -154,7 +158,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
         outFile.write<uint8_t>(start >> 8);
     }
 
-    //bool bankFile = false;
+    // bool bankFile = false;
 
     for (auto const& section : sections) {
 
@@ -185,7 +189,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
         auto bank = section.start >> 16;
 
         if (bank > 0) {
-            if (adr >= 0xa000 & adr + section.data.size() <= 0xc000) {
+            if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) {
                 offset = bank * 8192 + adr;
             } else {
                 throw machine_error("Illegal address");
@@ -387,4 +391,3 @@ void Machine::setRegs(Tuple6 const& regs)
     std::get<4>(r) = std::get<4>(regs);
     std::get<5>(r) = std::get<5>(regs);
 }
-

@@ -31,7 +31,8 @@ enum SectionFlags
 {
     NoStorage = 1,
     WriteToDisk = 2,
-    ReadOnly = 4
+    ReadOnly = 4,
+    First = 8
 };
 
 enum class AsmResult
@@ -76,8 +77,8 @@ public:
     AsmResult assemble(Instruction const& instr);
     Section& addSection(std::string const& name, uint32_t start);
     void removeSection(std::string const& name);
-    void setSection(std::string const& name);
-    Section const& getSection(std::string const& name) const;
+    Section& setSection(std::string const& name);
+    Section& getSection(std::string const& name);
     Section& getCurrentSection();
     std::deque<Section> const& getSections() const { return sections; }
     uint32_t getPC() const;
