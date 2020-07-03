@@ -7,15 +7,40 @@ blocks enclosed in curly braces.
 
 ## `!section`
 
-1. `!section <name>, <start> [, <flags>] [ { <statements...> } ]`
-2. `!section <name> [ { <statements...> } ]`
-3. `!section { <statements...> }`
+1. `!section <name>, <start> [,<options>] [ { <statements...> } ]`
+2. `!section <name>, in=<parent> [,<options>] [ { <statements...> } ]`
 
-Create or activate a section. All code and data must be placed into a section. The sections are gathered at the end and written to the output file.
+Create a section. All code and data must be placed into a section.
+The sections are gathered at the end and written to the output file.
 
-1. Create a new section beginning at address _start_. If a block is provided, all statements goes into the section, otherwise the section is active until the next section directive.
-2. Open up a previous section. With a block the old section is restored after the block was parsed.
-3. Group statements together in the current section.
+If a block is given, it specifies the entire section contents, and the previous section will be restored after.
+
+If no block is given, this section is active until the next section directive.
+
+A _root_ section is a a top level section with no parent. It must have a start address.
+
+A _leaf_ section is a section without children.
+Only leaf sections may contain data.
+
+* _name_ : Name of the section. Not required for child sections.
+* _start_ : Start in memory. Only required for root sections.
+* _size_ : Fixed size of section. Normally given for root sections.
+* _in_ : Parent of section. Makes this section a child section.
+
+* _align_ : Set alignment (in bytes) of this section
+* _file_ : Set output file of this section. Will remove the section from the main output file.
+* _bank_size_ : Makes this section a banked section with given bank size.
+  Child sections can not overlap bank boundary.
+
+* _ReadOnly_ : Flag that marks this section (and all children) as read only. Used for ROM areas.
+
+* _NoStore_ : Flag that marks this section as not
+having data in the output file. This is normally used for the zero page, and other bss sections.
+
+Unrecognized options will be passed on to the output module.
+
+1. Create a root section beginning at address _start_. If a block is provided, all statements goes into the section, otherwise the section is active until the next section directive.
+2. Create a child section.
 
 ## `!rept`
 
@@ -146,10 +171,16 @@ Conditional parsing of statements.
 
 * `!include <filename>`
 
+Include another file, relative to this file.
+
 ## `!incbin`
 
 * `!incbin <filename>`
 
+Include a binary file, relative to this file.
+
 ## `!script`
 
 * `!script <filename>`
+
+Include a script file, relative to this file.
