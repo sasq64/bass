@@ -121,7 +121,7 @@ FnCall <- Call
 Call <- CallName '(' CallArgs ')'
 CallName <- Symbol
 CallArgs <- (CallArg (',' CallArg)*)?
-CallArg <- (Symbol '=' !'=')? (String / Expression)
+CallArg <- (Symbol _? '=' !'=')? (String / Expression)
 Operator <-  
         '&&' / '||' / '<<' / '>>' / '==' / '!=' /
         '+' / '-' / '*' / '/' / '%' / '\\' /

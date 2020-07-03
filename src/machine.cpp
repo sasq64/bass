@@ -3,6 +3,7 @@
 
 #include "machine.h"
 
+#include <coreutils/algorithm.h>
 #include <coreutils/file.h>
 #include <coreutils/log.h>
 
@@ -59,6 +60,7 @@ Section& Machine::addSection(std::string const& name, int32_t start)
                 throw machine_error(
                     fmt::format("Section {} already exists", name));
             }
+            currentSection->valid = true;
             if (start != -1) {
                 LOGI("%s start = %x", currentSection->name, start);
                 currentSection->start = start;
@@ -108,6 +110,10 @@ void Machine::removeSection(std::string const& name)
 // Return section end
 int32_t Machine::layoutSection(int32_t address, Section& s)
 {
+    if(!s.valid) {
+        LOGI("Skipping invalid section %s", s.name);
+        return address;
+    }
 
     Section old = s;
     LOGI("Layout %s", s.name);
@@ -184,6 +190,7 @@ void Machine::clear()
     for (auto& s : sections) {
         s.data.clear();
         s.pc = s.start;
+        s.valid = false;
     }
     setSection("default");
     // sections.clear();
@@ -222,15 +229,20 @@ constexpr static std::array modeTemplate = {
 
 void Machine::write(std::string const& name, OutFmt fmt)
 {
-    std::sort(sections.begin(), sections.end(),
+
+    auto filtered = utils::filter_to(sections, [](auto const& s) { return !s.data.empty(); });
+
+    LOGI("%d data sections", filtered.size());
+
+    std::sort(filtered.begin(), filtered.end(),
               [](auto const& a, auto const& b) { return a.start < b.start; });
 
     int32_t last_end = -1;
     utils::File outFile{name, utils::File::Mode::Write};
 
-    auto start = sections.front().start;
-    auto end = sections.back().start +
-               static_cast<int32_t>(sections.back().data.size());
+    auto start = filtered.front().start;
+    auto end = filtered.back().start +
+               static_cast<int32_t>(filtered.back().data.size());
 
     if (end <= start) {
         printf("**Warning: No code generated\n");
@@ -244,7 +256,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
     // bool bankFile = false;
 
-    for (auto const& section : sections) {
+    for (auto const& section : filtered) {
 
         if ((int32_t)section.start < last_end) {
             throw machine_error(

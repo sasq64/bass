@@ -20,7 +20,7 @@ tileMem = $1e000
 USE_BITMAP = 0
 
 
-    !section "main", $801
+    !section "main_code",in="code"
 
     !byte $0b, $08,$01,$00,$9e,$32,$30,$36,$31,$00,$00,$00
 start:

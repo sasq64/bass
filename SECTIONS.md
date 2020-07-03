@@ -3,9 +3,9 @@
 Sections form a tree, where the leaves are the only one allowed
 to have content.
 
-A leaf section is defined using `in=parent` and a block
+A leaf section is defined using `in=parent`.
 
-A root section has no `in` and usually have a fixed size
+A root section has no `in` and usually have a fixed size.
 
 Secttion layout options:
  First - Put this section first in the list of children
@@ -20,17 +20,15 @@ all sections after each other. If no overlaps occurs and nothing
 was moved we are done.
 
 
-
-
 ```
 ; Root sections
-!section "RAM" start=$0000 size=64*1024 NoStore
-!section "ZP" start=$00 size=256 NoStore
+!section "RAM" start=$0000 size=64*1024
+!section "ZP" start=$00 size=256
 
 ; Non-leaf section
-!section "text" in="RAM" NoStore{
+!section "text" in="RAM"
     ; This can be put anywhere
-}
+    nop
 
 ; Leaf secton
 !section "code" in="RAM", start=$801 {

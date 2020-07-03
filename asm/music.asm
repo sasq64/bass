@@ -11,11 +11,11 @@
     sta $400+xpos+ypos*40,x
     dex
     bpl .l
-    !section "text"
+    !section in="text" {
 .text:
     !fill txt
 .text_end:
-    !section "main"
+    }
 }
 
     !section "main", $801

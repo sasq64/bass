@@ -60,6 +60,7 @@ struct Section
     int32_t size = -1;
     uint32_t flags{};
     std::vector<uint8_t> data;
+    bool valid{true};
 };
 
 enum class OutFmt

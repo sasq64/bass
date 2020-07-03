@@ -180,7 +180,7 @@ void initMeta(Assembler& a)
             for (size_t i = 0; i < vec->size(); i++) {
                 uint8_t d = (*vec)[i];
                 syms.erase("i");
-                syms.set("i", i);
+                syms.set("i", any_num(i));
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
                     auto res = a.evaluateExpression(b);
@@ -193,7 +193,7 @@ void initMeta(Assembler& a)
             for (size_t i = 0; i < utext.size(); i++) {
                 auto d = utext[i];
                 syms.erase("i");
-                syms.set("i", i);
+                syms.set("i", any_num(i));
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
                     auto res = a.evaluateExpression(b);
@@ -203,9 +203,10 @@ void initMeta(Assembler& a)
             }
         } else {
             auto size = number<size_t>(data);
+            LOGI("Fill %d bytes", size);
             for (size_t i = 0; i < size; i++) {
                 syms.erase("i");
-                syms.set("i", i);
+                syms.set("i", any_num(i));
                 uint8_t d = 0;
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
@@ -336,6 +337,9 @@ void initMeta(Assembler& a)
         // if (pc == -1) {
         //    pc = start;
         //}
+        if(name.empty()) {
+            name = "__anon" + std::to_string(mach.getPC());
+        }
 
         auto lastSection = mach.getCurrentSection().name;
 
@@ -371,26 +375,10 @@ void initMeta(Assembler& a)
                 a.evaluateBlock(blocks[0]);
                 parent.pc = s.pc;
                 mach.setSection(lastSection);
-            } else {
-                s.flags |= SectionFlags::NoStorage;
             }
             return;
         }
 
-#if 0
-        // Open existing section
-        if (start == -1) {
-            auto& s = mach.setSection(std::string(name));
-            if (pc >= 0) {
-                s.pc = pc;
-            }
-            if (!blocks.empty()) {
-                a.evaluateBlock(blocks[0]);
-                mach.setSection(lastSection);
-            }
-            return;
-        }
-#endif
         // Add and set root section
         Check(start != -1, "Must have start");
         auto& s = mach.addSection(std::string(name), start);

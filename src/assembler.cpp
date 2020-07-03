@@ -101,7 +101,7 @@ std::any Assembler::evaluateExpression(std::string_view expr)
 {
     auto s = ":x:"s + std::string(expr);
     if (!parser.parse(s)) {
-        LOGW("Parsing failed");
+        throw parse_error("Not an expression");
     }
     return parseResult;
 }
