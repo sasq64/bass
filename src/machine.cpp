@@ -19,7 +19,7 @@ inline void Check(bool v, std::string const& txt)
 Machine::Machine()
 {
     machine = std::make_unique<sixfive::Machine<>>();
-    addSection("default", 0);
+    addSection("default", 0).flags = FixedStart;
     machine->setBreakFunction(breakFunction, this);
 }
 
@@ -192,7 +192,7 @@ void Machine::clear()
         s.pc = s.start;
         s.valid = false;
     }
-    setSection("default");
+    setSection("default").valid = true;
     // sections.clear();
     // addSection("main", 0);
 }

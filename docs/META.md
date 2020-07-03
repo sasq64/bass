@@ -87,7 +87,7 @@ Create a macro. A macro can be called at a later time, at which point its conten
 
 1. `!define <name>(<args>...) { <expression> }` 
 
-[//]:<>
+Define a function.
 
 1. `<name>` becomes a function that returns `<epression>`.
 

@@ -53,7 +53,7 @@ struct Tester
 
     bool noErrors() { return a->getErrors().empty(); }
 
-    size_t mainSize() { return a->getMachine().getSection("main").data.size(); }
+    size_t mainSize() { return a->getMachine().getSection("default").data.size(); }
 
     template <typename T,
               typename S = std::enable_if_t<std::is_arithmetic_v<T>>>
@@ -250,7 +250,7 @@ amplitude = round(endValue-startValue)
         fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
     }
     auto& mach = ass.getMachine();
-    auto const& data = mach.getSection("main").data;
+    auto const& data = mach.getSection("default").data;
     for (auto x : data) {
         fmt::print("{:0x} ", x);
     }
@@ -353,7 +353,6 @@ TEST_CASE("assembler.test", "[assembler]")
 {
     Assembler ass;
     ass.parse(R"(
-    ;!section "test", $2000
     !section "main", $800
 start:
     ldx #0
@@ -367,7 +366,7 @@ start:
     !section "data", $1000
     !byte 1,2,3,4,5,6,7
 
-!test $2000
+!test $3000
 
 !test "my_test" {
     jsr start
