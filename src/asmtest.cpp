@@ -7,7 +7,7 @@
 #include "machine.h"
 #include <coreutils/log.h>
 #include <fmt/format.h>
-#include <math.h>
+#include <cmath>
 #include <string>
 
 using namespace std::string_literals;
@@ -16,12 +16,12 @@ void printSymbols(Assembler& ass)
 {
     using std::any_cast;
     ass.getSymbols().forAll([](std::string const& name, std::any const& val) {
-        if (auto const* v = any_cast<Number>(&val)) {
-            fmt::print("{} == 0x{:x}\n", name, (int)*v);
+        if (auto const* n = any_cast<Number>(&val)) {
+            fmt::print("{} == 0x{:x}\n", name, static_cast<int>(*n));
         } else if (auto const* v = any_cast<std::vector<uint8_t>>(&val)) {
             fmt::print("{} == [{} bytes]\n", name, v->size());
-        } else if (auto const* v = any_cast<std::string>(&val)) {
-            fmt::print("{} == \"{}\"\n", name, *v);
+        } else if (auto const* s = any_cast<std::string>(&val)) {
+            fmt::print("{} == \"{}\"\n", name, *s);
         } else {
             fmt::print("{} == ?{}\n", name, val.type().name());
         }
@@ -33,7 +33,7 @@ struct Tester
     std::shared_ptr<Assembler> a;
     Tester() : a{std::make_shared<Assembler>()} {};
 
-    Tester(std::string const& code) : a{std::make_shared<Assembler>()}
+    explicit Tester(std::string const& code) : a{std::make_shared<Assembler>()}
     {
         a->parse(code);
     };
@@ -54,6 +54,8 @@ struct Tester
     bool noErrors() { return a->getErrors().empty(); }
 
     size_t mainSize() { return a->getMachine().getSection("default").data.size(); }
+
+    std::vector<uint8_t> const& mainData() { return a->getMachine().getSection("default").data; }
 
     template <typename T,
               typename S = std::enable_if_t<std::is_arithmetic_v<T>>>
@@ -93,7 +95,33 @@ TEST_CASE("assembler.sections", "[assembler]")
         }
     )");
     auto const& errs = ass.getErrors();
-    for (auto& e : errs) {
+    for (auto const& e : errs) {
+        fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
+    }
+    REQUIRE(errs.empty());
+}
+
+TEST_CASE("assembler.sections2", "[assembler]")
+{
+    Assembler ass;
+
+    ass.parse(R"(
+        !section "BASIC",start=$0801,size=$d000 {
+
+            !section "code",in="BASIC"
+            !section "text",in="BASIC"
+
+            !section "start",in="code" {
+            start:
+                !section {
+                    nop
+                }
+                rts
+            }
+        }
+    )");
+    auto const& errs = ass.getErrors();
+    for (auto const& e : errs) {
         fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
     }
     REQUIRE(errs.empty());
@@ -114,10 +142,17 @@ TEST_CASE("assembler.first", "[assembler]")
     REQUIRE(t.noErrors());
     REQUIRE(t.mainSize() == 16);
 
+    t = "!rept y,4 { !rept x,4 { !byte x+y*4 } }";
+    REQUIRE(t.noErrors());
+    REQUIRE(t.mainSize() == 16);
+    for(int i=0; i<16; i++) {
+        REQUIRE(t.mainData()[i] == i);
+    }
+
     logging::setLevel(logging::Level::Debug);
     t = "!enum { A = 1\nB\n C = \"xx\" }";
 
-    for (auto err : t.a->getErrors()) {
+    for (auto const& err : t.a->getErrors()) {
         LOGI("%d : %s", err.line, err.message);
     }
 

@@ -109,12 +109,11 @@ void Machine::removeSection(std::string const& name)
 // Return section end
 int32_t Machine::layoutSection(int32_t address, Section& s)
 {
-    if(!s.valid) {
+    if (!s.valid) {
         LOGI("Skipping invalid section %s", s.name);
         return address;
     }
 
-    Section old = s;
     LOGD("Layout %s", s.name);
     if ((s.flags & FixedStart) == 0) {
         if (s.start != address) {
@@ -136,16 +135,16 @@ int32_t Machine::layoutSection(int32_t address, Section& s)
 
     if (!s.children.empty()) {
         // Lay out children
-        //fmt::print("Start children at {:x}\n", address);
+        // fmt::print("Start children at {:x}\n", address);
         for (auto const& child : s.children) {
             address = layoutSection(address, getSection(child));
         }
-        //fmt::print("End children at {:x}\n", address);
+        // fmt::print("End children at {:x}\n", address);
     }
     // Unless fixed size, update size to total of its children
     if ((s.flags & FixedSize) == 0) {
         s.size = address - s.start;
-        //fmt::print("Set size to {:x}\n", s.size);
+        // fmt::print("Set size to {:x}\n", s.size);
     }
     if (address - s.start > s.size) {
         throw machine_error(fmt::format("Section {} is too large", s.name));
@@ -159,7 +158,7 @@ bool Machine::layoutSections()
     // Lay out all root sections
     for (auto& s : sections) {
         if (s.parent.empty()) {
-            //LOGI("Root %s at %x", s.name, s.start);
+            // LOGI("Root %s at %x", s.name, s.start);
             auto start = s.start;
             layoutSection(start, s);
         }
@@ -229,7 +228,8 @@ constexpr static std::array modeTemplate = {
 void Machine::write(std::string const& name, OutFmt fmt)
 {
 
-    auto filtered = utils::filter_to(sections, [](auto const& s) { return !s.data.empty(); });
+    auto filtered = utils::filter_to(
+        sections, [](auto const& s) { return !s.data.empty(); });
 
     LOGD("%d data sections", filtered.size());
 
@@ -257,7 +257,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
     for (auto const& section : filtered) {
 
-        if ((int32_t)section.start < last_end) {
+        if (section.start < last_end) {
             throw machine_error(
                 fmt::format("Section {} overlaps previous", section.name));
         }
@@ -290,20 +290,10 @@ void Machine::write(std::string const& name, OutFmt fmt)
                 throw machine_error("Illegal address");
             }
         }
-#if 0
-        if (bank > 0 && !bankFile) {
-            LOGI("Bank");
-            outFile.close();
-            outFile = utils::File("BANKED", utils::File::Mode::Write);
-            outFile.write<uint8_t>(0);
-            outFile.write<uint8_t>(0xa0);
-            last_end = -1;
-            bankFile = true;
-        }
-#endif
+
         if (last_end >= 0) {
-            //LOGI("Padding %d bytes", offset - last_end);
-            while (last_end < (int)offset) {
+            // LOGI("Padding %d bytes", offset - last_end);
+            while (last_end < offset) {
                 outFile.write<uint8_t>(0);
                 last_end++;
             }
@@ -311,7 +301,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
         last_end = static_cast<uint32_t>(offset + section.data.size());
 
-        //LOGI("Writing %d bytes", section.data.size());
+        // LOGI("Writing %d bytes", section.data.size());
         outFile.write(section.data);
     }
 }
