@@ -26,6 +26,7 @@ Only leaf sections may contain data.
 * _start_ : Start in memory. Only required for root sections.
 * _size_ : Fixed size of section. Normally given for root sections.
 * _in_ : Parent of section. Makes this section a child section.
+* _pc_ : Set the initial program counter. Defaults to _start_.
 
 * _align_ : Set alignment (in bytes) of this section
 * _file_ : Set output file of this section. Will remove the section from the main output file.
@@ -55,12 +56,14 @@ Repeat a block of statements a specific number of times.
 
 ## `!fill`
 
+1. `!fill <array>`
 1. `!fill <number> | <array> { <expression> }`
 
-Put data into memory,
-
-1. Evaluate _expression_ for each iteration, and write a byte to memory. Essentially a shorthand for
+Put data into memory, Essentially a shorthand for
 `!rept <arg> { !byte <expression }`.
+
+1. Put array in memory.
+2. Evaluate expression for each item in array, or just _number_ times.
 
 ## `!map`
 
@@ -136,8 +139,8 @@ Asserts are only evaluated in the final pass.
 
 * `!align <bytes>`
 
-Align the _Program Counter_ so it is evenly dividable with _bytes_. Normal use case
-is `!align 256` to ensure page boundry.
+Align the _Program Counter_ so it is evenly dividable with _bytes_.
+Normal use case is `!align 256` to ensure page boundary.
 
 ##  `!pc`
 
@@ -156,8 +159,10 @@ Declare an empty sequence of _size_ bytes. Only increase the _Program Counter_, 
 
 `!enum [<name>] { <assignments...> }`
 
-Perform the assignments into a symbol table called `name`, or
-directly to the global symbol table if no name is given.
+Perform all assignments in the block. If _name_ is given,
+assignments are prefixed with `name.`.
+
+Assignments must take the form `symbol = <number>` or just `symbol`, and must be placed on separate lines.
 
 ## `!if`
 
