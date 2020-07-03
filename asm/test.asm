@@ -1,4 +1,9 @@
 
+    !section "main", $0801
+    !section "code",in="main"
+    !section "utils",in="main"
+    !section "text",in="main"
+
     !include "vera.inc"
     !include "x16.inc"
 

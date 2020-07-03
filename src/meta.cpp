@@ -333,27 +333,51 @@ void initMeta(Assembler& a)
             }
         }
 
-        if (pc == -1) {
-            pc = start;
-        }
+        // if (pc == -1) {
+        //    pc = start;
+        //}
 
         auto lastSection = mach.getCurrentSection().name;
 
         // Create child section
         if (!in.empty()) {
             auto& parent = mach.getSection(in);
-            Check(parent.flags & SectionFlags::NoStorage,
-                  "Parent section must be NoStore");
-            start = parent.pc;
-            auto& s = mach.addSection(std::string(name), start);
+            Check(parent.data.empty(), "Parent section must contain no data");
+            auto& s = mach.addSection(name, in);
+            s.flags = flags;
             s.flags = (s.flags & ~SectionFlags::ReadOnly) |
                       (parent.flags & SectionFlags::ReadOnly);
-            a.evaluateBlock(blocks[0]);
-            parent.pc = s.pc;
-            mach.setSection(lastSection);
+
+            if (s.start == -1) {
+                if (start == -1) {
+                    s.start = parent.pc;
+                } else {
+                    s.start = start;
+                    s.flags |= SectionFlags::FixedStart;
+                }
+            }
+
+            if (s.pc == -1) {
+                if (pc == -1) pc = s.start;
+                s.pc = pc;
+            }
+
+            if (size != -1) {
+                s.size = size;
+                s.flags |= SectionFlags::FixedSize;
+            }
+
+            if (!blocks.empty()) {
+                a.evaluateBlock(blocks[0]);
+                parent.pc = s.pc;
+                mach.setSection(lastSection);
+            } else {
+                s.flags |= SectionFlags::NoStorage;
+            }
             return;
         }
 
+#if 0
         // Open existing section
         if (start == -1) {
             auto& s = mach.setSection(std::string(name));
@@ -366,11 +390,21 @@ void initMeta(Assembler& a)
             }
             return;
         }
-
-        // Add and set section
+#endif
+        // Add and set root section
+        Check(start != -1, "Must have start");
         auto& s = mach.addSection(std::string(name), start);
-        s.pc = pc;
         s.flags = flags;
+        s.start = start;
+        s.flags |= SectionFlags::FixedStart;
+
+        if (pc == -1) pc = s.start;
+
+        s.pc = pc;
+        if (size != -1) {
+            s.size = size;
+            s.flags |= SectionFlags::FixedSize;
+        }
     });
 
     a.registerMeta("script", [&](auto const& text, auto const&) {

@@ -184,7 +184,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     auto saved = save();
 
     auto oldSection = mach->getCurrentSection();
-    auto testSection = mach->addSection("test", testLocation);
+    auto testSection = mach->addSection("__test", testLocation);
 
     auto start = mach->getPC();
     LOGI("Testing at %x", start);
@@ -214,7 +214,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     auto cycles = mach->run(start);
     fmt::print("*** Test {} : {} cycles\n", name, cycles);
 
-    mach->removeSection("test");
+    mach->removeSection("__test");
 
     auto [a, x, y, sr, sp, pc] = mach->getRegs();
 
@@ -864,9 +864,12 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
             return false;
         }
 
+        auto layoutOk = mach->layoutSections();
+
         for (auto const& s : mach->getSections()) {
             // auto& secsyms =
             // syms.at<AnyMap>("section").at<AnyMap>(s.name);
+            LOGI("%s : %x -> %x (%d) [%x]\n", s.name, s.start, s.start + s.size, s.data.size(), s.flags);
 
             auto prefix = "section."s + std::string(s.name);
 
@@ -880,11 +883,14 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
 
         auto result = checkUndefined();
         passNo++;
-        if (result == DONE) {
-            break;
-        }
         if (result == PASS) {
             continue;
+        }
+        if(!layoutOk) {
+            continue;
+        }
+        if (result == DONE) {
+            break;
         }
         for (auto const& u : syms.undefined) {
             parser.errors.push_back(

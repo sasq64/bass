@@ -15,8 +15,8 @@ endif()
 # Warning level setup #######################################################
 
 # GCC/Clang common warnings
-set(GCC_CLANG_WARNINGS -Wno-unused-parameter -Wno-unused-variable -Werror
-        -Wall -Wextra -Wnon-virtual-dtor -pedantic)
+set(GCC_CLANG_WARNINGS -Werror -Wall -Wextra -Wnon-virtual-dtor -pedantic
+    -Wno-unused-variable -Wno-unused-parameter)
 
 set(MSVC_WARNINGS /W3)
 
@@ -72,6 +72,10 @@ if(FUZZ)
 else()
     add_executable(bass src/main.cpp)
     target_link_libraries(bass PRIVATE badlib CLI11::CLI11)
+
+    add_executable(sectiontest src/testmain.cpp src/sectiontest.cpp src/machine.cpp)
+    target_include_directories(sectiontest PRIVATE src)
+    target_link_libraries(sectiontest PRIVATE catch coreutils fmt)
 
     add_executable(symtest src/testmain.cpp src/symtest.cpp)
     target_include_directories(symtest PRIVATE src)

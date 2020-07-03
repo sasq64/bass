@@ -27,14 +27,6 @@ template <class POLICY>
 struct Machine;
 } // namespace sixfive
 
-enum SectionFlags
-{
-    NoStorage = 1,
-    WriteToDisk = 2,
-    ReadOnly = 4,
-    First = 8
-};
-
 enum class AsmResult
 {
     Ok,
@@ -44,13 +36,28 @@ enum class AsmResult
     Failed
 };
 
+enum SectionFlags
+{
+    NoStorage = 1, // May not contain data (non leaf)
+    WriteToDisk = 2,
+    ReadOnly = 4,
+    KeepFirst = 8, // Keep first even if new First section is added
+    KeepLast = 16, // Keep last when new sections are added
+    FixedStart = 32, // Section may not moved (specified with Start)
+    FixedSize = 64 // Specified with size
+};
+
 struct Section
 {
     Section() = default;
     Section(std::string const& n, uint32_t s) : name(n), start(s), pc(s) {}
+
     std::string name;
-    uint32_t start = 0;
-    uint32_t pc = 0;
+    std::string parent;
+    std::vector<std::string> children;
+    int32_t start = -1;
+    int32_t pc = -1;
+    int32_t size = -1;
     uint32_t flags{};
     std::vector<uint8_t> data;
 };
@@ -72,10 +79,14 @@ public:
 
     void clear();
 
+    int32_t layoutSection(int32_t start, Section& s);
+    bool layoutSections();
+
     uint32_t writeByte(uint8_t b);
     uint32_t writeChar(uint8_t b);
     AsmResult assemble(Instruction const& instr);
-    Section& addSection(std::string const& name, uint32_t start);
+    Section& addSection(std::string const& name, int32_t start);
+    Section& addSection(std::string const& name, std::string const& parent = "");
     void removeSection(std::string const& name);
     Section& setSection(std::string const& name);
     Section& getSection(std::string const& name);
@@ -119,4 +130,6 @@ private:
     std::deque<Section> sections;
     Section* currentSection = nullptr;
     FILE* fp = nullptr;
+
+    bool layoutOk{false};
 };

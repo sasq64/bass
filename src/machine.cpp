@@ -10,10 +10,15 @@
 #include <array>
 #include <vector>
 
+inline void Check(bool v, std::string const& txt)
+{
+    if (!v) throw machine_error(txt);
+}
+
 Machine::Machine()
 {
     machine = std::make_unique<sixfive::Machine<>>();
-    addSection("main", 0);
+    addSection("default", 0);
     machine->setBreakFunction(breakFunction, this);
 }
 
@@ -38,7 +43,7 @@ void Machine::setBreakFunction(uint8_t what,
     break_functions[what] = fn;
 }
 
-Section& Machine::addSection(std::string const& name, uint32_t start)
+Section& Machine::addSection(std::string const& name, int32_t start)
 {
     if (!name.empty()) {
         if (fp != nullptr) {
@@ -54,12 +59,26 @@ Section& Machine::addSection(std::string const& name, uint32_t start)
                 throw machine_error(
                     fmt::format("Section {} already exists", name));
             }
-            currentSection->start = start;
+            if (start != -1) {
+                LOGI("%s start = %x", currentSection->name, start);
+                currentSection->start = start;
+            }
         }
     } else {
         currentSection = &sections.emplace_back("", start);
     }
     return *currentSection;
+}
+Section& Machine::addSection(std::string const& name,
+                             std::string const& parentName)
+{
+    auto& s = addSection(name, -1);
+    if (s.parent.empty() && !parentName.empty()) {
+        auto& parent = getSection(parentName);
+        s.parent = parent.name;
+        parent.children.push_back(name);
+    }
+    return s;
 }
 
 Section& Machine::setSection(std::string const& name)
@@ -84,6 +103,65 @@ void Machine::removeSection(std::string const& name)
     }
 }
 
+// Layout section 's', exactly at address if Floating, otherwise
+// it must at least be placed after address
+// Return section end
+int32_t Machine::layoutSection(int32_t address, Section& s)
+{
+
+    Section old = s;
+    LOGI("Layout %s", s.name);
+    if ((s.flags & FixedStart) == 0) {
+        if ((int32_t)s.start != address) {
+            LOGI("%s: %x differs from %x", s.name, s.start, address);
+            layoutOk = false;
+        }
+        s.start = address;
+    }
+
+    Check((int32_t)s.start >= address,
+          fmt::format("Section {} starts at {:x} which is before {:x}", s.name,
+                      s.start, address));
+
+    if (!s.data.empty()) {
+        Check(s.children.empty(), "Data section may not have children");
+        // Leaf / data section
+        return s.start + s.data.size();
+    }
+
+    if (!s.children.empty()) {
+        // Lay out children
+        fmt::print("Start children at {:x}\n", address);
+        for (auto const& child : s.children) {
+            address = layoutSection(address, getSection(child));
+        }
+        fmt::print("End children at {:x}\n", address);
+    }
+    // Unless fixed size, update size to total of its children
+    if (!(s.flags & FixedSize)) {
+        s.size = address - s.start;
+        fmt::print("Set size to {:x}\n", s.size);
+    }
+    if (address - s.start > s.size) {
+        throw machine_error(fmt::format("Section {} is too large", s.name));
+    }
+    return s.start + s.size;
+}
+
+bool Machine::layoutSections()
+{
+    layoutOk = true;
+    // Lay out all root sections
+    for (auto& s : sections) {
+        if (s.parent.empty()) {
+            LOGI("Root %s at %x", s.name, s.start);
+            auto start = s.start;
+            layoutSection(start, s);
+        }
+    }
+    return layoutOk;
+}
+
 Section& Machine::getSection(std::string const& name)
 {
     auto it = std::find_if(sections.begin(), sections.end(),
@@ -103,8 +181,13 @@ void Machine::clear()
     if (fp != nullptr) {
         rewind(fp);
     }
-    sections.clear();
-    addSection("main", 0);
+    for (auto& s : sections) {
+        s.data.clear();
+        s.pc = s.start;
+    }
+    setSection("default");
+    // sections.clear();
+    // addSection("main", 0);
 }
 
 uint32_t Machine::getPC() const
@@ -146,7 +229,8 @@ void Machine::write(std::string const& name, OutFmt fmt)
     utils::File outFile{name, utils::File::Mode::Write};
 
     auto start = sections.front().start;
-    auto end = sections.back().start + sections.back().data.size();
+    auto end = sections.back().start +
+               static_cast<int32_t>(sections.back().data.size());
 
     if (end <= start) {
         printf("**Warning: No code generated\n");

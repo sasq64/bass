@@ -70,6 +70,35 @@ struct Tester
     }
 };
 
+TEST_CASE("assembler.sections", "[assembler]")
+{
+    Assembler ass;
+    auto& syms = ass.getSymbols();
+
+    ass.parse(R"(
+        !section "BASIC",start=$0801,size=$d000
+
+        !section "code",in="BASIC"
+        !section "text",in="BASIC"
+
+        !section "start",in="code" {
+        start:
+            !section "x",in="text" {
+            hello:
+                !text "hello peope"
+            }
+            nop
+            lda hello,x
+            rts
+        }
+    )");
+    auto const& errs = ass.getErrors();
+    for (auto& e : errs) {
+        fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
+    }
+    REQUIRE(errs.empty());
+}
+
 TEST_CASE("assembler.first", "[assembler]")
 {
     Tester t;
@@ -85,12 +114,10 @@ TEST_CASE("assembler.first", "[assembler]")
     REQUIRE(t.noErrors());
     REQUIRE(t.mainSize() == 16);
 
-
     logging::setLevel(logging::Level::Debug);
     t = "!enum { A = 1\nB\n C = \"xx\" }";
 
-
-    for(auto err : t.a->getErrors()) {
+    for (auto err : t.a->getErrors()) {
         LOGI("%d : %s", err.line, err.message);
     }
 
@@ -98,7 +125,6 @@ TEST_CASE("assembler.first", "[assembler]")
     REQUIRE(t.mainSize() == 0);
     REQUIRE(t.haveSymbol("B", 2));
     REQUIRE(t.haveSymbol("C", "xx"));
-
 }
 
 TEST_CASE("assembler.basic", "[assembler]")
@@ -327,8 +353,8 @@ TEST_CASE("assembler.test", "[assembler]")
 {
     Assembler ass;
     ass.parse(R"(
-    !section "test", $2000
-    !org $800
+    ;!section "test", $2000
+    !section "main", $800
 start:
     ldx #0
 .loop
@@ -341,12 +367,15 @@ start:
     !section "data", $1000
     !byte 1,2,3,4,5,6,7
 
-!test my_test {
+!test $2000
+
+!test "my_test" {
     jsr start
     jmp xxx
     nop
 xxx:
     lda #4
+    rts
 }
 
 !assert compare(tests.my_test.ram[0x2000:0x2007], bytes(1,2,3,4,5,6,7))
@@ -455,8 +484,7 @@ a       !byte 3
         bool ok = false;
         for (auto& e : errs) {
             fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
-            if(e.line == (size_t)s.second)
-                ok = true;
+            if (e.line == (size_t)s.second) ok = true;
         }
         REQUIRE(ok);
     }

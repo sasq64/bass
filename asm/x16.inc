@@ -4,14 +4,13 @@
     lda #.fname_end - .fname
     ldx #<.fname
     ldy #>.fname
-    !section "text" {
+    !section "x",in="text" {
 .fname !fill name
 .fname_end
     }
 }
 
-    !section "text", section.main.end
-    !section "utils", section.text.end
+    !section "kernel",in="utils" {
 
 kernel_load:
         jsr $ffbd     ; call SETNAM
@@ -28,4 +27,4 @@ kernel_load:
         ;bcs VBL    ; if carry set, a load error has happened
 
         rts
-
+}
