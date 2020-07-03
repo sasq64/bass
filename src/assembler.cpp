@@ -187,7 +187,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     auto testSection = mach->addSection("__test", testLocation);
 
     auto start = mach->getPC();
-    LOGI("Testing at %x", start);
+    LOGD("Testing at %x", start);
     while (true) {
         syms.clear();
         mach->getCurrentSection() = testSection;
@@ -195,7 +195,6 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
         if (!parser.parse(contents, fileName.c_str())) {
             throw parse_error("Syntax error in test block");
         }
-        LOGI("Size %x", mach->getCurrentSection().data.size());
         auto result = checkUndefined();
         if (result == DONE) break;
         if (result == PASS) continue;
@@ -869,7 +868,7 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         for (auto const& s : mach->getSections()) {
             // auto& secsyms =
             // syms.at<AnyMap>("section").at<AnyMap>(s.name);
-            LOGI("%s : %x -> %x (%d) [%x]\n", s.name, s.start, s.start + s.size, s.data.size(), s.flags);
+            LOGD("%s : %x -> %x (%d) [%x]\n", s.name, s.start, s.start + s.size, s.data.size(), s.flags);
 
             auto prefix = "section."s + std::string(s.name);
 

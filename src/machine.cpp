@@ -62,7 +62,6 @@ Section& Machine::addSection(std::string const& name, int32_t start)
             }
             currentSection->valid = true;
             if (start != -1) {
-                LOGI("%s start = %x", currentSection->name, start);
                 currentSection->start = start;
             }
         }
@@ -116,16 +115,16 @@ int32_t Machine::layoutSection(int32_t address, Section& s)
     }
 
     Section old = s;
-    LOGI("Layout %s", s.name);
+    LOGD("Layout %s", s.name);
     if ((s.flags & FixedStart) == 0) {
-        if ((int32_t)s.start != address) {
-            LOGI("%s: %x differs from %x", s.name, s.start, address);
+        if (s.start != address) {
+            LOGD("%s: %x differs from %x", s.name, s.start, address);
             layoutOk = false;
         }
         s.start = address;
     }
 
-    Check((int32_t)s.start >= address,
+    Check(s.start >= address,
           fmt::format("Section {} starts at {:x} which is before {:x}", s.name,
                       s.start, address));
 
@@ -137,16 +136,16 @@ int32_t Machine::layoutSection(int32_t address, Section& s)
 
     if (!s.children.empty()) {
         // Lay out children
-        fmt::print("Start children at {:x}\n", address);
+        //fmt::print("Start children at {:x}\n", address);
         for (auto const& child : s.children) {
             address = layoutSection(address, getSection(child));
         }
-        fmt::print("End children at {:x}\n", address);
+        //fmt::print("End children at {:x}\n", address);
     }
     // Unless fixed size, update size to total of its children
-    if (!(s.flags & FixedSize)) {
+    if ((s.flags & FixedSize) == 0) {
         s.size = address - s.start;
-        fmt::print("Set size to {:x}\n", s.size);
+        //fmt::print("Set size to {:x}\n", s.size);
     }
     if (address - s.start > s.size) {
         throw machine_error(fmt::format("Section {} is too large", s.name));
@@ -160,7 +159,7 @@ bool Machine::layoutSections()
     // Lay out all root sections
     for (auto& s : sections) {
         if (s.parent.empty()) {
-            LOGI("Root %s at %x", s.name, s.start);
+            //LOGI("Root %s at %x", s.name, s.start);
             auto start = s.start;
             layoutSection(start, s);
         }
@@ -232,7 +231,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
     auto filtered = utils::filter_to(sections, [](auto const& s) { return !s.data.empty(); });
 
-    LOGI("%d data sections", filtered.size());
+    LOGD("%d data sections", filtered.size());
 
     std::sort(filtered.begin(), filtered.end(),
               [](auto const& a, auto const& b) { return a.start < b.start; });
@@ -303,7 +302,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
         }
 #endif
         if (last_end >= 0) {
-            LOGI("Padding %d bytes", offset - last_end);
+            //LOGI("Padding %d bytes", offset - last_end);
             while (last_end < (int)offset) {
                 outFile.write<uint8_t>(0);
                 last_end++;
@@ -312,7 +311,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
         last_end = static_cast<uint32_t>(offset + section.data.size());
 
-        LOGI("Writing %d bytes", section.data.size());
+        //LOGI("Writing %d bytes", section.data.size());
         outFile.write(section.data);
     }
 }
