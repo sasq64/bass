@@ -272,6 +272,10 @@ void initMeta(Assembler& a)
         mach.getCurrentSection().pc += sz;
     });
 
+    a.registerMeta("require", [&](auto const& text, auto const&) {
+        a.addRequire(text);
+    });
+
     a.registerMeta("print", [&](auto const& text, auto const&) {
         if (!a.isFinalPass()) return;
         auto args = a.evaluateList(text);
@@ -337,7 +341,7 @@ void initMeta(Assembler& a)
         // if (pc == -1) {
         //    pc = start;
         //}
-        if(name.empty()) {
+        if (name.empty()) {
             name = "__anon" + std::to_string(mach.getPC());
         }
 

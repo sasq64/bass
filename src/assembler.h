@@ -89,7 +89,10 @@ public:
 
     void debugflags(uint32_t flags);
 
-    uint32_t testLocation = 0x400;
+    void addRequire(std::string_view text);
+
+
+    uint32_t testLocation = 0xf800;
 private:
     template <typename T>
     T& sym(std::string const& s) {
@@ -144,6 +147,8 @@ private:
 
     bool doTrace = false;
 
+    std::unordered_map<int32_t, std::string> requires;
+
     utils::path currentPath;
     std::unordered_map<std::string, std::string> includes;
     std::shared_ptr<Machine> mach;
@@ -160,6 +165,8 @@ private:
 
     int labelNum = 0;
     int inMacro = 0;
+
+    int inTest = 0;
 
 
     std::any parseResult;

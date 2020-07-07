@@ -3,11 +3,12 @@
 #include "catch.hpp"
 
 #include "assembler.h"
+#include "test_utils.h"
 
 #include "machine.h"
+#include <cmath>
 #include <coreutils/log.h>
 #include <fmt/format.h>
-#include <cmath>
 #include <string>
 
 using namespace std::string_literals;
@@ -53,9 +54,15 @@ struct Tester
 
     bool noErrors() { return a->getErrors().empty(); }
 
-    size_t mainSize() { return a->getMachine().getSection("default").data.size(); }
+    size_t mainSize()
+    {
+        return a->getMachine().getSection("default").data.size();
+    }
 
-    std::vector<uint8_t> const& mainData() { return a->getMachine().getSection("default").data; }
+    std::vector<uint8_t> const& mainData()
+    {
+        return a->getMachine().getSection("default").data;
+    }
 
     template <typename T,
               typename S = std::enable_if_t<std::is_arithmetic_v<T>>>
@@ -71,6 +78,22 @@ struct Tester
         return x == v;
     }
 };
+
+TEST_CASE("all", "[assembler]")
+{
+    for (auto const& p : utils::listFiles(projDir() / "tests")) {
+        Assembler ass;
+        fmt::print("Assembling '{}'\n", p.string());
+        ass.parse_path(p);
+        if (ass.getErrors().empty()) {
+            continue;
+        }
+        for (auto const& e : ass.getErrors()) {
+            fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
+        }
+        FAIL();
+    }
+}
 
 TEST_CASE("assembler.sections", "[assembler]")
 {
@@ -99,6 +122,7 @@ TEST_CASE("assembler.sections", "[assembler]")
         fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
     }
     REQUIRE(errs.empty());
+    REQUIRE(syms.get<Number>("hello") == 0x0801 + 5);
 }
 
 TEST_CASE("assembler.sections2", "[assembler]")
@@ -108,15 +132,11 @@ TEST_CASE("assembler.sections2", "[assembler]")
     ass.parse(R"(
         !section "BASIC",start=$0801,size=$d000 {
 
-            !section "code",in="BASIC"
-            !section "text",in="BASIC"
-
-            !section "start",in="code" {
-            start:
-                !section {
-                    nop
-                }
-                rts
+            !section in="BASIC" {
+                start: rts
+            }
+            !section "text",in="BASIC" {
+                data: .text "hello"
             }
         }
     )");
@@ -124,7 +144,6 @@ TEST_CASE("assembler.sections2", "[assembler]")
     for (auto const& e : errs) {
         fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
     }
-    REQUIRE(errs.empty());
 }
 
 TEST_CASE("assembler.first", "[assembler]")
@@ -145,7 +164,7 @@ TEST_CASE("assembler.first", "[assembler]")
     t = "!rept y,4 { !rept x,4 { !byte x+y*4 } }";
     REQUIRE(t.noErrors());
     REQUIRE(t.mainSize() == 16);
-    for(int i=0; i<16; i++) {
+    for (int i = 0; i < 16; i++) {
         REQUIRE(t.mainData()[i] == i);
     }
 
@@ -572,4 +591,3 @@ $   nop
     REQUIRE(mach.getSection("a").data == mach.getSection("b").data);
     REQUIRE(mach.getSection("b").data == mach.getSection("c").data);
 }
-

@@ -188,6 +188,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 
     auto start = mach->getPC();
     LOGD("Testing at %x", start);
+    inTest++;
     while (true) {
         syms.clear();
         mach->getCurrentSection() = testSection;
@@ -206,9 +207,9 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
         }
         throw parse_error("Undefined symbol in test");
     }
+    inTest--;
 
     mach->assemble({"rts", AddressingMode::NONE, 0});
-
 
     auto cycles = mach->run(start);
     fmt::print("*** Test {} : {} cycles\n", name, cycles);
@@ -332,6 +333,28 @@ Assembler::Assembler() : parser(grammar6502)
 {
     parser.packrat();
     mach = std::make_shared<Machine>();
+
+    mach->setBreakFunction(255, [this](int what) {
+        auto check = requires[mach->getPC()];
+      LOGI("REQUIRE %x=%s", mach->getPC(), check);
+        if (!check.empty()) {
+            auto [a, x, y, sr, sp, pc] = mach->getRegs();
+            auto saved = syms;
+            syms.set("A", num(a));
+            syms.set("X", num(x));
+            syms.set("Y", num(y));
+            syms.set("SR", num(sr));
+            syms.set("SP", num(sp));
+            syms.set("PC", num(pc));
+            syms.set("RAM", mach->getRam());
+            std::any v = evaluateExpression(check);
+            syms = saved;
+            if (!number<bool>(v)) {
+                throw parse_error("Require failed");
+            }
+        }
+    });
+
     initFunctions(*this);
     initMeta(*this);
     setupRules();
@@ -521,10 +544,11 @@ void Assembler::setupRules()
     };
 
     parser["CallArg"] = [&](SV& sv) {
-        if(sv.size() == 1) {
+        if (sv.size() == 1) {
             return sv[0];
         }
-        return std::any(std::make_pair(std::any_cast<std::string_view>(sv[0]), sv[1]));
+        return std::any(
+            std::make_pair(std::any_cast<std::string_view>(sv[0]), sv[1]));
     };
 
     parser["MetaText"] = [&](SV& sv) { return sv.token_view(); };
@@ -545,7 +569,7 @@ void Assembler::setupRules()
 
     parser["Test"] = [&](SV& sv) {
         trace(sv);
-        if(sv.size() == 1) {
+        if (sv.size() == 1) {
             testLocation = number<int32_t>(sv[0]);
             return sv[0];
         }
@@ -868,7 +892,8 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         for (auto const& s : mach->getSections()) {
             // auto& secsyms =
             // syms.at<AnyMap>("section").at<AnyMap>(s.name);
-            LOGD("%s : %x -> %x (%d) [%x]\n", s.name, s.start, s.start + s.size, s.data.size(), s.flags);
+            LOGD("%s : %x -> %x (%d) [%x]\n", s.name, s.start, s.start + s.size,
+                 s.data.size(), s.flags);
 
             auto prefix = "section."s + std::string(s.name);
 
@@ -885,7 +910,7 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         if (result == PASS) {
             continue;
         }
-        if(!layoutOk) {
+        if (!layoutOk) {
             continue;
         }
         if (result == DONE) {
@@ -919,4 +944,11 @@ void Assembler::printSymbols()
         if (!utils::startsWith(name, "__"))
             fmt::print("{} == {}\n", name, to_string(val));
     });
+}
+
+void Assembler::addRequire(std::string_view text)
+{
+    requires[mach->getPC()] = std::string(text);
+    mach->assemble({"brk", sixfive::AddressingMode::IMM, 255});
+    LOGI("ADD REQUIRE %x=%s", mach->getPC(), text);
 }

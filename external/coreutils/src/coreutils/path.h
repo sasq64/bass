@@ -121,7 +121,7 @@ public:
         if (p.is_absolute()) {
             *this = p;
         } else {
-            if (!empty() && segment(-1) == "") {
+            if (!empty() && segment(-1).empty()) {
                 segments.resize(segments.size() - 1);
             }
             segments.insert(std::end(segments), std::begin(p.segments),
@@ -239,7 +239,7 @@ inline path operator/(path const& a, path const& b)
 
 inline bool exists(path const& p)
 {
-    struct stat sb;
+    struct stat sb{};
     return stat(p.string().c_str(), &sb) >= 0;
 }
 
@@ -298,8 +298,8 @@ inline path absolute(path const& name)
 
 inline std::vector<path> listFiles(path const& root)
 {
-    DIR* dir;
-    struct dirent* ent;
+    DIR* dir{};
+    struct dirent* ent{};
     std::vector<path> rc;
     if ((dir = opendir(root.c_str())) != nullptr) {
         while ((ent = readdir(dir)) != nullptr) {
@@ -316,8 +316,8 @@ inline std::vector<path> listFiles(path const& root)
 inline void listRecursive(const path& root, std::vector<path>& result,
                           bool includeDirs = false)
 {
-    DIR* dir;
-    struct dirent* ent;
+    DIR* dir{};
+    struct dirent* ent{};
     if ((dir = opendir(root.c_str())) != nullptr) {
         while ((ent = readdir(dir)) != nullptr) {
             char* p = ent->d_name;
