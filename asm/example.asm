@@ -50,9 +50,11 @@ bitmapMem = $4000
 spriteMem = $7000
 spritePtrs = screenMem + 1016
 
-    !section "test", $c000
+    !section "RAM",$801
+    !section "main",in="RAM"
+    !section "data",in="RAM"
 
-    !section "main", $801
+    !section "code",in="main"
     !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
 start:
 
@@ -155,7 +157,9 @@ update_sprite
     sta spritePtrs+2
     rts
 
+    !section in="data" {
 xy: !byte 0,0
+}
 
 sine_xy:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }

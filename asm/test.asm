@@ -12,9 +12,6 @@
     png = load_png("../data/face.png")
 
 
-
-    
-
 tileMem = $1e000
 
 USE_BITMAP = 0

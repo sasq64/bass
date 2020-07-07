@@ -2,6 +2,7 @@
     !section "text", $880
 
     !script "../lua/sid.lua"
+
     data = load("../data/test.sid")
     sid = sid_parse(data)
 
@@ -39,7 +40,7 @@ start:
 
     lda #0
     jsr sid.init
-.loop
+$
     lda $d012
     cmp #130
     bne .loop
@@ -48,7 +49,7 @@ start:
     jsr sid.play
     lda #0
     sta $d020
-    jmp .loop
+    jmp -
 
     !section "music", sid.load
 music:

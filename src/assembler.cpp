@@ -335,10 +335,10 @@ Assembler::Assembler() : parser(grammar6502)
     mach = std::make_shared<Machine>();
 
     mach->setBreakFunction(255, [this](int what) {
-        auto check = requires[mach->getPC()];
-      LOGI("REQUIRE %x=%s", mach->getPC(), check);
+        auto [a, x, y, sr, sp, pc] = mach->getRegs();
+        auto check = requires[pc];
+        LOGI("REQUIRE %x=%s", pc, check);
         if (!check.empty()) {
-            auto [a, x, y, sr, sp, pc] = mach->getRegs();
             auto saved = syms;
             syms.set("A", num(a));
             syms.set("X", num(x));
@@ -948,7 +948,7 @@ void Assembler::printSymbols()
 
 void Assembler::addRequire(std::string_view text)
 {
-    requires[mach->getPC()] = std::string(text);
     mach->assemble({"brk", sixfive::AddressingMode::IMM, 255});
+    requires[mach->getPC()] = std::string(text);
     LOGI("ADD REQUIRE %x=%s", mach->getPC(), text);
 }

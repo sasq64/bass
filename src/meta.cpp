@@ -65,13 +65,14 @@ void initMeta(Assembler& a)
                 a.testLocation = *n;
             }
         }
-
         if (!testName.empty()) {
-            Check(blocks.size() == 1, "Expected block");
-            auto contents = blocks[0];
-            auto res = a.runTest(testName, contents);
-            a.getSymbols().set("tests."s + testName, res, 0);
+            testName = "test";
         }
+
+        Check(blocks.size() == 1, "Expected block");
+        auto contents = blocks[0];
+        auto res = a.runTest(testName, contents);
+        a.getSymbols().set("tests."s + testName, res, 0);
     });
 
     a.registerMeta("macro", [&](auto const& text, auto const& blocks) {
@@ -272,9 +273,8 @@ void initMeta(Assembler& a)
         mach.getCurrentSection().pc += sz;
     });
 
-    a.registerMeta("require", [&](auto const& text, auto const&) {
-        a.addRequire(text);
-    });
+    a.registerMeta("require",
+                   [&](auto const& text, auto const&) { a.addRequire(text); });
 
     a.registerMeta("print", [&](auto const& text, auto const&) {
         if (!a.isFinalPass()) return;
