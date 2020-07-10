@@ -131,13 +131,16 @@ struct SymbolTable
     }
 
     template <typename T = std::any>
-    T get(std::string_view name, int line = -1)
+    T& get(std::string_view name, int line = -1)
     {
+        static T empty;
+        static std::any zero(0.0);
+        static AnyMap cres;
         accessed.insert(std::string(name));
         if constexpr (std::is_same_v<T, AnyMap>) {
             auto s = std::string(name);
-            auto res = collect(s);
-            return res;
+            cres = collect(s);
+            return cres;
         }
         auto s = std::string(name);
         auto it = syms.find(s);
@@ -148,15 +151,15 @@ struct SymbolTable
             }
             undefined.insert({s, line});
             if constexpr (std::is_same_v<T, std::any>) {
-                return std::any(static_cast<double>(0));
+                return zero;
             }
             LOGD("Returning default (%s)", typeid(T{}).name());
-            return T{};
+            return empty;
         }
         if constexpr (std::is_same_v<T, std::any>) {
             return it->second;
         }
-        return std::any_cast<T>(it->second);
+        return *std::any_cast<T>(&it->second);
     }
 
     template <typename T>
