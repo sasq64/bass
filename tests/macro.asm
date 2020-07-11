@@ -21,9 +21,9 @@ a0:
     apa(3,4)
 a1:
     !assert (a1-a0) == 12
-    !require X == 3
-    !require Y == 4
-    !require RAM[$d020] == 9
+    !check X == 3
+    !check Y == 4
+    !check RAM[$d020] == 9
     test(3)
     rts
 other:

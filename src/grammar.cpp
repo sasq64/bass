@@ -10,7 +10,7 @@ RootEnum <- ':e:' EnumBlock
 Program <- ((_? LineComment? EOL) / (Line (EOL / &EOT)))*
 Line <- (Script / AssignLine / OpLine / ~Label) _? LineComment?
 AssignLine <- _? ('*' / Assignee) _? '=' (String / Expression)
-Assignee <- DotSymbol _?
+Assignee <- AsmSymbol _?
 
 Script <- '%{' ScriptContents '}%'
 ScriptContents <- (!'}%' .)* 
@@ -34,9 +34,10 @@ BlockContents <- SkipProgram
 
 SkipProgram <- (SkipLine EOL)* SkipLine?
 SkipLine <- SkipLabel? _? (SkipMeta / SkipInstruction)? _? LineComment?
-SkipLabel <- (_? DotSymbol ':') / (DotSymbol (_ / &EOL))
+SkipLabel <- (_? SkipAsmSymbol ':') / (SkipAsmSymbol (_ / &EOL))
 SkipInstruction <- (!(LineComment / EOL / '}') .)*
 SkipMeta <- MetaName _  (!(EOL / '}' / '{') .)* Block? (_ Symbol _ Block)*
+SkipAsmSymbol <- LabelChar / ( ([._A-Za-z] [_A-Za-z0-9]*) ('[' !']'* ']')? )
 
 String <- _ ["] StringContents ["] _
 StringContents <- (!["] .)*
@@ -44,7 +45,7 @@ StringContents <- (!["] .)*
 EnumBlock <- ((_? LineComment? EOL) / (EnumLine (EOL / &EOT)))*
 EnumLine <- _? Symbol (_ '=' (String / Expression))? _? LineComment?
 
-Label <- (_? DotSymbol ':') / (DotSymbol (_ / &EOL))
+Label <- (_? AsmSymbol ':') / (AsmSymbol (_ / &EOL))
 
 Arg <- _ (LabelRef / Acc / Imm / IndY / IndX / Ind / AbsX / AbsY / Abs)
 
@@ -79,7 +80,8 @@ LineComment <- ';' (!EOL .)* &EOL
 ~_ <- [ \t]*
 
 Symbol <- [_A-Za-z] [_A-Za-z0-9]*
-DotSymbol <- LabelChar / ([._A-Za-z] [_A-Za-z0-9]*)
+DotSymbol <- ([._A-Za-z] [_A-Za-z0-9]*)
+AsmSymbol <- LabelChar / ( DotSymbol ('[' Expression ']')? )
 
 LabelChar <- '-' / '+' / '$'
 

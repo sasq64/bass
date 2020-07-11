@@ -84,14 +84,52 @@ TEST_CASE("all", "[assembler]")
     for (auto const& p : utils::listFiles(projDir() / "tests")) {
         Assembler ass;
         fmt::print("Assembling '{}'\n", p.string());
+
+        std::unordered_map<size_t, std::string> expected;
+        utils::File f{p};
+        int l = 0;
+        for (auto const& line : f.lines()) {
+            auto pos = line.find("!error");
+            if (pos != std::string::npos) {
+                pos += 6;
+                while (line[pos] == ' ')
+                    pos++;
+                auto match = line.substr(pos);
+                expected[l + 2] = match;
+            }
+            l++;
+        }
+
         ass.parse_path(p);
-        if (ass.getErrors().empty()) {
-            continue;
-        }
         for (auto const& e : ass.getErrors()) {
-            fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
+            fmt::print("ERROR {} in {}\n", e.line, e.message);
         }
-        FAIL();
+
+        for (auto const& e : ass.getErrors()) {
+            auto it = expected.find(e.line);
+            if (it != expected.end()) {
+                if (it->first == e.line &&
+                    e.message.find(it->second) != std::string::npos) {
+                    fmt::print("Found expected error {} in line {}\n",
+                               e.message, e.line);
+                    expected.erase(it);
+                } else {
+                    fmt::print("Unexpected error {} in line {}!\n", e.message,
+                               e.line);
+                    FAIL();
+                }
+            } else {
+                fmt::print("Unexpected error {} in line {}!\n", e.message,
+                           e.line);
+                FAIL();
+            }
+        }
+
+        if (!expected.empty()) {
+            auto it = expected.begin();
+            fmt::print("Did not get expexted error {} in line {}\n", it->second,
+                       it->first);
+        }
     }
 }
 

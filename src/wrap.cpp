@@ -88,8 +88,14 @@ ParserWrapper::ParserWrapper(std::string const& s)
                        size_t) { fmt::print("Leave {}\n", name); });
 #endif
     p->log = [&](size_t line, size_t col, const std::string& msg) {
-        errors.push_back({line, col, msg});
-        // fmt::printf("%s (%s) in %d:%d\n", current_error, msg, line, col);
+        // errors.push_back({line, col, msg});
+        if (currentError.line > 0) {
+            LOGI("Already have error");
+            currentError.message = msg;
+        } else {
+            currentError = {line, col, msg};
+        }
+        fmt::printf("XXX %s in %d:%d\n", msg, line, col);
     };
 }
 ParserWrapper::~ParserWrapper() = default;
@@ -99,25 +105,39 @@ void ParserWrapper::packrat() const
     p->enable_packrat_parsing();
 }
 
-bool ParserWrapper::parse(std::string_view source, const char* file) const
+/* void ParserWrapper::fixupErrors(size_t line, std::string_view errText) */
+/* { */
+/*     for (auto& e : errors) { */
+/*         if (!errText.empty()) e.message = std::string(errText); */
+/*         e.line += (line - 1); */
+/*     } */
+/* } */
+
+Error ParserWrapper::parse(std::string_view source, const char* file,
+                           size_t line)
 {
     try {
-        return p->parse_n(source.data(), source.length(), file);
+        currentError.line = 0;
+        auto rc = p->parse_n(source.data(), source.length(), nullptr);
+        if (currentError.line > 0) {
+            currentError.line += (line - 1);
+        }
     } catch (peg::parse_error& e) {
         fmt::print("Parse error: {}\n", e.what());
-        return false;
+        currentError.message = e.what();
+        currentError.line = line;
     }
+    return currentError;
 }
 
-bool ParserWrapper::parse(std::string_view source, std::any& d,
-                          const char* file) const
+Error ParserWrapper::parse(std::string_view source, size_t line)
 {
-    try {
-        return p->parse_n(source.data(), source.length(), d, file);
-    } catch (peg::parse_error& e) {
-        fmt::print("Parse error: {}\n", e.what());
-        return false;
-    }
+    return parse(source, nullptr, line);
+}
+
+Error ParserWrapper::parse(std::string_view source, std::string const& file)
+{
+    return parse(source, file.c_str(), 1);
 }
 
 void ParserWrapper::enter(
@@ -127,9 +147,9 @@ void ParserWrapper::enter(
     (*p)[name].enter = fn;
 }
 
-void ParserWrapper::leave(const char* name,
-                          std::function<void(const char*, size_t, size_t,
-                                             std::any&, std::any&)> const& fn) const
+void ParserWrapper::leave(
+    const char* name, std::function<void(const char*, size_t, size_t, std::any&,
+                                         std::any&)> const& fn) const
 {
     (*p)[name].leave = fn;
 }

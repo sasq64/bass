@@ -30,19 +30,19 @@ static void resetTranslate()
 }
 
 static void evalIf(Assembler& a, bool cond,
-                   std::vector<std::string_view> const& blocks)
+                   std::vector<std::string_view> const& blocks, size_t line)
 {
     if (blocks.empty()) {
         throw parse_error("Expected block");
     }
     if (cond) {
-        a.evaluateBlock(blocks[0]);
+        a.evaluateBlock(blocks[0], line);
     } else {
         if (blocks.size() == 3) {
             if (std::any_cast<std::string_view>(blocks[1]) != "else") {
                 throw parse_error("Expected 'else'");
             }
-            a.evaluateBlock(blocks[2]);
+            a.evaluateBlock(blocks[2], line);
         }
     }
 }
@@ -63,9 +63,10 @@ void initMeta(Assembler& a)
                 testName = *s;
             } else if (auto* n = any_cast<Number>(&v)) {
                 a.testLocation = *n;
+                return;
             }
         }
-        if (!testName.empty()) {
+        if (testName.empty()) {
             testName = "test";
         }
 
@@ -73,18 +74,19 @@ void initMeta(Assembler& a)
         auto contents = blocks[0];
         auto res = a.runTest(testName, contents);
         a.getSymbols().set("tests."s + testName, res, 0);
+        //LOGI("Set %s %x", testName, number<int32_t>(res["A"]));
     });
 
-    a.registerMeta("macro", [&](auto const& text, auto const& blocks) {
+    a.registerMeta("macro", [&](auto const& text, auto const& blocks, size_t line) {
         Check(blocks.size() == 1, "Expected block");
-        auto def = a.evaluateDefinition(text);
-        a.defineMacro(def.name, def.args, blocks[0]);
+        auto def = a.evaluateDefinition(text, line);
+        a.defineMacro(def.name, def.args, line, blocks[0]);
     });
 
-    a.registerMeta("define", [&](auto const& text, auto const& blocks) {
+    a.registerMeta("define", [&](auto const& text, auto const& blocks, size_t line) {
         Check(blocks.size() == 1, "Expected block");
         auto def = a.evaluateDefinition(text);
-        a.addDefine(def.name, def.args, blocks[0]);
+        a.addDefine(def.name, def.args, line, blocks[0]);
     });
 
     a.registerMeta("chartrans", [&](auto const& args, auto const&) {
@@ -273,22 +275,16 @@ void initMeta(Assembler& a)
         mach.getCurrentSection().pc += sz;
     });
 
-    a.registerMeta("require",
-                   [&](auto const& text, auto const&) { a.addRequire(text); });
+    a.registerMeta("log",
+                   [&](auto const& text, auto const&) { a.addLog(text); });
+    a.registerMeta("check",
+                   [&](auto const& text, auto const&) { a.addCheck(text); });
 
     a.registerMeta("print", [&](auto const& text, auto const&) {
         if (!a.isFinalPass()) return;
         auto args = a.evaluateList(text);
         for (auto const& arg : args) {
-            if (auto* l = any_cast<Number>(&arg)) {
-                fmt::print("{}", *l);
-            } else if (auto* s = any_cast<std::string_view>(&arg)) {
-                fmt::print("{}", *s);
-            } else if (auto* v = any_cast<std::vector<uint8_t>>(&arg)) {
-                for (auto const& item : *v) {
-                    fmt::print("{:02x} ", item);
-                }
-            }
+            printArg(arg);
         }
         fmt::print("\n");
     });
@@ -434,7 +430,7 @@ void initMeta(Assembler& a)
         }
     });
 
-    a.registerMeta("rept", [&](auto const& text, auto const& blocks) {
+    a.registerMeta("rept", [&](auto const& text, auto const& blocks, size_t line) {
         Check(blocks.size() == 1, "Expected block");
 
         std::any data;
@@ -456,24 +452,25 @@ void initMeta(Assembler& a)
                 a.getSymbols().erase("v");
                 a.getSymbols().set("v", any_num((*vec)[i]));
             }
-            a.evaluateBlock(blocks[0]);
+            //localLabel = prefix + std::to_string(i);
+            a.evaluateBlock(blocks[0], line);
         }
     });
 
     a.registerMeta("if", [&](auto const& text,
-                             std::vector<std::string_view> const& blocks) {
-        evalIf(a, any_cast<Number>(a.evaluateExpression(text)) != 0, blocks);
+                             std::vector<std::string_view> const& blocks, size_t line) {
+        evalIf(a, any_cast<Number>(a.evaluateExpression(text)) != 0, blocks, line);
     });
 
     a.registerMeta("ifdef", [&](auto const& text,
-                                std::vector<std::string_view> const& blocks) {
+                                std::vector<std::string_view> const& blocks, size_t line) {
         auto rc = a.getSymbols().is_defined(text);
-        evalIf(a, rc, blocks);
+        evalIf(a, rc, blocks, line);
     });
 
-    a.registerMeta("ifndef", [&](auto const& text, auto const& blocks) {
+    a.registerMeta("ifndef", [&](auto const& text, auto const& blocks, size_t line) {
         auto rc = a.getSymbols().is_defined(text);
-        evalIf(a, !rc, blocks);
+        evalIf(a, !rc, blocks, line);
     });
 
     a.registerMeta("enum", [&](auto const& text, auto const& blocks) {

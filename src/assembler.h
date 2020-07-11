@@ -51,12 +51,22 @@ public:
 
     void addScript(utils::path const& p) { scripting.load(p); }
 
-    using MetaFn = std::function<void(std::string_view,
-                                      std::vector<std::string_view> const&)>;
+    using MetaFn = std::function<void(
+        std::string_view, std::vector<std::string_view> const&, size_t)>;
 
-    void registerMeta(std::string const& name, MetaFn const& fn)
+    using MetaFnNoLine = std::function<void(
+        std::string_view, std::vector<std::string_view> const&)>;
+
+    inline void registerMeta(std::string const& name, MetaFn const& fn)
     {
         metaFunctions[name] = fn;
+    }
+
+    inline void registerMeta(std::string const& name, MetaFnNoLine const& fn)
+    {
+        metaFunctions[name] = [fn](std::string_view text,
+                                   std::vector<std::string_view> const& blocks,
+                                   size_t line) { fn(text, blocks); };
     }
 
     struct Def
@@ -65,21 +75,20 @@ public:
         std::vector<std::string_view> args;
     };
 
-
-    std::any evaluateExpression(std::string_view expr);
-    Def evaluateDefinition(std::string_view expr);
-    std::vector<std::any> evaluateList(std::string_view expr);
+    std::any evaluateExpression(std::string_view expr, size_t line = 0);
+    Def evaluateDefinition(std::string_view expr, size_t line = 0);
+    std::vector<std::any> evaluateList(std::string_view expr, size_t line = 0);
     void defineMacro(std::string_view name,
-                     std::vector<std::string_view> const& args,
+                     std::vector<std::string_view> const& args, size_t line,
                      std::string_view contents);
     void addDefine(std::string_view name,
-                   std::vector<std::string_view> const& args,
+                   std::vector<std::string_view> const& args, size_t line,
                    std::string_view contents);
 
-    AnyMap evaluateEnum(std::string_view expr);
+    AnyMap evaluateEnum(std::string_view expr, size_t line = 0);
     void evaluateBlock(std::string_view block, std::string_view fileName = "");
+    void evaluateBlock(std::string_view block, size_t line);
     AnyMap runTest(std::string_view name, std::string_view contents);
-
 
     enum
     {
@@ -89,15 +98,21 @@ public:
 
     void debugflags(uint32_t flags);
 
-    void addRequire(std::string_view text);
-
+    void addCheck(std::string_view text);
+    void addLog(std::string_view text);
 
     uint32_t testLocation = 0xf800;
+
 private:
     template <typename T>
-    T& sym(std::string const& s) {
+    T& sym(std::string const& s)
+    {
         return syms.get<T>(s);
     }
+
+    void setRegSymbols();
+
+    std::vector<Error> errors;
 
     bool passDebug = false;
     struct Call
@@ -111,6 +126,7 @@ private:
         std::string_view name;
         std::vector<std::string_view> args;
         std::string_view contents;
+        size_t line;
     };
 
     struct Undefined
@@ -147,7 +163,8 @@ private:
 
     bool doTrace = false;
 
-    std::unordered_map<int32_t, std::string> requires;
+    std::unordered_map<int32_t, std::string> checks;
+    std::unordered_map<int32_t, std::string> logs;
 
     utils::path currentPath;
     std::unordered_map<std::string, std::string> includes;
@@ -167,7 +184,6 @@ private:
     int inMacro = 0;
 
     int inTest = 0;
-
 
     std::any parseResult;
 

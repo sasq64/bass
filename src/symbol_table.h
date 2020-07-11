@@ -12,6 +12,7 @@
 
 #include <cassert>
 
+
 using AnyMap = std::unordered_map<std::string, std::any>;
 
 class sym_error : public std::exception
@@ -27,13 +28,24 @@ private:
 // SymbolTable for use in DSL. Remembers undefined references
 // and value changes. Handles dot notation.
 // Setting specific type checks if value changed
-//
+
+struct Symbol
+{
+    std::any value;
+    bool accessed;
+};
+
 struct SymbolTable
 {
-    std::unordered_map<std::string, std::any> syms;
+    std::unordered_map<std::string, Symbol> syms;
     std::unordered_map<std::string, int> undefined;
     std::unordered_set<std::string> accessed;
     bool trace = false;
+    bool undef_ok = true;
+
+    void acceptUndefined(bool ok) {
+        undef_ok = ok;
+    }
 
     bool is_defined(std::string_view name) const
     {
@@ -69,7 +81,7 @@ struct SymbolTable
             if (trace && undefined.find(s) != undefined.end()) {
                 fmt::print("Defined {}\n", s);
             }
-            syms[s] = val;
+            syms[s].value = val;
         }
     }
 
@@ -86,14 +98,16 @@ struct SymbolTable
                 LOGD("%s has been accessed", s);
                 auto it = syms.find(s);
                 if (it != syms.end()) {
-                    if (std::any_cast<T>(it->second) != val) {
+                    if (std::any_cast<T>(it->second.value) != val) {
                         LOGD("Redefined '%s' in %d", s, line);
                         if (trace) {
                             if constexpr (std::is_arithmetic_v<T>) {
-                                fmt::print("Redefined {} in line {} from {} "
-                                           "to {}\n",
-                                           s, line,
-                                           std::any_cast<double>(it->second), val);
+                                fmt::print(
+                                    "Redefined {} in line {} from {} "
+                                    "to {}\n",
+                                    s, line,
+                                    std::any_cast<double>(it->second.value),
+                                    val);
                             } else {
                                 fmt::print("Redefined {} in line {}\n", s,
                                            line);
@@ -107,10 +121,12 @@ struct SymbolTable
                     }
                 }
             }
-            syms[s] = std::any(val);
+            syms[s].value = std::any(val);
         }
     }
 
+    // Return a map containg all symbols beginning with
+    // name.
     AnyMap collect(std::string const& name) const
     {
         AnyMap s;
@@ -118,12 +134,11 @@ struct SymbolTable
             auto dot = p.first.find('.');
             if (dot != std::string::npos) {
                 auto prefix = p.first.substr(0, dot);
-                LOGD("Checking %s vs %s", prefix, name);
                 if (prefix == name) {
                     // rest = one.x
                     auto rest = p.first.substr(dot + 1);
                     // Can never be undefined
-                    s[rest] = syms.at(p.first);
+                    s[rest] = syms.at(p.first).value;
                 }
             }
         }
@@ -145,6 +160,9 @@ struct SymbolTable
         auto s = std::string(name);
         auto it = syms.find(s);
         if (it == syms.end()) {
+            if(!undef_ok) {
+                throw sym_error("Undefined:" + std::string(name));
+            }
             LOGD("%s is undefined", name);
             if (trace) {
                 fmt::print("Access undefined '{}' in line {}\n", name, line);
@@ -157,9 +175,9 @@ struct SymbolTable
             return empty;
         }
         if constexpr (std::is_same_v<T, std::any>) {
-            return it->second;
+            return it->second.value;
         }
-        return *std::any_cast<T>(&it->second);
+        return *std::any_cast<T>(&it->second.value);
     }
 
     template <typename T>
@@ -231,6 +249,9 @@ struct SymbolTable
 
     void clear()
     {
+        for(auto& s : syms) {
+            s.second.accessed = false;
+        }
         accessed.clear();
         undefined.clear();
     }
