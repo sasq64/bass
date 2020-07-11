@@ -12,7 +12,6 @@
 
 #include <cassert>
 
-
 using AnyMap = std::unordered_map<std::string, std::any>;
 
 class sym_error : public std::exception
@@ -43,9 +42,7 @@ struct SymbolTable
     bool trace = false;
     bool undef_ok = true;
 
-    void acceptUndefined(bool ok) {
-        undef_ok = ok;
-    }
+    void acceptUndefined(bool ok) { undef_ok = ok; }
 
     bool is_defined(std::string_view name) const
     {
@@ -103,8 +100,7 @@ struct SymbolTable
                                 fmt::print(
                                     "Redefined {} from {} "
                                     "to {}\n",
-                                    s,
-                                    std::any_cast<double>(it->second.value),
+                                    s, std::any_cast<double>(it->second.value),
                                     val);
                             } else {
                                 fmt::print("Redefined {} \n", s);
@@ -157,7 +153,7 @@ struct SymbolTable
         auto s = std::string(name);
         auto it = syms.find(s);
         if (it == syms.end()) {
-            if(!undef_ok) {
+            if (!undef_ok) {
                 throw sym_error("Undefined:" + std::string(name));
             }
             LOGD("%s is undefined", name);
@@ -246,7 +242,7 @@ struct SymbolTable
 
     void clear()
     {
-        for(auto& s : syms) {
+        for (auto& s : syms) {
             s.second.accessed = false;
         }
         accessed.clear();

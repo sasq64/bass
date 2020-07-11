@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "wrap.h"
 
 #include <cstdint>
 #include <deque>
@@ -41,10 +42,10 @@ enum SectionFlags
     NoStorage = 1, // May not contain data (non leaf)
     WriteToDisk = 2,
     ReadOnly = 4,
-    KeepFirst = 8, // Keep first even if new First section is added
-    KeepLast = 16, // Keep last when new sections are added
+    KeepFirst = 8,   // Keep first even if new First section is added
+    KeepLast = 16,   // Keep last when new sections are added
     FixedStart = 32, // Section may not moved (specified with Start)
-    FixedSize = 64 // Specified with size
+    FixedSize = 64   // Specified with size
 };
 
 struct Section
@@ -69,12 +70,12 @@ enum class OutFmt
     Raw
 };
 
-using Tuple6 = std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>;
+using Tuple6 =
+    std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>;
 
 class Machine
 {
 public:
-
     Machine();
     ~Machine();
 
@@ -82,13 +83,14 @@ public:
 
     int32_t layoutSection(int32_t start, Section& s);
     bool layoutSections();
-    bool checkOverlap();
+    Error checkOverlap();
 
     uint32_t writeByte(uint8_t b);
     uint32_t writeChar(uint8_t b);
     AsmResult assemble(Instruction const& instr);
     Section& addSection(std::string const& name, int32_t start);
-    Section& addSection(std::string const& name, std::string const& parent = "");
+    Section& addSection(std::string const& name,
+                        std::string const& parent = "");
     void removeSection(std::string const& name);
     Section& setSection(std::string const& name);
     Section& getSection(std::string const& name);
@@ -103,7 +105,6 @@ public:
 
     uint32_t run(uint16_t pc);
     std::vector<uint8_t> getRam();
-
 
     Tuple6 getRegs() const;
     void setRegs(Tuple6 const& regs);

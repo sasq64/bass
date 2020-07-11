@@ -202,7 +202,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
         syms.clear();
         mach->getCurrentSection() = testSection;
         lastLabel = "__test_" + std::to_string(start);
-        if (!parser.parse(contents, fileName.c_str())) {
+        if (!parser.parse(contents, fileName)) {
             throw parse_error("Syntax error in test block");
         }
         auto result = checkUndefined();
@@ -354,7 +354,7 @@ Assembler::Assembler() : parser(grammar6502)
     parser.packrat();
     mach = std::make_shared<Machine>();
 
-    mach->setBreakFunction(254, [this](int what) {
+    mach->setBreakFunction(254, [this](int) {
         auto [a, x, y, sr, sp, pc] = mach->getRegs();
         auto text = logs[pc];
         if (!text.empty()) {
@@ -369,7 +369,7 @@ Assembler::Assembler() : parser(grammar6502)
         }
     });
 
-    mach->setBreakFunction(255, [this](int what) {
+    mach->setBreakFunction(255, [this](int) {
         auto [a, x, y, sr, sp, pc] = mach->getRegs();
         auto check = checks[pc];
         if (!check.empty()) {
@@ -493,7 +493,7 @@ void Assembler::setupRules()
                 syms.set(p->first, std::vector<Number>{});
             }
             auto& vec = syms.get<std::vector<Number>>(p->first);
-            if ((int32_t)vec.size() <= p->second) {
+            if (static_cast<int32_t>(vec.size()) <= p->second) {
                 vec.resize(p->second + 1);
             }
             vec[p->second] = static_cast<Number>(mach->getPC());
@@ -918,7 +918,7 @@ bool Assembler::pass(std::string_view const& source)
     mach->clear();
     syms.clear();
     errors.clear();
-    auto err = parser.parse(source, fileName.c_str());
+    auto err = parser.parse(source, fileName);
     if (!err) {
         errors.push_back(err);
         return false;
@@ -951,7 +951,6 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
 
         auto layoutOk = mach->layoutSections();
 
-        mach->checkOverlap();
 
         for (auto const& s : mach->getSections()) {
             // auto& secsyms =
@@ -977,6 +976,11 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
             continue;
         }
         break;
+    }
+    auto err = mach->checkOverlap();
+    if(!err) {
+        errors.push_back(err);
+        return false;
     }
     finalPass = true;
     fmt::print("* FINAL PASS\n");

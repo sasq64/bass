@@ -24,6 +24,11 @@ using SV = const SVWrap;
 using Parser = ParserWrapper;
 #endif
 
+inline void Check(bool v, std::string const& txt)
+{
+    if (!v) throw parse_error(txt);
+}
+
 class Assembler
 {
 public:
@@ -66,7 +71,7 @@ public:
     {
         metaFunctions[name] = [fn](std::string_view text,
                                    std::vector<std::string_view> const& blocks,
-                                   size_t line) { fn(text, blocks); };
+                                   size_t) { fn(text, blocks); };
     }
 
     struct Def
@@ -127,12 +132,6 @@ private:
         std::vector<std::string_view> args;
         std::string_view contents;
         size_t line;
-    };
-
-    struct Undefined
-    {
-        std::string name;
-        std::pair<size_t, size_t> line_info;
     };
 
     std::unordered_map<std::string, AnyCallable> functions;

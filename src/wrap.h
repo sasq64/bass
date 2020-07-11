@@ -138,10 +138,6 @@ private:
     std::string msg;
 };
 
-inline void Check(bool v, std::string const& txt)
-{
-    if (!v) throw parse_error(txt);
-}
 
 /* class syntax_error : public std::exception */
 /* { */

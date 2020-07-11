@@ -54,17 +54,17 @@ AnyMap loadPng(std::string_view const& name)
         std::unordered_map<uint32_t, int> tiles_crc{};
         std::vector<uint8_t> indexes;
         std::vector<uint8_t> tiles;
-        tiles.resize(8*8, 0);
+        tiles.resize(8 * 8, 0);
 
         int count = 0;
-        for(auto const& tile : bm.split(8,8)) {
+        for (auto const& tile : bm.split(8, 8)) {
             auto crc = tile.crc();
             auto it = tiles_crc.find(crc);
             int index = -1;
-            if(it == tiles_crc.end()) {
+            if (it == tiles_crc.end()) {
                 index = count;
                 tiles_crc[crc] = count++;
-                tiles.insert(tiles.end(), tile.data(), tile.data() + 8*8);
+                tiles.insert(tiles.end(), tile.data(), tile.data() + 8 * 8);
             } else {
                 index = it->second;
             }
@@ -76,9 +76,9 @@ AnyMap loadPng(std::string_view const& name)
         res["tiles"] = tiles;
         res["indexes"] = indexes;
 
-        LOGD("%d different tiles (out of %d)", tiles_crc.size(), indexes.size() / 2);
+        LOGD("%d different tiles (out of %d)", tiles_crc.size(),
+             indexes.size() / 2);
     }
     lodepng_state_cleanup(&state);
     return res;
 }
-

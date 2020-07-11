@@ -155,15 +155,15 @@ AnyMap loadPng(std::string_view const& name);
 
 inline void printArg(std::any const& arg)
 {
-    if (auto* l = std::any_cast<Number>(&arg)) {
+    if (auto const* l = std::any_cast<Number>(&arg)) {
         if (*l == trunc(*l)) {
             fmt::print("{}", static_cast<int32_t>(*l));
         } else {
             fmt::print("{}", *l);
         }
-    } else if (auto* s = std::any_cast<std::string_view>(&arg)) {
+    } else if (auto const* s = std::any_cast<std::string_view>(&arg)) {
         fmt::print("{}", *s);
-    } else if (auto* v = std::any_cast<std::vector<uint8_t>>(&arg)) {
+    } else if (auto const* v = std::any_cast<std::vector<uint8_t>>(&arg)) {
         for (auto const& item : *v) {
             fmt::print("{:02x} ", item);
         }

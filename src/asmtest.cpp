@@ -129,6 +129,7 @@ TEST_CASE("all", "[assembler]")
             auto it = expected.begin();
             fmt::print("Did not get expexted error {} in line {}\n", it->second,
                        it->first);
+            FAIL();
         }
     }
 }
@@ -528,7 +529,7 @@ TEST_CASE("assembler.errors", "[assembler]")
         }
         test(2)
         rts)",
-         6},
+         4},
         //
         {R"(!org $800
         nop
@@ -540,7 +541,7 @@ TEST_CASE("assembler.errors", "[assembler]")
             stq 0
         }
         rts)",
-         6},
+         8},
         //
         {R"(!org $800
         lda #15

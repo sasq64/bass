@@ -76,21 +76,10 @@ std::vector<std::any> SVWrap::transform() const
 ParserWrapper::ParserWrapper(std::string const& s)
     : p(std::make_unique<peg::parser>(s.c_str()))
 {
-
-//    p->enable_packrat_parsing();
-#if 0
-    p->enable_trace([](const char* name, const char* s, size_t n,
-                       const peg::SemanticValues& sv, const peg::Context& c,
-                       const std::any& dt) { fmt::print("Enter {}\n", name); },
-                    [](const char* name, const char* s, size_t n,
-                       const peg::SemanticValues& sv, const peg::Context& c,
-                       const std::any& dt,
-                       size_t) { fmt::print("Leave {}\n", name); });
-#endif
-    p->log = [&](size_t line, size_t col, const std::string& msg) {
+    p->log = [&](size_t line, size_t col, std::string const& msg) {
         // errors.push_back({line, col, msg});
         if (currentError.line > 0) {
-            LOGI("Already have error");
+            LOGD("Already have error");
             currentError.message = msg;
         } else {
             currentError = {line, col, msg};
@@ -105,20 +94,12 @@ void ParserWrapper::packrat() const
     p->enable_packrat_parsing();
 }
 
-/* void ParserWrapper::fixupErrors(size_t line, std::string_view errText) */
-/* { */
-/*     for (auto& e : errors) { */
-/*         if (!errText.empty()) e.message = std::string(errText); */
-/*         e.line += (line - 1); */
-/*     } */
-/* } */
-
 Error ParserWrapper::parse(std::string_view source, const char* file,
                            size_t line)
 {
     try {
         currentError.line = 0;
-        auto rc = p->parse_n(source.data(), source.length(), nullptr);
+        auto rc = p->parse_n(source.data(), source.length(), file);
         if (currentError.line > 0) {
             currentError.line += (line - 1);
         }

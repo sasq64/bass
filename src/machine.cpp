@@ -1,7 +1,6 @@
+#include "machine.h"
 #include "defines.h"
 #include "emulator.h"
-
-#include "machine.h"
 
 #include <coreutils/algorithm.h>
 #include <coreutils/file.h>
@@ -166,26 +165,31 @@ bool Machine::layoutSections()
     return layoutOk;
 }
 
-bool Machine::checkOverlap()
+Error Machine::checkOverlap()
 {
     for (auto& a : sections) {
         if (!a.data.empty()) {
             for (auto const& b : sections) {
                 if (&a != &b && !b.data.empty()) {
                     auto as = a.start;
-                    auto ae = as + (int32_t)a.data.size();
+                    auto ae = as + static_cast<int32_t>(a.data.size());
                     auto bs = b.start;
-                    auto be = bs + (int32_t)b.data.size();
+                    auto be = bs + static_cast<int32_t>(b.data.size());
                     if (as >= bs && as < be) {
-                        LOGI("Section %s overlaps %s", a.name, b.name);
-                    } else if (bs >= as && bs < ae) {
-                        LOGI("Section %s overlaps%s}", b.name, a.name);
+                        return {2, 0,
+                                fmt::format("Section {} overlaps {}", a.name,
+                                            b.name)};
+                    }
+                    if (bs >= as && bs < ae) {
+                        return {2, 0,
+                                fmt::format("Section {} overlaps {}", b.name,
+                                            a.name)};
                     }
                 }
             }
         }
     }
-    return true;
+    return {};
 }
 
 Section& Machine::getSection(std::string const& name)
