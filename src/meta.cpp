@@ -73,7 +73,7 @@ void initMeta(Assembler& a)
         Check(blocks.size() == 1, "Expected block");
         auto contents = blocks[0];
         auto res = a.runTest(testName, contents);
-        a.getSymbols().set("tests."s + testName, res, 0);
+        a.getSymbols().set("tests."s + testName, res);
         //LOGI("Set %s %x", testName, number<int32_t>(res["A"]));
     });
 

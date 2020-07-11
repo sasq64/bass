@@ -171,9 +171,6 @@ int Assembler::checkUndefined()
 
     syms.resolve();
     if (!undef.empty()) {
-        for (auto const& u : undef) {
-            fmt::format("Undefined symbol {} in line {}", u.first, u.second);
-        }
         return ERROR;
     }
     return PASS;
@@ -211,11 +208,6 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
         auto result = checkUndefined();
         if (result == DONE) break;
         if (result == PASS) continue;
-        for (auto const& u : syms.undefined) {
-            errors.push_back({static_cast<size_t>(u.second),
-                              0, // u.line_info.first, u.line_info.second,
-                              fmt::format("Undefined symbol: '{}'", u.first)});
-        }
         throw parse_error("Undefined symbol in test");
     }
     syms.acceptUndefined(false);
@@ -471,7 +463,7 @@ void Assembler::setupRules()
                 sym = std::string(lastLabel) + sym;
             }
             // LOGI("Symbol:%s", sym);
-            syms.set(sym, sv[1], sv.line());
+            syms.set(sym, sv[1]);
         } else if (sv.size() == 1) {
             mach->getCurrentSection().pc = number<uint16_t>(sv[0]);
         }
@@ -527,7 +519,7 @@ void Assembler::setupRules()
             }
         }
         // LOGI("Label %s=%x", label, mach->getPC());
-        syms.set(label, static_cast<Number>(mach->getPC()), sv.line());
+        syms.set(label, static_cast<Number>(mach->getPC()));
         return sv[0];
     };
 
@@ -639,7 +631,7 @@ void Assembler::setupRules()
         auto contents = any_cast<std::string_view>(sv[1]);
         auto name = any_cast<std::string_view>(sv[0]);
         auto res = runTest(name, contents);
-        syms.set("tests."s + std::string(name), res, sv.line());
+        syms.set("tests."s + std::string(name), res);
         LOGI("Set %s %x", name, number<int32_t>(res["A"]));
         return sv[0];
     };
@@ -905,7 +897,7 @@ void Assembler::setupRules()
             full = utils::join(parts.begin(), parts.end(), ".");
         }
 
-        val = syms.get(full, sv.line());
+        val = syms.get(full);
         // Set undefined numbers to PC, to increase likelyhood of
         // correct code generation (less passes)
         if (val.type() == typeid(Number) && !syms.is_defined(full)) {
@@ -977,38 +969,19 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
             syms.set(prefix + ".data", s.data);
         }
 
-        auto result = checkUndefined();
         passNo++;
-        if (result == PASS) {
+        if (checkUndefined() == PASS) {
             continue;
         }
         if (!layoutOk) {
             continue;
         }
-        //if (result == DONE) {
-            break;
-        //}
-        //for (auto const& u : syms.undefined) {
-          //  errors.push_back({static_cast<size_t>(u.second),
-            //                  0, // u.line_info.first, u.line_info.second,
-              //                fmt::format("Undefined symbol: '{}'", u.first)});
-        //}
-        //return false;
+        break;
     }
     finalPass = true;
     fmt::print("* FINAL PASS\n");
     syms.acceptUndefined(false);
-    auto res = pass(source);
-    auto result = checkUndefined();
-    if (result != DONE) {
-        for (auto const& u : syms.undefined) {
-            errors.push_back({static_cast<size_t>(u.second),
-                              0, // u.line_info.first, u.line_info.second,
-                              fmt::format("Undefined symbol: '{}'", u.first)});
-        }
-        return false;
-    }
-    return res;
+    return pass(source);
 }
 
 SymbolTable& Assembler::getSymbols()
