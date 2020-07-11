@@ -889,6 +889,8 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
 
         auto layoutOk = mach->layoutSections();
 
+        mach->checkOverlap();
+
         for (auto const& s : mach->getSections()) {
             // auto& secsyms =
             // syms.at<AnyMap>("section").at<AnyMap>(s.name);

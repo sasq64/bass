@@ -82,6 +82,7 @@ public:
 
     int32_t layoutSection(int32_t start, Section& s);
     bool layoutSections();
+    bool checkOverlap();
 
     uint32_t writeByte(uint8_t b);
     uint32_t writeChar(uint8_t b);
