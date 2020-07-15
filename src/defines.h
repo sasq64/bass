@@ -14,7 +14,7 @@
 
 // using Number = double;
 
-// Update string view so contents is stored persitently
+// Update string view so contents is stored persistently
 inline std::string const& persist(std::string_view& sv)
 {
     static std::unordered_set<std::string> persisted;
@@ -31,18 +31,19 @@ inline std::string_view persist(std::string const& s)
     return sv;
 }
 
-
 class dbz_error : public std::exception
 {
 public:
-    explicit dbz_error(std::string m = "Division by zero") : msg(std::move(m)) {}
+    explicit dbz_error(std::string m = "Division by zero") : msg(std::move(m))
+    {}
     const char* what() const noexcept override { return msg.c_str(); }
 
 private:
     std::string msg;
 };
 
-#define DBZ(x) if(x == 0) throw dbz_error()
+#define DBZ(x)                                                                 \
+    if (x == 0) throw dbz_error()
 
 struct Num
 {
@@ -55,14 +56,22 @@ struct Num
     Num operator+(Num n) const { return d + n.d; }
     Num operator-(Num n) const { return d - n.d; }
     Num operator*(Num n) const { return d * n.d; }
-    Num operator/(Num n) const { DBZ(n.d) ; return d / n.d; }
+    Num operator/(Num n) const
+    {
+        DBZ(n.d);
+        return d / n.d;
+    }
 
     Num operator|(Num n) const { return i() | n.i(); };
     Num operator&(Num n) const { return i() & n.i(); };
     Num operator^(Num n) const { return i() ^ n.i(); };
     Num operator>>(Num n) const { return i() >> n.i(); };
     Num operator<<(Num n) const { return i() << n.i(); };
-    Num operator%(Num n) const { DBZ(n.i()) ; return i() % n.i(); };
+    Num operator%(Num n) const
+    {
+        DBZ(n.i());
+        return i() % n.i();
+    };
 
     Num operator&&(Num n) const { return b() && n.b(); }
     Num operator||(Num n) const { return b() || n.b(); }
@@ -87,7 +96,7 @@ inline std::string_view operator+(std::string_view const& sv, Num n)
 }
 
 inline std::string_view operator+(std::string_view const& sv,
-                           std::string_view const& n)
+                                  std::string_view const& n)
 {
     return persist(std::string(sv) + std::string(n));
 }
@@ -121,8 +130,6 @@ inline Number num(T const& v)
 {
     return static_cast<Number>(v);
 }
-
-
 
 template <typename T>
 inline std::any any_num(T const& v)

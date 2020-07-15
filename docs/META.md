@@ -167,8 +167,8 @@ Assignments must take the form `symbol = <number>` or just `symbol`, and must be
 ## `!if`
 
 1. `!if <expression> { <statements...> } [ else { <statements...>} ]`
-1. `!ifdef <symbol> { <statements...> } [ else { <statements...>} ]`
-1. `!ifndef <symbol> { <statements...> } [ else { <statements...>} ]`
+2. `!ifdef <symbol> { <statements...> } [ else { <statements...>} ]`
+3. `!ifndef <symbol> { <statements...> } [ else { <statements...>} ]`
 
 Conditional parsing of statements.
 

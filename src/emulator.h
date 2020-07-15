@@ -207,7 +207,7 @@ struct Machine
     auto regs() const { return std::make_tuple(a, x, y, sr, sp, pc); }
     auto regs() { return std::tie(a, x, y, sr, sp, pc); }
 
-    typedef void(*BreakFn)(int, void*);
+    using BreakFn = void (*)(int, void *);
 
     void setBreakFunction(BreakFn const& fn, void* data) {
         breakData = data;
@@ -382,11 +382,11 @@ private:
     template <int FLAG, bool v>
     constexpr bool check() const
     {
-        if constexpr (FLAG == ZERO) return result & 0xff ? !v : v;
+        if constexpr (FLAG == ZERO) return (result & 0xff) != 0 == !v;
         if constexpr (FLAG == SIGN)
-            return result & 0x280 ? v : !v;
+            return (result & 0x280) != 0 == v;
         else
-            return (sr & (1 << FLAG)) ? v : !v;
+            return (sr & 1 << FLAG) != 0 == v;
     }
 
     /////////////////////////////////////////////////////////////////////////

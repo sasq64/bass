@@ -80,7 +80,7 @@ struct ParserWrapper
 
     void packrat() const;
     void action(const char* name,
-                std::function<std::any(SVWrap const&)> const& fn) const;
+                std::function<std::any(SVWrap const&)> const& fn);
 
     void
     enter(const char* name,

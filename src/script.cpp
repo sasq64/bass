@@ -70,6 +70,7 @@ void Scripting::add(std::string_view const& code)
     try {
         lua.script(code);
     } catch (sol::error& e) {
+        LOGI("Exception");
         throw script_error(e.what());
     }
 }

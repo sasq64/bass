@@ -112,7 +112,6 @@ $   lda #100
     jsr update_sprite
     jmp -
 
-
 test_func:
     rts
 

@@ -84,7 +84,6 @@ ParserWrapper::ParserWrapper(std::string const& s)
         } else {
             currentError = {line, col, msg};
         }
-        fmt::printf("XXX %s in %d:%d\n", msg, line, col);
     };
 }
 ParserWrapper::~ParserWrapper() = default;
@@ -136,9 +135,9 @@ void ParserWrapper::leave(
 }
 
 void ParserWrapper::action(
-    const char* name, std::function<std::any(SVWrap const&)> const& fn) const
+    const char* name, std::function<std::any(SVWrap const&)> const& fn)
 {
-    (*p)[name] = [fn](peg::SemanticValues const& sv) -> std::any {
+    (*p)[name] = [fn, this](peg::SemanticValues const& sv) -> std::any {
         SVWrap s(sv);
         try {
             return fn(s);
@@ -149,7 +148,15 @@ void ParserWrapper::action(
             LOGD("Caught %s", e.what());
             throw peg::parse_error(e.what());
         } catch (script_error& e) {
-            throw peg::parse_error(e.what());
+            std::string w = e.what();
+            auto r = w.find("]:");
+            auto colon = w.find(':', r+2);
+            if(r != std::string::npos && colon != std::string::npos) {
+                auto ln = std::stol(w.substr(r + 2), nullptr, 10);
+                currentError.line = ln + sv.line_info().first - 1;
+                w = "lua: "s + w.substr(colon+2);
+            }
+            throw peg::parse_error(w.c_str());
         } catch (assert_error& e) {
             throw peg::parse_error(e.what());
         } catch (machine_error& e) {

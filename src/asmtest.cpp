@@ -8,6 +8,7 @@
 #include "machine.h"
 #include <cmath>
 #include <coreutils/log.h>
+#include <fmt/color.h>
 #include <fmt/format.h>
 #include <string>
 
@@ -83,7 +84,7 @@ TEST_CASE("all", "[assembler]")
 {
     for (auto const& p : utils::listFiles(projDir() / "tests")) {
         Assembler ass;
-        fmt::print("Assembling '{}'\n", p.string());
+        fmt::print(fmt::fg(fmt::color::yellow), "{}\n", p.string());
 
         std::unordered_map<size_t, std::string> expected;
         utils::File f{p};
@@ -102,7 +103,7 @@ TEST_CASE("all", "[assembler]")
 
         ass.parse_path(p);
         for (auto const& e : ass.getErrors()) {
-            fmt::print("ERROR {} in {}\n", e.line, e.message);
+            fmt::print("ERROR '{}' in line {}\n", e.message, e.line);
         }
 
         for (auto const& e : ass.getErrors()) {
