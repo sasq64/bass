@@ -80,57 +80,52 @@ struct Tester
     }
 };
 
+bool checkFile(Error const& e)
+{
+    constexpr std::string_view errorTag = "!error";
+    utils::File f{e.file};
+    size_t l = 1;
+    for (auto const& line : f.lines()) {
+        l++;
+        auto pos = line.find(errorTag);
+        if (pos != std::string::npos) {
+            pos += errorTag.size();
+            while (line[pos] == ' ')
+                pos++;
+            auto match = line.substr(pos);
+            if (e.line == l && e.message.find(match) != std::string::npos) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool checkErrors(std::vector<Error> errs)
+{
+    auto it = errs.begin();
+    while (it != errs.end()) {
+        auto const& e = *it;
+        if(checkFile(e)) {
+            it = errs.erase(it);
+        } else {
+            it++;
+        }
+    }
+    return errs.empty();
+}
+
 TEST_CASE("all", "[assembler]")
 {
     for (auto const& p : utils::listFiles(projDir() / "tests")) {
         Assembler ass;
         fmt::print(fmt::fg(fmt::color::yellow), "{}\n", p.string());
-
-        std::unordered_map<size_t, std::string> expected;
-        utils::File f{p};
-        int l = 0;
-        for (auto const& line : f.lines()) {
-            auto pos = line.find("!error");
-            if (pos != std::string::npos) {
-                pos += 6;
-                while (line[pos] == ' ')
-                    pos++;
-                auto match = line.substr(pos);
-                expected[l + 2] = match;
-            }
-            l++;
-        }
-
         ass.parse_path(p);
         for (auto const& e : ass.getErrors()) {
-            fmt::print("ERROR '{}' in line {}\n", e.message, e.line);
+            fmt::print(fmt::fg(fmt::color::coral), "ERROR '{}' in {}:{}\n", e.message, e.file, e.line);
         }
-
-        for (auto const& e : ass.getErrors()) {
-            auto it = expected.find(e.line);
-            if (it != expected.end()) {
-                if (it->first == e.line &&
-                    e.message.find(it->second) != std::string::npos) {
-                    fmt::print("Found expected error {} in line {}\n",
-                               e.message, e.line);
-                    expected.erase(it);
-                } else {
-                    fmt::print("Unexpected error {} in line {}!\n", e.message,
-                               e.line);
-                    FAIL();
-                }
-            } else {
-                fmt::print("Unexpected error {} in line {}!\n", e.message,
-                           e.line);
-                FAIL();
-            }
-        }
-
-        if (!expected.empty()) {
-            auto it = expected.begin();
-            fmt::print("Did not get expexted error {} in line {}\n", it->second,
-                       it->first);
-            FAIL();
+        if (!checkErrors(ass.getErrors())) {
+            FAIL("Did not find expected errors");
         }
     }
 }

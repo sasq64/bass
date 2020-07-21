@@ -134,16 +134,13 @@ int32_t Machine::layoutSection(int32_t address, Section& s)
 
     if (!s.children.empty()) {
         // Lay out children
-        // fmt::print("Start children at {:x}\n", address);
         for (auto const& child : s.children) {
             address = layoutSection(address, getSection(child));
         }
-        // fmt::print("End children at {:x}\n", address);
     }
     // Unless fixed size, update size to total of its children
     if ((s.flags & FixedSize) == 0) {
         s.size = address - s.start;
-        // fmt::print("Set size to {:x}\n", s.size);
     }
     if (address - s.start > s.size) {
         throw machine_error(fmt::format("Section {} is too large", s.name));
@@ -217,8 +214,6 @@ void Machine::clear()
         s.valid = false;
     }
     setSection("default").valid = true;
-    // sections.clear();
-    // addSection("main", 0);
 }
 
 uint32_t Machine::getPC() const

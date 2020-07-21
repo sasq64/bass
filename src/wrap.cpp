@@ -77,13 +77,12 @@ ParserWrapper::ParserWrapper(std::string const& s)
     : p(std::make_unique<peg::parser>(s.c_str()))
 {
     p->log = [&](size_t line, size_t col, std::string const& msg) {
-        // errors.push_back({line, col, msg});
-        if (currentError.line > 0) {
-            LOGD("Already have error");
-            currentError.message = msg;
-        } else {
-            currentError = {line, col, msg};
+        currentError.message = msg;
+        if (currentError.line <= 0) {
+            currentError.line = line;
+            currentError.column = col;
         }
+        currentError.message = msg;
     };
 }
 ParserWrapper::~ParserWrapper() = default;
@@ -98,6 +97,9 @@ Error ParserWrapper::parse(std::string_view source, const char* file,
 {
     try {
         currentError.line = 0;
+        if (file != nullptr) {
+            currentError.file = file;
+        }
         auto rc = p->parse_n(source.data(), source.length(), file);
         if (currentError.line > 0) {
             currentError.line += (line - 1);
@@ -134,8 +136,8 @@ void ParserWrapper::leave(
     (*p)[name].leave = fn;
 }
 
-void ParserWrapper::action(
-    const char* name, std::function<std::any(SVWrap const&)> const& fn)
+void ParserWrapper::action(const char* name,
+                           std::function<std::any(SVWrap const&)> const& fn)
 {
     (*p)[name] = [fn, this](peg::SemanticValues const& sv) -> std::any {
         SVWrap s(sv);
@@ -150,11 +152,11 @@ void ParserWrapper::action(
         } catch (script_error& e) {
             std::string w = e.what();
             auto r = w.find("]:");
-            auto colon = w.find(':', r+2);
-            if(r != std::string::npos && colon != std::string::npos) {
+            auto colon = w.find(':', r + 2);
+            if (r != std::string::npos && colon != std::string::npos) {
                 auto ln = std::stol(w.substr(r + 2), nullptr, 10);
                 currentError.line = ln + sv.line_info().first - 1;
-                w = "lua: "s + w.substr(colon+2);
+                w = "lua: "s + w.substr(colon + 2);
             }
             throw peg::parse_error(w.c_str());
         } catch (assert_error& e) {

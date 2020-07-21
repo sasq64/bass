@@ -3,8 +3,6 @@
 #include "enums.h"
 #include "symbol_table.h"
 
-//#include <sol/forward.hpp>
-
 #include <any>
 #include <memory>
 #include <string>

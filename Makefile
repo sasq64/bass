@@ -13,5 +13,5 @@ debug : builds/debug/cmake_install.cmake compile_commands.json
 	cmake --build builds/debug -- -j8
 
 test : all
-	builds/debug/tester
+	builds/debug/tester all
 

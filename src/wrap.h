@@ -1,5 +1,7 @@
 #pragma once
 
+#include <coreutils/path.h>
+
 #include <any>
 #include <functional>
 #include <memory>
@@ -59,9 +61,14 @@ enum class ErrLevel
 
 struct Error
 {
+    Error(size_t line_ = 0, size_t column_ = 0,
+          std::string const& message_ = "", ErrLevel level_ = ErrLevel::Error)
+        : line(line_), column(column_), message(message_), level(level_)
+    {}
     size_t line = 0;
     size_t column = 0;
     std::string message;
+    std::string file;
     ErrLevel level{ErrLevel::Error};
 
     operator bool() const { return line == 0; }
@@ -117,8 +124,6 @@ struct ParserWrapper
         return ActionSetter{action, this};
     }
 
-    void fixupErrors(size_t line, std::string_view errText = "");
-
     Error parse(std::string_view source, const char* file, size_t line);
     Error parse(std::string_view source, size_t line);
     Error parse(std::string_view source, std::string const& file);
@@ -128,16 +133,15 @@ class parse_error : public std::exception
 {
 public:
     explicit parse_error(std::string m = "Parse error") : msg(std::move(m)) {}
-//    explicit parse_error(size_t l, std::string m = "Parse error")
-//        : line(l), msg(std::move(m))
-//    {}
+    //    explicit parse_error(size_t l, std::string m = "Parse error")
+    //        : line(l), msg(std::move(m))
+    //    {}
     const char* what() const noexcept override { return msg.c_str(); }
 
 private:
- //   size_t line = 0;
+    //   size_t line = 0;
     std::string msg;
 };
-
 
 /* class syntax_error : public std::exception */
 /* { */
@@ -152,4 +156,3 @@ private:
 /* private: */
 /*     std::string msg; */
 /* }; */
-

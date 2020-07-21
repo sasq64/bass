@@ -74,19 +74,28 @@ void initMeta(Assembler& a)
         auto contents = blocks[0];
         auto res = a.runTest(testName, contents);
         a.getSymbols().set("tests."s + testName, res);
-        //LOGI("Set %s %x", testName, number<int32_t>(res["A"]));
+        // LOGI("Set %s %x", testName, number<int32_t>(res["A"]));
     });
 
-    a.registerMeta("macro", [&](auto const& text, auto const& blocks, size_t line) {
-        Check(blocks.size() == 1, "Expected block");
-        auto def = a.evaluateDefinition(text, line);
-        a.defineMacro(def.name, def.args, line, blocks[0]);
-    });
+    a.registerMeta("macro",
+                   [&](auto const& text, auto const& blocks, size_t line) {
+                       Check(blocks.size() == 1, "Expected block");
+                       auto def = a.evaluateDefinition(text, line);
+                       a.defineMacro(def.name, def.args, line, blocks[0]);
+                   });
 
-    a.registerMeta("define", [&](auto const& text, auto const& blocks, size_t line) {
-        Check(blocks.size() == 1, "Expected block");
-        auto def = a.evaluateDefinition(text);
-        a.addDefine(def.name, def.args, line, blocks[0]);
+    a.registerMeta("define",
+                   [&](auto const& text, auto const& blocks, size_t line) {
+                       Check(blocks.size() == 1, "Expected block");
+                       auto def = a.evaluateDefinition(text);
+                       a.addDefine(def.name, def.args, line, blocks[0]);
+                   });
+
+    a.registerMeta("ascii", [&](auto const& args, auto const&) {
+        resetTranslate();
+        for (int i = 0; i < 256; i++) {
+            char_translate[i] = i;
+        }
     });
 
     a.registerMeta("chartrans", [&](auto const& args, auto const&) {
@@ -412,8 +421,9 @@ void initMeta(Assembler& a)
         auto args = a.evaluateList(text);
         Check(args.size() == 1, "Incorrect number of arguments");
         auto name = any_cast<std::string_view>(args[0]);
-        auto source = a.includeFile(name);
-        a.evaluateBlock(source, name);
+        auto p = a.evaluatePath(name);
+        auto source = a.includeFile(p.string());
+        a.evaluateBlock(source, p.string());
     });
 
     a.registerMeta("incbin", [&](auto const& text, auto const&) {
@@ -430,48 +440,53 @@ void initMeta(Assembler& a)
         }
     });
 
-    a.registerMeta("rept", [&](auto const& text, auto const& blocks, size_t line) {
-        Check(blocks.size() == 1, "Expected block");
+    a.registerMeta("rept",
+                   [&](auto const& text, auto const& blocks, size_t line) {
+                       Check(blocks.size() == 1, "Expected block");
 
-        std::any data;
-        std::string indexVar = "i";
-        auto parts = utils::split(std::string(text), ',');
-        if (parts.size() == 2) {
-            indexVar = utils::lrstrip(parts[0]);
-            data = a.evaluateExpression(parts[1]);
-        } else {
-            data = a.evaluateExpression(text);
-        }
-        auto* vec = any_cast<std::vector<uint8_t>>(&data);
-        size_t count = vec ? vec->size() : number<size_t>(data);
+                       std::any data;
+                       std::string indexVar = "i";
+                       auto parts = utils::split(std::string(text), ',');
+                       if (parts.size() == 2) {
+                           indexVar = utils::lrstrip(parts[0]);
+                           data = a.evaluateExpression(parts[1]);
+                       } else {
+                           data = a.evaluateExpression(text);
+                       }
+                       auto* vec = any_cast<std::vector<uint8_t>>(&data);
+                       size_t count = vec ? vec->size() : number<size_t>(data);
 
-        for (size_t i = 0; i < count; i++) {
-            a.getSymbols().erase(indexVar);
-            a.getSymbols().set(indexVar, any_num(i));
-            if (vec) {
-                a.getSymbols().erase("v");
-                a.getSymbols().set("v", any_num((*vec)[i]));
-            }
-            //localLabel = prefix + std::to_string(i);
-            a.evaluateBlock(blocks[0], line);
-        }
-    });
+                       for (size_t i = 0; i < count; i++) {
+                           a.getSymbols().erase(indexVar);
+                           a.getSymbols().set(indexVar, any_num(i));
+                           if (vec) {
+                               a.getSymbols().erase("v");
+                               a.getSymbols().set("v", any_num((*vec)[i]));
+                           }
+                           // localLabel = prefix + std::to_string(i);
+                           a.evaluateBlock(blocks[0], line);
+                       }
+                   });
 
     a.registerMeta("if", [&](auto const& text,
-                             std::vector<std::string_view> const& blocks, size_t line) {
-        evalIf(a, any_cast<Number>(a.evaluateExpression(text)) != 0, blocks, line);
+                             std::vector<std::string_view> const& blocks,
+                             size_t line) {
+        evalIf(a, any_cast<Number>(a.evaluateExpression(text)) != 0, blocks,
+               line);
     });
 
     a.registerMeta("ifdef", [&](auto const& text,
-                                std::vector<std::string_view> const& blocks, size_t line) {
+                                std::vector<std::string_view> const& blocks,
+                                size_t line) {
         auto rc = a.getSymbols().is_defined(text);
         evalIf(a, rc, blocks, line);
     });
 
-    a.registerMeta("ifndef", [&](auto const& text, auto const& blocks, size_t line) {
-        auto rc = a.getSymbols().is_defined(text);
-        evalIf(a, !rc, blocks, line);
-    });
+    a.registerMeta("ifndef",
+                   [&](auto const& text, auto const& blocks, size_t line) {
+                       auto rc = a.getSymbols().is_defined(text);
+                       evalIf(a, !rc, blocks, line);
+                   });
 
     a.registerMeta("enum", [&](auto const& text, auto const& blocks) {
         Check(!blocks.empty(), "Expected block");

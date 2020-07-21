@@ -108,6 +108,7 @@ public:
 
     uint32_t testLocation = 0xf800;
 
+    utils::path evaluatePath(std::string_view name);
 private:
     template <typename T>
     T& sym(std::string const& s)

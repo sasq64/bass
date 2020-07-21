@@ -1,15 +1,15 @@
 
+#include "assembler.h"
+#include "defines.h"
+#include "machine.h"
+#include "wrap.h"
+
 #include <coreutils/algorithm.h>
 #include <coreutils/file.h>
 #include <coreutils/log.h>
 #include <coreutils/path.h>
 #include <coreutils/split.h>
 #include <coreutils/text.h>
-
-#include "assembler.h"
-#include "defines.h"
-#include "machine.h"
-#include "wrap.h"
 
 #include <fmt/format.h>
 #include <string_view>
@@ -75,6 +75,15 @@ void Assembler::debugflags(uint32_t flags)
     doTrace = (flags & DEB_TRACE) != 0;
     passDebug = (flags & DEB_PASS) != 0;
     syms.trace = passDebug;
+}
+
+utils::path Assembler::evaluatePath(std::string_view name)
+{
+    auto p = utils::path(name);
+    if (p.is_relative()) {
+        p = currentPath / p;
+    }
+    return p;
 }
 
 std::string_view Assembler::includeFile(std::string_view name)
@@ -151,15 +160,16 @@ AnyMap Assembler::evaluateEnum(std::string_view expr, size_t line)
 // Evaluate the a block of statements
 void Assembler::evaluateBlock(std::string_view block, std::string_view fn)
 {
-    if (!parser.parse(block, fn.empty() ? fileName.c_str()
-                                        : std::string(fn).c_str())) {
-        throw parse_error("Syntax error");
+    auto err = parser.parse(block, fn.empty() ? fileName.c_str()
+                                              : std::string(fn).c_str());
+    if (!err) {
+        throw parse_error(err.message);
     }
 }
 void Assembler::evaluateBlock(std::string_view block, size_t line)
 {
     auto err = parser.parse(block, line);
-    if(!err) {
+    if (!err) {
         throw parse_error(err.message);
     }
 }
@@ -247,11 +257,11 @@ std::any Assembler::applyDefine(Macro const& fn, Call const& call)
     for (unsigned i = 0; i < call.args.size(); i++) {
         // auto const& v = syms.get(args[i]);
         if (syms.is_defined(args[i])) {
-            errors.push_back(
-                {0, 0,
-                 fmt::format("Function '{}' shadows global symbol {}",
-                             call.name, fn.args[i]),
-                 ErrLevel::Warning});
+            errors.emplace_back(
+                0, 0,
+                fmt::format("Function '{}' shadows global symbol {}", call.name,
+                            fn.args[i]),
+                ErrLevel::Warning);
             shadowed[args[i]] = syms.get(args[i]);
             syms.erase(args[i]);
         }
@@ -289,10 +299,10 @@ void Assembler::applyMacro(Call const& call)
     for (unsigned i = 0; i < call.args.size(); i++) {
 
         if (syms.is_defined(m.args[i])) {
-            errors.push_back({0, 0,
+            errors.emplace_back(0, 0,
                               fmt::format("Macro '{}' shadows global symbol {}",
                                           call.name, m.args[i]),
-                              ErrLevel::Warning});
+                              ErrLevel::Warning);
             shadowed[m.args[i]] = syms.get(m.args[i]);
             syms.erase(m.args[i]);
         }
@@ -306,7 +316,7 @@ void Assembler::applyMacro(Call const& call)
     lastLabel = macroLabel;
     inMacro++;
     auto err = parser.parse(m.contents, fileName.c_str(), m.line);
-    if(!err) {
+    if (!err) {
         inMacro--;
         throw parse_error(err.message);
     }
@@ -763,6 +773,11 @@ void Assembler::setupRules()
         }
     };
 
+    parser["Char"] = [&](SV& sv) -> Number {
+        auto t = sv.token_view();
+        return t[1];
+    };
+
     parser["HexNum"] = [&](SV& sv) -> Number {
         try {
             const char* ptr = sv.c_str();
@@ -788,6 +803,16 @@ void Assembler::setupRules()
         }
 
         auto ope = any_cast<std::string_view>(sv[1]);
+        if(ope == "+") {
+            if (sv[0].type() == typeid(std::string_view)) {
+                auto a = any_cast<std::string_view>(sv[0]);
+                if (sv[1].type() == typeid(std::string_view)) {
+                    auto b = any_cast<std::string_view>(sv[2]);
+                    auto result = a + b;
+                    return std::any(result);
+                }
+            }
+        }
         auto a = Num(any_cast<Number>(sv[0]));
         auto b = Num(any_cast<Number>(sv[2]));
         try {
@@ -951,7 +976,6 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
 
         auto layoutOk = mach->layoutSections();
 
-
         for (auto const& s : mach->getSections()) {
             // auto& secsyms =
             // syms.at<AnyMap>("section").at<AnyMap>(s.name);
@@ -978,7 +1002,8 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         break;
     }
     auto err = mach->checkOverlap();
-    if(!err) {
+    if (!err) {
+        err.file = fileName;
         errors.push_back(err);
         return false;
     }

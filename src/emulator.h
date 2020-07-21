@@ -150,7 +150,7 @@ struct Machine
     // Map ROM to a bank
     void mapRom(uint8_t bank, const Word* data, int len)
     {
-        auto const *end = data + len;
+        auto const* end = data + len;
         while (data < end) {
             rbank[bank++] = const_cast<Word*>(data); // NOLINT
             data += 256;
@@ -161,7 +161,7 @@ struct Machine
                          uint8_t (*cb)(uint16_t a, void*))
     {
         while (len > 0) {
-            rcallbacks[bank] = cb; // NOLINT
+            rcallbacks[bank] = cb;  // NOLINT
             rcbdata[bank++] = data; // NOLINT
             len--;
         }
@@ -207,9 +207,10 @@ struct Machine
     auto regs() const { return std::make_tuple(a, x, y, sr, sp, pc); }
     auto regs() { return std::tie(a, x, y, sr, sp, pc); }
 
-    using BreakFn = void (*)(int, void *);
+    using BreakFn = void (*)(int, void*);
 
-    void setBreakFunction(BreakFn const& fn, void* data) {
+    void setBreakFunction(BreakFn const& fn, void* data)
+    {
         breakData = data;
         breakFunction = fn;
     }
@@ -382,11 +383,11 @@ private:
     template <int FLAG, bool v>
     constexpr bool check() const
     {
-        if constexpr (FLAG == ZERO) return (result & 0xff) != 0 == !v;
+        if constexpr (FLAG == ZERO) return ((result & 0xff) != 0) == !v;
         if constexpr (FLAG == SIGN)
-            return (result & 0x280) != 0 == v;
+            return ((result & 0x280) != 0) == v;
         else
-            return (sr & 1 << FLAG) != 0 == v;
+            return ((sr & 1 << FLAG) != 0) == v;
     }
 
     /////////////////////////////////////////////////////////////////////////
@@ -439,9 +440,9 @@ private:
         return adr + offs;
     }
 
-    unsigned Read16(unsigned a, unsigned offs = 0) const
+    unsigned Read16(unsigned adr, unsigned offs = 0) const
     {
-        return to_adr(Read(a), Read(a + 1)) + offs;
+        return to_adr(Read(adr), Read(adr + 1)) + offs;
     }
 
     // Read operand from PC and create effective adress depeding on 'MODE'
