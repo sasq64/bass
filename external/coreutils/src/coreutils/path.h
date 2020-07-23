@@ -10,6 +10,9 @@
 
 #ifdef _WIN32
 #    include <direct.h>
+#    include <filesystem>
+namespace fs = std::filesystem;
+
 #else
 #    include <dirent.h>
 #    include <unistd.h>
@@ -294,7 +297,19 @@ inline path absolute(path const& name)
     return path(resolvedPath);
 }
 
-#ifndef WIN32
+#ifdef WIN32
+
+inline std::vector<path> listFiles(path const& r)
+{
+    std::vector<path> rc;
+    fs::path root{r.string()};
+    for (auto& p : fs::directory_iterator(root)) {
+        rc.emplace_back(p.path().string());
+    }
+    return rc;
+}
+
+#else
 
 inline std::vector<path> listFiles(path const& root)
 {
@@ -324,11 +339,7 @@ inline void listRecursive(const path& root, std::vector<path>& result,
             if (p[0] == '.' && (p[1] == 0 || (p[1] == '.' && p[2] == 0)))
                 continue;
             path f{root / ent->d_name};
-#    ifdef _WIN32
-            if (f.isDir()) {
-#    else
             if (ent->d_type == DT_DIR) {
-#    endif
                 if (includeDirs) result.push_back(f);
                 listRecursive(f, result, includeDirs);
             } else
@@ -336,7 +347,7 @@ inline void listRecursive(const path& root, std::vector<path>& result,
         }
         closedir(dir);
     }
-} // namespace utils
+}
 
 inline std::vector<path> listRecursive(const path& root,
                                        bool includeDirs = false)

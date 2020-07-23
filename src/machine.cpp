@@ -129,7 +129,7 @@ int32_t Machine::layoutSection(int32_t address, Section& s)
     if (!s.data.empty()) {
         Check(s.children.empty(), "Data section may not have children");
         // Leaf / data section
-        return s.start + s.data.size();
+        return s.start + static_cast<int32_t>(s.data.size());
     }
 
     if (!s.children.empty()) {
@@ -248,9 +248,13 @@ constexpr static std::array modeTemplate = {
 
 void Machine::write(std::string const& name, OutFmt fmt)
 {
-
     auto filtered = utils::filter_to(
         sections, [](auto const& s) { return !s.data.empty(); });
+
+    if (filtered.empty()) {
+        puts("**Warning: No sections");
+        return;
+    }
 
     LOGD("%d data sections", filtered.size());
 
@@ -265,7 +269,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
                static_cast<int32_t>(filtered.back().data.size());
 
     if (end <= start) {
-        printf("**Warning: No code generated\n");
+        puts("**Warning: No code generated");
         return;
     }
 

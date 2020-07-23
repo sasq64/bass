@@ -62,7 +62,7 @@ void initMeta(Assembler& a)
             if (auto* s = any_cast<std::string_view>(&v)) {
                 testName = *s;
             } else if (auto* n = any_cast<Number>(&v)) {
-                a.testLocation = *n;
+                a.testLocation = static_cast<uint32_t>(*n);
                 return;
             }
         }
