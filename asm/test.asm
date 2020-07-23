@@ -1,4 +1,9 @@
 
+    !section "main", $0801
+    !section "code",in="main"
+    !section "utils",in="main"
+    !section "text",in="main"
+
     !include "vera.inc"
     !include "x16.inc"
 
@@ -7,23 +12,20 @@
     png = load_png("../data/face.png")
 
 
-
-    
-
 tileMem = $1e000
 
 USE_BITMAP = 0
 
-    !section "test", $600
 
-    !section "main", $801
+    !section "main_code",in="code"
 
     !byte $0b, $08,$01,$00,$9e,$32,$30,$36,$31,$00,$00,$00
 start:
     lda #0
     sta BANK_SELECT
 
-    LoadFile(fname)
+    SetFileName("IMAGE");
+    jsr kernel_load
 
     lda #0
     sta BANK_SELECT
@@ -133,7 +135,9 @@ copy_image:
     bne .loop2
     rts
 
-!test pixel_copy {
+!test 0x600
+
+!test "pixel_copy" {
     SetVReg(0)
     SetVAdr($0000 | INC_1)
     jsr copy_image
@@ -156,7 +160,7 @@ mul320_lo:
 mul320_hi:
     nop
 
-!test pixel {
+!test "pixel" {
     stx ADDR_L
     tax
     lda mul320_lo,y
@@ -203,10 +207,6 @@ scales:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 10}
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 10}
 
-fname:
-    !byte "IMAGE", 0
-fname_end:
-
 save: !byte 0,0
 
     ;!section "indexes", *
@@ -216,7 +216,7 @@ indexes_end:
 
 ;------------------- INDEX COPY UNIT TEST -----------------
 
-!test index_copy {
+!test "index_copy" {
     SetVReg(0)
     SetVAdr(tileMem | INC_1)
     jsr copy_indexes

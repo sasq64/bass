@@ -16,7 +16,7 @@ const char* banner = R"(
 | '_ \ / _` |/ _` |/ _` / __/ __|
 | |_) | (_| | (_| | (_| \__ \__ \
 |_.__/ \__,_|\__,_|\__,_|___/___/
-6502 assembler (beta)      /sasq
+6502 assembler (beta4)      /sasq
 )";
 
 int main(int argc, char** argv)
@@ -50,7 +50,7 @@ int main(int argc, char** argv)
 
     try {
         app.parse(argc, argv);
-    } catch(const CLI::ParseError &e) {
+    } catch (const CLI::ParseError& e) {
         app.exit(e);
     }
     Assembler ass;
@@ -87,14 +87,14 @@ int main(int argc, char** argv)
         auto sp = utils::path(sourceFile);
         if (!ass.parse_path(sp)) {
             for (auto const& e : ass.getErrors()) {
-                if(e.level == ErrLevel::Error) failed = true;
-                fmt::print("{}:{}:{}: {}: {}\n", sourceFile, e.line, e.column,
+                if (e.level == ErrLevel::Error) failed = true;
+                fmt::print("{}:{}: {}: {}\n", sourceFile, e.line,
                            e.level == ErrLevel::Warning ? "warning" : "error",
                            e.message.c_str());
             }
         }
     }
-    if(failed) {
+    if (failed) {
         return 1;
     }
     mach.write(outFile, outFmt);

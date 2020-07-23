@@ -76,20 +76,13 @@ std::vector<std::any> SVWrap::transform() const
 ParserWrapper::ParserWrapper(std::string const& s)
     : p(std::make_unique<peg::parser>(s.c_str()))
 {
-
-//    p->enable_packrat_parsing();
-#if 0
-    p->enable_trace([](const char* name, const char* s, size_t n,
-                       const peg::SemanticValues& sv, const peg::Context& c,
-                       const std::any& dt) { fmt::print("Enter {}\n", name); },
-                    [](const char* name, const char* s, size_t n,
-                       const peg::SemanticValues& sv, const peg::Context& c,
-                       const std::any& dt,
-                       size_t) { fmt::print("Leave {}\n", name); });
-#endif
-    p->log = [&](size_t line, size_t col, const std::string& msg) {
-        errors.push_back({line, col, msg});
-        // fmt::printf("%s (%s) in %d:%d\n", current_error, msg, line, col);
+    p->log = [&](size_t line, size_t col, std::string const& msg) {
+        currentError.message = msg;
+        if (currentError.line <= 0) {
+            currentError.line = line;
+            currentError.column = col;
+        }
+        currentError.message = msg;
     };
 }
 ParserWrapper::~ParserWrapper() = default;
@@ -99,25 +92,34 @@ void ParserWrapper::packrat() const
     p->enable_packrat_parsing();
 }
 
-bool ParserWrapper::parse(std::string_view source, const char* file) const
+Error ParserWrapper::parse(std::string_view source, const char* file,
+                           size_t line)
 {
     try {
-        return p->parse_n(source.data(), source.length(), file);
+        currentError.line = 0;
+        if (file != nullptr) {
+            currentError.file = file;
+        }
+        auto rc = p->parse_n(source.data(), source.length(), file);
+        if (currentError.line > 0) {
+            currentError.line += (line - 1);
+        }
     } catch (peg::parse_error& e) {
         fmt::print("Parse error: {}\n", e.what());
-        return false;
+        currentError.message = e.what();
+        currentError.line = line;
     }
+    return currentError;
 }
 
-bool ParserWrapper::parse(std::string_view source, std::any& d,
-                          const char* file) const
+Error ParserWrapper::parse(std::string_view source, size_t line)
 {
-    try {
-        return p->parse_n(source.data(), source.length(), d, file);
-    } catch (peg::parse_error& e) {
-        fmt::print("Parse error: {}\n", e.what());
-        return false;
-    }
+    return parse(source, nullptr, line);
+}
+
+Error ParserWrapper::parse(std::string_view source, std::string const& file)
+{
+    return parse(source, file.c_str(), 1);
 }
 
 void ParserWrapper::enter(
@@ -127,17 +129,17 @@ void ParserWrapper::enter(
     (*p)[name].enter = fn;
 }
 
-void ParserWrapper::leave(const char* name,
-                          std::function<void(const char*, size_t, size_t,
-                                             std::any&, std::any&)> const& fn) const
+void ParserWrapper::leave(
+    const char* name, std::function<void(const char*, size_t, size_t, std::any&,
+                                         std::any&)> const& fn) const
 {
     (*p)[name].leave = fn;
 }
 
-void ParserWrapper::action(
-    const char* name, std::function<std::any(SVWrap const&)> const& fn) const
+void ParserWrapper::action(const char* name,
+                           std::function<std::any(SVWrap const&)> const& fn)
 {
-    (*p)[name] = [fn](peg::SemanticValues const& sv) -> std::any {
+    (*p)[name] = [fn, this](peg::SemanticValues const& sv) -> std::any {
         SVWrap s(sv);
         try {
             return fn(s);
@@ -148,7 +150,15 @@ void ParserWrapper::action(
             LOGD("Caught %s", e.what());
             throw peg::parse_error(e.what());
         } catch (script_error& e) {
-            throw peg::parse_error(e.what());
+            std::string w = e.what();
+            auto r = w.find("]:");
+            auto colon = w.find(':', r + 2);
+            if (r != std::string::npos && colon != std::string::npos) {
+                auto ln = std::stol(w.substr(r + 2), nullptr, 10);
+                currentError.line = ln + sv.line_info().first - 1;
+                w = "lua: "s + w.substr(colon + 2);
+            }
+            throw peg::parse_error(w.c_str());
         } catch (assert_error& e) {
             throw peg::parse_error(e.what());
         } catch (machine_error& e) {

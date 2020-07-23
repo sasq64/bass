@@ -3,11 +3,13 @@
 #include "catch.hpp"
 
 #include "assembler.h"
+#include "test_utils.h"
 
 #include "machine.h"
+#include <cmath>
 #include <coreutils/log.h>
+#include <fmt/color.h>
 #include <fmt/format.h>
-#include <math.h>
 #include <string>
 
 using namespace std::string_literals;
@@ -16,12 +18,12 @@ void printSymbols(Assembler& ass)
 {
     using std::any_cast;
     ass.getSymbols().forAll([](std::string const& name, std::any const& val) {
-        if (auto const* v = any_cast<Number>(&val)) {
-            fmt::print("{} == 0x{:x}\n", name, (int)*v);
+        if (auto const* n = any_cast<Number>(&val)) {
+            fmt::print("{} == 0x{:x}\n", name, static_cast<int>(*n));
         } else if (auto const* v = any_cast<std::vector<uint8_t>>(&val)) {
             fmt::print("{} == [{} bytes]\n", name, v->size());
-        } else if (auto const* v = any_cast<std::string>(&val)) {
-            fmt::print("{} == \"{}\"\n", name, *v);
+        } else if (auto const* s = any_cast<std::string>(&val)) {
+            fmt::print("{} == \"{}\"\n", name, *s);
         } else {
             fmt::print("{} == ?{}\n", name, val.type().name());
         }
@@ -33,7 +35,7 @@ struct Tester
     std::shared_ptr<Assembler> a;
     Tester() : a{std::make_shared<Assembler>()} {};
 
-    Tester(std::string const& code) : a{std::make_shared<Assembler>()}
+    explicit Tester(std::string const& code) : a{std::make_shared<Assembler>()}
     {
         a->parse(code);
     };
@@ -53,7 +55,15 @@ struct Tester
 
     bool noErrors() { return a->getErrors().empty(); }
 
-    size_t mainSize() { return a->getMachine().getSection("main").data.size(); }
+    size_t mainSize()
+    {
+        return a->getMachine().getSection("default").data.size();
+    }
+
+    std::vector<uint8_t> const& mainData()
+    {
+        return a->getMachine().getSection("default").data;
+    }
 
     template <typename T,
               typename S = std::enable_if_t<std::is_arithmetic_v<T>>>
@@ -70,6 +80,107 @@ struct Tester
     }
 };
 
+bool checkFile(Error const& e)
+{
+    constexpr std::string_view errorTag = "!error";
+    utils::File f{e.file};
+    size_t l = 1;
+    for (auto const& line : f.lines()) {
+        l++;
+        auto pos = line.find(errorTag);
+        if (pos != std::string::npos) {
+            pos += errorTag.size();
+            while (line[pos] == ' ')
+                pos++;
+            auto match = line.substr(pos);
+            if (e.line == l && e.message.find(match) != std::string::npos) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool checkErrors(std::vector<Error> errs)
+{
+    auto it = errs.begin();
+    while (it != errs.end()) {
+        auto const& e = *it;
+        if(checkFile(e)) {
+            it = errs.erase(it);
+        } else {
+            it++;
+        }
+    }
+    return errs.empty();
+}
+
+TEST_CASE("all", "[assembler]")
+{
+    for (auto const& p : utils::listFiles(projDir() / "tests")) {
+        Assembler ass;
+        fmt::print(fmt::fg(fmt::color::yellow), "{}\n", p.string());
+        ass.parse_path(p);
+        for (auto const& e : ass.getErrors()) {
+            fmt::print(fmt::fg(fmt::color::coral), "ERROR '{}' in {}:{}\n", e.message, e.file, e.line);
+        }
+        if (!checkErrors(ass.getErrors())) {
+            FAIL("Did not find expected errors");
+        }
+    }
+}
+
+TEST_CASE("assembler.sections", "[assembler]")
+{
+    Assembler ass;
+    auto& syms = ass.getSymbols();
+
+    ass.parse(R"(
+        !section "BASIC",start=$0801,size=$d000
+
+        !section "code",in="BASIC"
+        !section "text",in="BASIC"
+
+        !section "start",in="code" {
+        start:
+            !section "x",in="text" {
+            hello:
+                !text "hello peope"
+            }
+            nop
+            lda hello,x
+            rts
+        }
+    )");
+    auto const& errs = ass.getErrors();
+    for (auto const& e : errs) {
+        fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
+    }
+    REQUIRE(errs.empty());
+    REQUIRE(syms.get<Number>("hello") == 0x0801 + 5);
+}
+
+TEST_CASE("assembler.sections2", "[assembler]")
+{
+    Assembler ass;
+
+    ass.parse(R"(
+        !section "BASIC",start=$0801,size=$d000 {
+
+            !section in="BASIC" {
+                start: rts
+            }
+            !section "text",in="BASIC" {
+                data: .text "hello"
+            }
+        }
+    )");
+    auto const& errs = ass.getErrors();
+    for (auto const& e : errs) {
+        fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
+    }
+}
+
 TEST_CASE("assembler.first", "[assembler]")
 {
     Tester t;
@@ -85,12 +196,17 @@ TEST_CASE("assembler.first", "[assembler]")
     REQUIRE(t.noErrors());
     REQUIRE(t.mainSize() == 16);
 
+    t = "!rept y,4 { !rept x,4 { !byte x+y*4 } }";
+    REQUIRE(t.noErrors());
+    REQUIRE(t.mainSize() == 16);
+    for (int i = 0; i < 16; i++) {
+        REQUIRE(t.mainData()[i] == i);
+    }
 
     logging::setLevel(logging::Level::Debug);
     t = "!enum { A = 1\nB\n C = \"xx\" }";
 
-
-    for(auto err : t.a->getErrors()) {
+    for (auto const& err : t.a->getErrors()) {
         LOGI("%d : %s", err.line, err.message);
     }
 
@@ -98,7 +214,6 @@ TEST_CASE("assembler.first", "[assembler]")
     REQUIRE(t.mainSize() == 0);
     REQUIRE(t.haveSymbol("B", 2));
     REQUIRE(t.haveSymbol("C", "xx"));
-
 }
 
 TEST_CASE("assembler.basic", "[assembler]")
@@ -224,7 +339,7 @@ amplitude = round(endValue-startValue)
         fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
     }
     auto& mach = ass.getMachine();
-    auto const& data = mach.getSection("main").data;
+    auto const& data = mach.getSection("default").data;
     for (auto x : data) {
         fmt::print("{:0x} ", x);
     }
@@ -327,8 +442,7 @@ TEST_CASE("assembler.test", "[assembler]")
 {
     Assembler ass;
     ass.parse(R"(
-    !section "test", $2000
-    !org $800
+    !section "main", $800
 start:
     ldx #0
 .loop
@@ -341,12 +455,15 @@ start:
     !section "data", $1000
     !byte 1,2,3,4,5,6,7
 
-!test my_test {
+!test $3000
+
+!test "my_test" {
     jsr start
     jmp xxx
     nop
 xxx:
     lda #4
+    rts
 }
 
 !assert compare(tests.my_test.ram[0x2000:0x2007], bytes(1,2,3,4,5,6,7))
@@ -408,7 +525,7 @@ TEST_CASE("assembler.errors", "[assembler]")
         }
         test(2)
         rts)",
-         6},
+         4},
         //
         {R"(!org $800
         nop
@@ -420,7 +537,7 @@ TEST_CASE("assembler.errors", "[assembler]")
             stq 0
         }
         rts)",
-         6},
+         8},
         //
         {R"(!org $800
         lda #15
@@ -455,8 +572,7 @@ a       !byte 3
         bool ok = false;
         for (auto& e : errs) {
             fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
-            if(e.line == (size_t)s.second)
-                ok = true;
+            if (e.line == (size_t)s.second) ok = true;
         }
         REQUIRE(ok);
     }
@@ -510,4 +626,3 @@ $   nop
     REQUIRE(mach.getSection("a").data == mach.getSection("b").data);
     REQUIRE(mach.getSection("b").data == mach.getSection("c").data);
 }
-

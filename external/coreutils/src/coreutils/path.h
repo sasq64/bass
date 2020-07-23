@@ -10,6 +10,9 @@
 
 #ifdef _WIN32
 #    include <direct.h>
+#    include <filesystem>
+namespace fs = std::filesystem;
+
 #else
 #    include <dirent.h>
 #    include <unistd.h>
@@ -121,7 +124,7 @@ public:
         if (p.is_absolute()) {
             *this = p;
         } else {
-            if (!empty() && segment(-1) == "") {
+            if (!empty() && segment(-1).empty()) {
                 segments.resize(segments.size() - 1);
             }
             segments.insert(std::end(segments), std::begin(p.segments),
@@ -239,7 +242,7 @@ inline path operator/(path const& a, path const& b)
 
 inline bool exists(path const& p)
 {
-    struct stat sb;
+    struct stat sb{};
     return stat(p.string().c_str(), &sb) >= 0;
 }
 
@@ -294,12 +297,24 @@ inline path absolute(path const& name)
     return path(resolvedPath);
 }
 
-#ifndef WIN32
+#ifdef WIN32
+
+inline std::vector<path> listFiles(path const& r)
+{
+    std::vector<path> rc;
+    fs::path root{r.string()};
+    for (auto& p : fs::directory_iterator(root)) {
+        rc.emplace_back(p.path().string());
+    }
+    return rc;
+}
+
+#else
 
 inline std::vector<path> listFiles(path const& root)
 {
-    DIR* dir;
-    struct dirent* ent;
+    DIR* dir{};
+    struct dirent* ent{};
     std::vector<path> rc;
     if ((dir = opendir(root.c_str())) != nullptr) {
         while ((ent = readdir(dir)) != nullptr) {
@@ -316,19 +331,15 @@ inline std::vector<path> listFiles(path const& root)
 inline void listRecursive(const path& root, std::vector<path>& result,
                           bool includeDirs = false)
 {
-    DIR* dir;
-    struct dirent* ent;
+    DIR* dir{};
+    struct dirent* ent{};
     if ((dir = opendir(root.c_str())) != nullptr) {
         while ((ent = readdir(dir)) != nullptr) {
             char* p = ent->d_name;
             if (p[0] == '.' && (p[1] == 0 || (p[1] == '.' && p[2] == 0)))
                 continue;
             path f{root / ent->d_name};
-#    ifdef _WIN32
-            if (f.isDir()) {
-#    else
             if (ent->d_type == DT_DIR) {
-#    endif
                 if (includeDirs) result.push_back(f);
                 listRecursive(f, result, includeDirs);
             } else
@@ -336,7 +347,7 @@ inline void listRecursive(const path& root, std::vector<path>& result,
         }
         closedir(dir);
     }
-} // namespace utils
+}
 
 inline std::vector<path> listRecursive(const path& root,
                                        bool includeDirs = false)

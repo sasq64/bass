@@ -50,9 +50,11 @@ bitmapMem = $4000
 spriteMem = $7000
 spritePtrs = screenMem + 1016
 
-    !section "test", $c000
+    !section "RAM",$801
+    !section "main",in="RAM",start=$801
+    !section "data",in="RAM"
 
-    !section "main", $801
+    !section "code",in="main"
     !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
 start:
 
@@ -110,12 +112,10 @@ $   lda #100
     jsr update_sprite
     jmp -
 
-
 test_func:
-    brk #2
     rts
 
-!test my_test {
+!test "my_test" {
     jsr test_func
 }
 
@@ -131,7 +131,7 @@ init_sprite
     ; Copy sprite data
     !rept 8 {
         ldx #3*21
-    $:  lda spriteData-1+i*64,x
+    $:  lda sprite[i]-1,x
         sta spriteMem-1+i*64,x
         dex
         bne -
@@ -156,7 +156,9 @@ update_sprite
     sta spritePtrs+2
     rts
 
+    !section in="data" {
 xy: !byte 0,0
+    }
 
 sine_xy:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 + 24 }
@@ -189,6 +191,7 @@ end
 
 spriteData:
     !rept 8 {
+    sprite[i]:
         !fill circle(zeroes(3*21), 3, 12, 10, i + 3)
         !byte $ff
     }
@@ -217,6 +220,21 @@ spriteData:
 
     !section "music", musicLocation
     !fill music_data
+
+%{
+    map_bank_write(0xd4, 1, function(adr, val)
+        print("SID", adr - 0xd400, val)
+    end)
+}%
+
+!test "music_init" {
+    jsr $1000
+}
+
+
+!test "music_play" {
+    jsr $1003
+}
 
 colors:
     !fill color_ram

@@ -1,8 +1,8 @@
+#include "machine.h"
 #include "defines.h"
 #include "emulator.h"
 
-#include "machine.h"
-
+#include <coreutils/algorithm.h>
 #include <coreutils/file.h>
 #include <coreutils/log.h>
 
@@ -10,10 +10,15 @@
 #include <array>
 #include <vector>
 
+inline void Check(bool v, std::string const& txt)
+{
+    if (!v) throw machine_error(txt);
+}
+
 Machine::Machine()
 {
     machine = std::make_unique<sixfive::Machine<>>();
-    addSection("main", 0);
+    addSection("default", 0).flags = FixedStart;
     machine->setBreakFunction(breakFunction, this);
 }
 
@@ -38,7 +43,7 @@ void Machine::setBreakFunction(uint8_t what,
     break_functions[what] = fn;
 }
 
-Section& Machine::addSection(std::string const& name, uint32_t start)
+Section& Machine::addSection(std::string const& name, int32_t start)
 {
     if (!name.empty()) {
         if (fp != nullptr) {
@@ -50,28 +55,141 @@ Section& Machine::addSection(std::string const& name, uint32_t start)
             currentSection = &sections.emplace_back(name, start);
         } else {
             currentSection = &(*it);
-            currentSection->start = currentSection->pc = start;
+            if (!currentSection->data.empty()) {
+                throw machine_error(
+                    fmt::format("Section {} already exists", name));
+            }
+            currentSection->valid = true;
+            if (start != -1) {
+                currentSection->start = start;
+            }
         }
     } else {
         currentSection = &sections.emplace_back("", start);
     }
     return *currentSection;
 }
+Section& Machine::addSection(std::string const& name,
+                             std::string const& parentName)
+{
+    auto& s = addSection(name, -1);
+    if (s.parent.empty() && !parentName.empty()) {
+        auto& parent = getSection(parentName);
+        s.parent = parent.name;
+        parent.children.push_back(name);
+    }
+    return s;
+}
 
-void Machine::setSection(std::string const& name)
+Section& Machine::setSection(std::string const& name)
 {
     if (!name.empty()) {
         auto it = std::find_if(sections.begin(), sections.end(),
                                [&](auto const& s) { return s.name == name; });
         if (it != sections.end()) {
             currentSection = &(*it);
-            return;
+            return *currentSection;
         }
     }
     throw machine_error(fmt::format("Unknown section {}", name));
 }
 
-Section const& Machine::getSection(std::string const& name) const
+void Machine::removeSection(std::string const& name)
+{
+    auto it = std::find_if(sections.begin(), sections.end(),
+                           [&](auto const& s) { return s.name == name; });
+    if (it != sections.end()) {
+        sections.erase(it);
+    }
+}
+
+// Layout section 's', exactly at address if Floating, otherwise
+// it must at least be placed after address
+// Return section end
+int32_t Machine::layoutSection(int32_t address, Section& s)
+{
+    if (!s.valid) {
+        LOGI("Skipping invalid section %s", s.name);
+        return address;
+    }
+
+    LOGD("Layout %s", s.name);
+    if ((s.flags & FixedStart) == 0) {
+        if (s.start != address) {
+            LOGD("%s: %x differs from %x", s.name, s.start, address);
+            layoutOk = false;
+        }
+        s.start = address;
+    }
+
+    Check(s.start >= address,
+          fmt::format("Section {} starts at {:x} which is before {:x}", s.name,
+                      s.start, address));
+
+    if (!s.data.empty()) {
+        Check(s.children.empty(), "Data section may not have children");
+        // Leaf / data section
+        return s.start + static_cast<int32_t>(s.data.size());
+    }
+
+    if (!s.children.empty()) {
+        // Lay out children
+        for (auto const& child : s.children) {
+            address = layoutSection(address, getSection(child));
+        }
+    }
+    // Unless fixed size, update size to total of its children
+    if ((s.flags & FixedSize) == 0) {
+        s.size = address - s.start;
+    }
+    if (address - s.start > s.size) {
+        throw machine_error(fmt::format("Section {} is too large", s.name));
+    }
+    return s.start + s.size;
+}
+
+bool Machine::layoutSections()
+{
+    layoutOk = true;
+    // Lay out all root sections
+    for (auto& s : sections) {
+        if (s.parent.empty()) {
+            // LOGI("Root %s at %x", s.name, s.start);
+            auto start = s.start;
+            layoutSection(start, s);
+        }
+    }
+    return layoutOk;
+}
+
+Error Machine::checkOverlap()
+{
+    for (auto& a : sections) {
+        if (!a.data.empty()) {
+            for (auto const& b : sections) {
+                if (&a != &b && !b.data.empty()) {
+                    auto as = a.start;
+                    auto ae = as + static_cast<int32_t>(a.data.size());
+                    auto bs = b.start;
+                    auto be = bs + static_cast<int32_t>(b.data.size());
+                    if (as >= bs && as < be) {
+                        return {2, 0,
+                                fmt::format("Section {} overlaps {}", a.name,
+                                            b.name)};
+                    }
+                    if (bs >= as && bs < ae) {
+                        return {2, 0,
+                                fmt::format("Section {} overlaps {}", b.name,
+                                            a.name)};
+                    }
+                }
+            }
+        }
+    }
+    return {};
+}
+
+Section& Machine::getSection(std::string const& name)
 {
     auto it = std::find_if(sections.begin(), sections.end(),
                            [&](auto const& s) { return s.name == name; });
@@ -90,8 +208,12 @@ void Machine::clear()
     if (fp != nullptr) {
         rewind(fp);
     }
-    sections.clear();
-    addSection("main", 0);
+    for (auto& s : sections) {
+        s.data.clear();
+        s.pc = s.start;
+        s.valid = false;
+    }
+    setSection("default").valid = true;
 }
 
 uint32_t Machine::getPC() const
@@ -126,23 +248,44 @@ constexpr static std::array modeTemplate = {
 
 void Machine::write(std::string const& name, OutFmt fmt)
 {
-    std::array<uint8_t, 64 * 1024> ram{};
-    ram.fill(0);
-    uint32_t start = 0xffffffff;
-    uint32_t end = 0;
+    auto filtered = utils::filter_to(
+        sections, [](auto const& s) { return !s.data.empty(); });
 
-    std::sort(sections.begin(), sections.end(),
-              [](auto const& a, auto const& b) {
-                  return a.start < b.start;
-              });
+    if (filtered.empty()) {
+        puts("**Warning: No sections");
+        return;
+    }
 
-    size_t last_end = 0;
-    for (auto const& section : sections) {
+    LOGD("%d data sections", filtered.size());
 
-        if(section.start < last_end) {
-            throw machine_error(fmt::format("Section {} overlaps previous", section.name));
+    std::sort(filtered.begin(), filtered.end(),
+              [](auto const& a, auto const& b) { return a.start < b.start; });
+
+    int32_t last_end = -1;
+    utils::File outFile{name, utils::File::Mode::Write};
+
+    auto start = filtered.front().start;
+    auto end = filtered.back().start +
+               static_cast<int32_t>(filtered.back().data.size());
+
+    if (end <= start) {
+        puts("**Warning: No code generated");
+        return;
+    }
+
+    if (fmt == OutFmt::Prg) {
+        outFile.write<uint8_t>(start & 0xff);
+        outFile.write<uint8_t>(start >> 8);
+    }
+
+    // bool bankFile = false;
+
+    for (auto const& section : filtered) {
+
+        if (section.start < last_end) {
+            throw machine_error(
+                fmt::format("Section {} overlaps previous", section.name));
         }
-
 
         if (section.data.empty()) {
             continue;
@@ -154,44 +297,37 @@ void Machine::write(std::string const& name, OutFmt fmt)
             of.write<uint8_t>(section.start >> 8);
             of.write(section.data);
             of.close();
+            continue;
         }
 
         if ((section.flags & NoStorage) != 0) {
             continue;
         }
 
-        if (section.start < start) {
-            start = section.start;
-        }
-        auto section_end =
-            static_cast<uint32_t>(section.start + section.data.size());
-        if (section_end > 64 * 1024) {
-            section_end = 64 * 1024;
-        }
-        if (section_end > end) {
-            end = section_end;
+        auto offset = section.start;
+        auto adr = section.start & 0xffff;
+        auto bank = section.start >> 16;
+
+        if (bank > 0) {
+            if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) {
+                offset = bank * 8192 + adr;
+            } else {
+                throw machine_error("Illegal address");
+            }
         }
 
-        last_end = section_end;
-
-        memcpy(&ram[section.start], section.data.data(),
-               section_end - section.start);
-    }
-
-    if (end <= start) {
-        printf("**Warning: No code generated\n");
-        return;
-    }
-
-    if (end > start) {
-        fmt::print("Writing {:04x}->{:04x} > {}\n", start, end, name);
-        utils::File of{name, utils::File::Mode::Write};
-        if (fmt == OutFmt::Prg) {
-            of.write<uint8_t>(start & 0xff);
-            of.write<uint8_t>(start >> 8);
+        if (last_end >= 0) {
+            // LOGI("Padding %d bytes", offset - last_end);
+            while (last_end < offset) {
+                outFile.write<uint8_t>(0);
+                last_end++;
+            }
         }
-        of.write(&ram[start], end - start);
-        of.close();
+
+        last_end = static_cast<uint32_t>(offset + section.data.size());
+
+        // LOGI("Writing %d bytes", section.data.size());
+        outFile.write(section.data);
     }
 }
 
@@ -247,7 +383,6 @@ AsmResult Machine::assemble(Instruction const& instr)
         return AsmResult::NoSuchOpcode;
     }
 
-
     auto it1 = std::find_if(
         it0->opcodes.begin(), it0->opcodes.end(), [&](auto const& o) {
             if (o.mode == AddressingMode::ZPX &&
@@ -260,13 +395,15 @@ AsmResult Machine::assemble(Instruction const& instr)
                 arg.val <= 0xff) {
                 arg.mode = AddressingMode::ZPY;
             }
-            if (o.mode == AddressingMode::ZP && arg.mode == AddressingMode::ABS &&
-                arg.val >= 0 && arg.val <= 0xff) {
+            if (o.mode == AddressingMode::ZP &&
+                arg.mode == AddressingMode::ABS && arg.val >= 0 &&
+                arg.val <= 0xff) {
                 arg.mode = AddressingMode::ZP;
             }
             if (o.mode == AddressingMode::REL) {
                 arg.mode = AddressingMode::REL;
-                arg.val = arg.val - static_cast<int32_t>(currentSection->pc) - 2;
+                arg.val =
+                    arg.val - static_cast<int32_t>(currentSection->pc) - 2;
             }
             return o.mode == arg.mode;
         });
@@ -349,8 +486,6 @@ std::vector<uint8_t> Machine::getRam()
     return data;
 }
 
-
-
 Tuple6 Machine::getRegs() const
 {
     return machine->regs();
@@ -366,5 +501,3 @@ void Machine::setRegs(Tuple6 const& regs)
     std::get<4>(r) = std::get<4>(regs);
     std::get<5>(r) = std::get<5>(regs);
 }
-
-

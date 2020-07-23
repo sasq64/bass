@@ -92,7 +92,7 @@ $   lda #100
 
     sid = load("../data/test.sid")[0x7e:]
     !section "music", 0x1000
-    !block sid
+    !fill sid
 
     ;sum = add(sid)
     ;!print sum
@@ -102,12 +102,12 @@ $   lda #100
 
     !section "colors", *
 colors:
-    !block color_ram
+    !fill color_ram
 
     !section "screen", *
 screen:
-    !block screen_ram
+    !fill screen_ram
 
     !section "koala", 0x4000
-    !block bitmap
+    !fill bitmap
 

@@ -13,7 +13,6 @@ AnyMap loadPng(std::string_view const& name)
 {
     unsigned w{};
     unsigned h{};
-    unsigned char* out{};
     AnyMap res;
 
     utils::File f{name};
@@ -25,7 +24,9 @@ AnyMap loadPng(std::string_view const& name)
     state.info_raw.bitdepth = 8;
     state.info_raw.palette = nullptr;
     state.decoder.color_convert = 0;
-    auto error = lodepng_decode(&out, &w, &h, &state, data.data(), data.size());
+    unsigned char* o{};
+    auto error = lodepng_decode(&o, &w, &h, &state, data.data(), data.size());
+    std::unique_ptr<unsigned char> out{o};
 
     auto colors = state.info_png.color.palettesize;
     auto* pal = state.info_png.color.palette;
@@ -45,26 +46,25 @@ AnyMap loadPng(std::string_view const& name)
 
         res["width"] = num(w);
         res["height"] = num(h);
-        res["pixels"] = std::vector<uint8_t>(out, out + w * h);
+        res["pixels"] = std::vector<uint8_t>(out.get(), out.get() + w * h);
         res["colors"] = pal12;
 
-
-        image::bitmap8 bm{w, h, out};
+        image::bitmap8 bm{w, h, out.get()};
 
         std::unordered_map<uint32_t, int> tiles_crc{};
         std::vector<uint8_t> indexes;
         std::vector<uint8_t> tiles;
-        tiles.resize(8*8, 0);
+        tiles.resize(8 * 8, 0);
 
         int count = 0;
-        for(auto const& tile : bm.split(8,8)) {
+        for (auto const& tile : bm.split(8, 8)) {
             auto crc = tile.crc();
             auto it = tiles_crc.find(crc);
             int index = -1;
-            if(it == tiles_crc.end()) {
+            if (it == tiles_crc.end()) {
                 index = count;
                 tiles_crc[crc] = count++;
-                tiles.insert(tiles.end(), tile.data(), tile.data() + 8*8);
+                tiles.insert(tiles.end(), tile.data(), tile.data() + 8 * 8);
             } else {
                 index = it->second;
             }
@@ -76,12 +76,9 @@ AnyMap loadPng(std::string_view const& name)
         res["tiles"] = tiles;
         res["indexes"] = indexes;
 
-        LOGD("%d different tiles (out of %d)", tiles_crc.size(), indexes.size() / 2);
-
-
-        free(out);
+        LOGD("%d different tiles (out of %d)", tiles_crc.size(),
+             indexes.size() / 2);
     }
     lodepng_state_cleanup(&state);
     return res;
 }
-

@@ -77,7 +77,7 @@ spr0
     ;!rept 3*21 { !byte 0xff>>((i%3)+i/8) }
 
 !ifdef BALL {
-    !block circle_sprite
+    !fill circle_sprite
 } else {
     ; Balloon
     !byte 0,127,0,1,255,192,3,255,224,3,231,224

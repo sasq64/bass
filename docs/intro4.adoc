@@ -1,0 +1,204 @@
+## Intro to the _bass_ (badass) 6502 assembler
+
+### Part 4 - Unit Testing
+
+(NOTE: This part still needs work)
+
+To demonstrate unit testing I will leave the wonderful world of C64 for
+a while and show bits of code targeting the _Commander X16_ computer.
+
+But let's begin with the basic structure of a unit test:
+
+
+[source,ca65]
+----
+my_code:
+    lda #$ef
+    sta $1
+    lda #$70
+    adc $1
+    rts
+
+!test my_test {
+    jsr my_code
+}
+
+!assert tests.my_test.A == (0x70 + 0xef) & 0xff
+----
+
+Tests works like this:
+
+Any `!test` clause like the one above will be assembled into a special test section, 
+_after_ all other code has been placed into memory.
+
+Each test will be executed in the internal bass 6502 emulator, and the state of the
+emulator will be saved to a set of symbols for the specific test.
+
+`!assert` commands can then be used to verify the result, both my checking registers and
+reading _RAM_.
+
+
+Now let's dive into the example targeting the X16 Commander:
+
+[source,ca65]
+----
+
+    png = load_png("../data/face.png")
+
+copy_indexes:
+
+    ldy #80
+    ldx #0
+    clc
+.loop
+    lda indexes,x
+    sta DATA0
+    dey
+    bne +
+
+    ldy #128-80
+    lda #0
+.x  sta DATA0
+    dey
+    bne .x
+    ldy #80
+$
+    inx
+    bne .loop
+    inc .loop+2
+    lda .loop+2
+    cmp  #((indexes_end+128)>>8)
+    bne .loop
+
+    rts
+
+indexes:
+    !fill png.indexes
+indexes_end:
+
+; ---------------------------------------------------------------------------
+
+!test index_copy {
+    SetVReg(0)
+    SetVAdr(tileMem | INC_1)
+    jsr copy_indexes
+}
+; Check first lines of screen tiles
+vram = get_vram()
+!rept 10 {
+    !assert compare(vram[tileMem+i*128:tileMem+i*128+80], png.indexes[i*80:(i+1)*80])
+}
+----
+
+So a lot of things happeing here.
+
+First we load a png image using the `png_load()` function. The result of this call
+is a structure of several fields, which includes the actual bitmap and colors, but
+also a _tiled_ version of the image, where the bitmap has been split up into 8x8
+characters, and each character is assigned a tile index.
+
+Tiled data is used in a lot of older graphics hardware, and the graphics hardware 
+of the X16 (called Vera) also has a tiled graphics mode which we are using.
+
+After that we have the actual "function under test". Its job is to copy the
+tile indexes to the VRAM of the Vera. But the X16 does not have
+VRAM directly mapped, so you need to set the offset in VRAM you want to write to,
+and then write the values to the special Vera `DATA0` register.
+
+Then we have the actual test invocation, and the asserts.
+
+But what is `get_vram()` ? And how can the emulator deal with the specific way of
+copying data to VRAM unique to the X16/Vera hardware:
+
+It works because we load this LUA script into the Assembler:
+
+[source,lua]
+----
+-- Vera state
+vram = { 0 }
+vregs = { 0 }
+vsel = 1
+vadr = { 0, 0 }
+vinc = { 0, 0 }
+
+increments = {
+    0, 0, 1, -1, 2, -2, 4, -4, 8, -8, 16, -16, 32, -32,
+    64, -64, 128, -128, 256, -256, 512, -512,
+    40, -40, 80, -80, 160, -160, 320, -320, 640, -640,
+}
+
+
+-- The Vera Interface are mapped to registers between $9f20-$9f40
+
+map_bank_read(0x9f, 1, function(adr)
+    offset = adr & 0xff
+    -- print("Read", offset)
+    if offset >= 0x20 and offset < 0x40 then
+        if offset == 0x20 then
+            return vadr[vsel] & 0xff
+        elseif offset == 0x21 then
+            return (vadr[vsel] >> 8) & 0xff
+        elseif offset == 0x22 then
+            return (vadr[vsel] >> 16) | (vinc[vsel]<<3)
+        elseif offset == 0x23 then
+            res = vram[vadr[1]+1]
+            vadr[1] = vadr[1] + increments[vinc[1]+1]
+            return res
+        elseif offset == 0x24 then
+            res = vram[vadr[2]+1]
+            vadr[2] = vadr[2] + increments[vinc[2]+1]
+            return res
+        end
+        res =  vregs[offset-0x20+1]
+        return res
+    else
+        return mem_read(adr)
+    end
+end)
+
+map_bank_write(0x9f, 1, function(adr, val)
+    offset = adr & 0xff
+    if offset >= 0x20 and offset < 0x40 then
+        if offset == 0x20 then
+            vadr[vsel] = (vadr[vsel] & 0x1ff00) | val
+        elseif offset == 0x21 then
+            vadr[vsel] = (vadr[vsel] & 0x100ff) | (val<<8)
+        elseif offset == 0x22 then
+            vadr[vsel] = (vadr[vsel] & 0xffff) | ((val&1)<<16)
+            vinc[vsel] = val>>3
+        elseif offset == 0x23 then
+            -- print(string.format("Vram write %x to %x", val, vadr[1]))
+            vram[vadr[1]+1] = val
+            vadr[1] = vadr[1] + increments[vinc[1]+1]
+        elseif offset == 0x24 then
+            -- print(string.format("Vram write %x to %x", val, vadr[2]))
+            vram[vadr[2]+1] = val
+            vadr[2] = vadr[2] + increments[vinc[2]+1]
+        end
+        -- print(string.format("Write %x to %x", val, offset))
+        vregs[offset-0x20+1] = val
+    else
+        mem_write(adr, val)
+    end
+end)
+
+function get_vram()
+    return vram
+end
+----
+
+So this is a lot of code. If you know and/or are interested in how the
+Graphics access works in the X16, you can probably tell that this implements
+parts of the Vera access, and in fact you can find code similar to this in
+the official X16 emulator.
+
+It is an example on how you can _extend_ the internal emulator, by intercepting
+reads and write to certain memory areas. This way you can actually emulate those
+parts of your target system that you need for testing.
+
+And at the end of this LUA code you also see the `get_vram()` function used in the
+asserts above. This function returnes the data written to VRAM, so we can verify
+that it contains what we want.
+
+
+link:part3.html[Prev]

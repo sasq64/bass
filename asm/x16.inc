@@ -1,20 +1,24 @@
 
-    !section "utils", section.main.end
 
-!macro LoadFile(fname) {
-     LDA #5 ;fname_end-fname
-     LDX #<fname
-     LDY #>fname
-     jsr kernel_load
- }
+!macro SetFileName(name) {
+    lda #.fname_end - .fname
+    ldx #<.fname
+    ldy #>.fname
+    !section in = "text" {
+.fname !fill name
+.fname_end
+    }
+}
+
+    !section in = "utils" {
 
 kernel_load:
         jsr $ffbd     ; call SETNAM
         lda #$01
-        ;ldx $ba       ; last used device number
-        ;bne .skip
+        ldx $ba       ; last used device number
+        bne .skip
         ldx #$08      ; default to device 8
-;.skip
+.skip
         ldy #$01      ; not $01 means: load to address stored in file
         jsr $ffba     ; call SETLFS
 
@@ -23,3 +27,4 @@ kernel_load:
         ;bcs VBL    ; if carry set, a load error has happened
 
         rts
+}

@@ -91,11 +91,11 @@ struct Machine
         sr = 0x30;
         result = 0;
         for (int i = 0; i < 256; i++) {
-            rbank[i] = wbank[i] = &ram[(i * 256) % POLICY::MemSize];
-            rcallbacks[i] = &read_bank;
-            rcbdata[i] = this;
-            wcallbacks[i] = &write_bank;
-            wcbdata[i] = this;
+            rbank.at(i) = wbank.at(i) = &ram[(i * 256) % POLICY::MemSize];
+            rcallbacks.at(i) = &read_bank;
+            rcbdata.at(i) = this;
+            wcallbacks.at(i) = &write_bank;
+            wcbdata.at(i) = this;
         }
         for (const auto& i : getInstructions<false>()) {
             for (const auto& o : i.opcodes)
@@ -150,9 +150,9 @@ struct Machine
     // Map ROM to a bank
     void mapRom(uint8_t bank, const Word* data, int len)
     {
-        auto end = data + len;
+        auto const* end = data + len;
         while (data < end) {
-            rbank[bank++] = const_cast<Word*>(data);
+            rbank[bank++] = const_cast<Word*>(data); // NOLINT
             data += 256;
         }
     }
@@ -161,8 +161,8 @@ struct Machine
                          uint8_t (*cb)(uint16_t a, void*))
     {
         while (len > 0) {
-            rcallbacks[bank] = cb;
-            rcbdata[bank++] = data;
+            rcallbacks[bank] = cb;  // NOLINT
+            rcbdata[bank++] = data; // NOLINT
             len--;
         }
     }
@@ -170,8 +170,8 @@ struct Machine
                           void (*cb)(uint16_t a, uint8_t v, void*))
     {
         while (len > 0) {
-            wcallbacks[bank] = cb;
-            wcbdata[bank++] = data;
+            wcallbacks[bank] = cb;  // NOLINT
+            wcbdata[bank++] = data; // NOLINT
             len--;
         }
     }
@@ -207,9 +207,10 @@ struct Machine
     auto regs() const { return std::make_tuple(a, x, y, sr, sp, pc); }
     auto regs() { return std::tie(a, x, y, sr, sp, pc); }
 
-    typedef void(*BreakFn)(int, void*);
+    using BreakFn = void (*)(int, void*);
 
-    void setBreakFunction(BreakFn const& fn, void* data) {
+    void setBreakFunction(BreakFn const& fn, void* data)
+    {
         breakData = data;
         breakFunction = fn;
     }
@@ -245,7 +246,7 @@ private:
 
     uint8_t sp;
 
-    uint32_t cycles;
+    uint32_t cycles = 0;
     uint32_t realCycles = 0;
 
     // Current jumptable
@@ -261,25 +262,27 @@ private:
     void* breakData = nullptr;
 
     // Banks normally point to corresponding ram
-    std::array<const Word*, 256> rbank;
-    std::array<Word*, 256> wbank;
+    std::array<const Word*, 256> rbank{};
+    std::array<Word*, 256> wbank{};
 
-    std::array<Word (*)(uint16_t, void*), 256> rcallbacks;
-    std::array<void*, 256> rcbdata;
-    std::array<void (*)(uint16_t, Word, void*), 256> wcallbacks;
-    std::array<void*, 256> wcbdata;
+    std::array<Word (*)(uint16_t, void*), 256> rcallbacks{};
+    std::array<void*, 256> rcbdata{};
+    std::array<void (*)(uint16_t, Word, void*), 256> wcallbacks{};
+    std::array<void*, 256> wcbdata{};
 
     std::array<Opcode, 256> jumpTable_normal;
     std::array<Opcode, 256> jumpTable_bcd;
 
-    static void write_bank(uint16_t adr, Word v, void* m)
+    static void write_bank(uint16_t adr, Word v, void* ptr)
     {
-        ((Machine*)m)->wbank[adr >> 8][adr & 0xff] = v & 0xff;
+        auto* m = static_cast<Machine*>(ptr);
+        m->wbank[adr >> 8][adr & 0xff] = v & 0xff;
     }
 
-    static Word read_bank(uint16_t adr, void* m)
+    static Word read_bank(uint16_t adr, void* ptr)
     {
-        return ((Machine*)m)->rbank[adr >> 8][adr & 0xff];
+        auto* m = static_cast<Machine*>(ptr);
+        return m->rbank[adr >> 8][adr & 0xff];
     }
 
     template <int REG>
@@ -380,11 +383,11 @@ private:
     template <int FLAG, bool v>
     constexpr bool check() const
     {
-        if constexpr (FLAG == ZERO) return result & 0xff ? !v : v;
+        if constexpr (FLAG == ZERO) return ((result & 0xff) != 0) == !v;
         if constexpr (FLAG == SIGN)
-            return result & 0x280 ? v : !v;
+            return ((result & 0x280) != 0) == v;
         else
-            return (bool)(sr & (1 << FLAG)) == v;
+            return ((sr & 1 << FLAG) != 0) == v;
     }
 
     /////////////////////////////////////////////////////////////////////////
@@ -437,9 +440,9 @@ private:
         return adr + offs;
     }
 
-    unsigned Read16(unsigned a, unsigned offs = 0) const
+    unsigned Read16(unsigned adr, unsigned offs = 0) const
     {
-        return to_adr(Read(a), Read(a + 1)) + offs;
+        return to_adr(Read(adr), Read(adr + 1)) + offs;
     }
 
     // Read operand from PC and create effective adress depeding on 'MODE'

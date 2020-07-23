@@ -7,44 +7,42 @@
 #include <coreutils/log.h>
 #include <coreutils/split.h>
 #include <coreutils/text.h>
+#include <coreutils/utf8.h>
 #include <fmt/format.h>
 #include <vector>
 
 using namespace std::string_literals;
 
-static std::array<uint8_t, 256> char_translate;
+static std::unordered_map<uint16_t, uint8_t> char_translate;
 
-void Check(bool v, std::string const& txt)
-{
-    if (!v) throw parse_error(txt);
-}
-
+// Reset the translation of characters to Petscii/screen code
 static void resetTranslate()
 {
+    char_translate.clear();
     for (int i = 0; i < 256; i++) {
         auto c = i;
         if (c >= 'a' && c <= 'z')
             c = c - 'a' + 1;
         else if (c >= 'A' && c <= 'Z')
             c = c - 'A' + 0x41;
-        char_translate.at(i) = c;
+        char_translate[i] = c;
     }
 }
 
 static void evalIf(Assembler& a, bool cond,
-                   std::vector<std::string_view> const& blocks)
+                   std::vector<std::string_view> const& blocks, size_t line)
 {
     if (blocks.empty()) {
         throw parse_error("Expected block");
     }
     if (cond) {
-        a.evaluateBlock(blocks[0]);
+        a.evaluateBlock(blocks[0], line);
     } else {
         if (blocks.size() == 3) {
             if (std::any_cast<std::string_view>(blocks[1]) != "else") {
                 throw parse_error("Expected 'else'");
             }
-            a.evaluateBlock(blocks[2]);
+            a.evaluateBlock(blocks[2], line);
         }
     }
 }
@@ -56,44 +54,70 @@ void initMeta(Assembler& a)
 
     resetTranslate();
 
-    a.registerMeta("macro", [&](auto const& text, auto const& blocks) {
-        if (blocks.empty()) {
-            throw parse_error("Expected block");
+    a.registerMeta("test", [&](auto const& text, auto const& blocks) {
+        auto args = a.evaluateList(text);
+        std::string testName;
+
+        for (auto const& v : args) {
+            if (auto* s = any_cast<std::string_view>(&v)) {
+                testName = *s;
+            } else if (auto* n = any_cast<Number>(&v)) {
+                a.testLocation = static_cast<uint32_t>(*n);
+                return;
+            }
         }
-        auto def = a.evaluateDefinition(text);
-        a.defineMacro(def.name, def.args, blocks[0]);
+        if (testName.empty()) {
+            testName = "test";
+        }
+
+        Check(blocks.size() == 1, "Expected block");
+        auto contents = blocks[0];
+        auto res = a.runTest(testName, contents);
+        a.getSymbols().set("tests."s + testName, res);
+        // LOGI("Set %s %x", testName, number<int32_t>(res["A"]));
     });
 
-    a.registerMeta("define", [&](auto const& text, auto const& blocks) {
-        if (blocks.empty()) {
-            throw parse_error("Expected block");
+    a.registerMeta("macro",
+                   [&](auto const& text, auto const& blocks, size_t line) {
+                       Check(blocks.size() == 1, "Expected block");
+                       auto def = a.evaluateDefinition(text, line);
+                       a.defineMacro(def.name, def.args, line, blocks[0]);
+                   });
+
+    a.registerMeta("define",
+                   [&](auto const& text, auto const& blocks, size_t line) {
+                       Check(blocks.size() == 1, "Expected block");
+                       auto def = a.evaluateDefinition(text);
+                       a.addDefine(def.name, def.args, line, blocks[0]);
+                   });
+
+    a.registerMeta("ascii", [&](auto const& args, auto const&) {
+        resetTranslate();
+        for (int i = 0; i < 256; i++) {
+            char_translate[i] = i;
         }
-        auto def = a.evaluateDefinition(text);
-        a.addDefine(def.name, def.args, blocks[0]);
     });
 
     a.registerMeta("chartrans", [&](auto const& args, auto const&) {
         if (args.empty()) {
             resetTranslate();
-        } else {
-            auto list = a.evaluateList(args);
-            std::string text;
-            size_t index = 0;
-            for (auto const& v : list) {
-                if (auto* s = any_cast<std::string_view>(&v)) {
-                    text = *s;
-                    index = 0;
-                } else {
-                    if (text.empty()) {
-                        throw parse_error(
-                            "First argument must be a (non-empty) string");
-                    }
-                    if (index >= text.length()) {
-                        throw parse_error("Arguments exceed string length");
-                    }
-                    auto n = number<uint8_t>(v);
-                    char_translate.at(text[index++]) = n;
-                }
+            return;
+        }
+        auto list = a.evaluateList(args);
+        std::wstring text;
+        size_t index = 0;
+        for (auto const& v : list) {
+            if (auto* s = any_cast<std::string_view>(&v)) {
+                text = utils::utf8_decode(*s);
+                index = 0;
+            } else {
+                Check(!text.empty(),
+                      "First argument must be a (non-empty) string");
+                Check(index < text.length(), "Arguments exceed string length");
+                auto n = number<uint8_t>(v);
+                auto c = text[index++];
+                LOGI("%x %x", n, (uint16_t)c);
+                char_translate[c] = n;
             }
         }
     });
@@ -102,9 +126,10 @@ void initMeta(Assembler& a)
         auto list = a.evaluateList(text);
         for (auto const& v : list) {
             if (auto* s = any_cast<std::string_view>(&v)) {
-                for (auto c : *s) {
-                    c = char_translate.at(c);
-                    mach.writeChar(c);
+                auto ws = utils::utf8_decode(*s);
+                for (auto c : ws) {
+                    auto b = char_translate.at(c);
+                    mach.writeChar(b);
                 }
             } else {
                 throw parse_error("Need text");
@@ -167,7 +192,7 @@ void initMeta(Assembler& a)
             for (size_t i = 0; i < vec->size(); i++) {
                 uint8_t d = (*vec)[i];
                 syms.erase("i");
-                syms.set("i", i);
+                syms.set("i", any_num(i));
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
                     auto res = a.evaluateExpression(b);
@@ -176,22 +201,24 @@ void initMeta(Assembler& a)
                 mach.writeByte(d);
             }
         } else if (auto* sv = any_cast<std::string_view>(&data)) {
-            for (size_t i = 0; i < sv->size(); i++) {
-                char d = (*sv)[i];
+            auto utext = utils::utf8_decode(*sv);
+            for (size_t i = 0; i < utext.size(); i++) {
+                auto d = utext[i];
                 syms.erase("i");
-                syms.set("i", i);
+                syms.set("i", any_num(i));
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
                     auto res = a.evaluateExpression(b);
-                    d = number<uint8_t>(res);
+                    d = number<wchar_t>(res);
                 }
                 mach.writeByte(char_translate.at(d));
             }
         } else {
             auto size = number<size_t>(data);
+            LOGI("Fill %d bytes", size);
             for (size_t i = 0; i < size; i++) {
                 syms.erase("i");
-                syms.set("i", i);
+                syms.set("i", any_num(i));
                 uint8_t d = 0;
                 for (auto const& b : blocks) {
                     a.getSymbols().at<Number>("v") = d;
@@ -228,15 +255,6 @@ void initMeta(Assembler& a)
         a.getSymbols().set(name, result);
     });
 
-    // TODO: Redundant, use fill
-    a.registerMeta("block", [&](auto const& text, auto const&) {
-        std::any data = a.evaluateExpression(text);
-        auto const& vec = any_cast<std::vector<uint8_t>>(data);
-        for (auto d : vec) {
-            mach.writeByte(d);
-        }
-    });
-
     a.registerMeta("org", [&](auto const& text, auto const&) {
         auto org = number<int32_t>(a.evaluateExpression(text));
         mach.addSection("", org);
@@ -266,59 +284,128 @@ void initMeta(Assembler& a)
         mach.getCurrentSection().pc += sz;
     });
 
+    a.registerMeta("log",
+                   [&](auto const& text, auto const&) { a.addLog(text); });
+    a.registerMeta("check",
+                   [&](auto const& text, auto const&) { a.addCheck(text); });
+
     a.registerMeta("print", [&](auto const& text, auto const&) {
         if (!a.isFinalPass()) return;
         auto args = a.evaluateList(text);
         for (auto const& arg : args) {
-            if (auto* l = any_cast<Number>(&arg)) {
-                fmt::print("{}", *l);
-            } else if (auto* s = any_cast<std::string_view>(&arg)) {
-                fmt::print("{}", *s);
-            } else if (auto* v = any_cast<std::vector<uint8_t>>(&arg)) {
-                for (auto const& item : *v) {
-                    fmt::print("{:02x} ", item);
-                }
-            }
+            printArg(arg);
         }
         fmt::print("\n");
     });
 
-    a.registerMeta("section", [&](auto const& text, auto const&) {
-        a.getSymbols().set("NO_STORE", static_cast<Number>(0x100000000));
-        a.getSymbols().set("TO_PRG", static_cast<Number>(0x200000000));
-        a.getSymbols().set("RO", static_cast<Number>(0x400000000));
+    a.registerMeta("section", [&](auto const& text, auto const& blocks) {
+        auto& syms = a.getSymbols();
+        syms.set("NO_STORE", num(0x100000000));
+        syms.set("TO_PRG", num(0x200000000));
+        syms.set("RO", num(0x400000000));
         auto args = a.evaluateList(text);
+
+        int32_t start = -1;
+        std::string name;
+        std::string in;
+        int32_t pc = -1;
+        int32_t flags = 0;
+        int32_t size = -1;
+        int i = 0;
+
         if (args.empty()) {
             throw parse_error("Too few arguments");
         }
-        auto name = any_cast<std::string_view>(args[0]);
-        uint16_t start = 0;
-        if (args.size() == 1) {
-            mach.setSection(std::string(name));
+        for (auto const& arg : args) {
+            if (auto* p =
+                    any_cast<std::pair<std::string_view, std::any>>(&arg)) {
+                if (p->first == "start") {
+                    start = number<int32_t>(p->second);
+                } else if (p->first == "size") {
+                    size = number<int32_t>(p->second);
+                } else if (p->first == "in") {
+                    in = any_cast<std::string_view>(p->second);
+                }
+            } else {
+                if (i == 0) {
+                    name = any_cast<std::string_view>(arg);
+                } else if (i == 1) {
+                    start = number<uint32_t>(arg);
+                } else if (i == 2) {
+                    auto res = number<uint64_t>(arg);
+                    if (res >= 0x100000000) {
+                        flags = res >> 32;
+                    } else {
+                        pc = static_cast<uint32_t>(res);
+                    }
+                }
+                i++;
+            }
+        }
+
+        // if (pc == -1) {
+        //    pc = start;
+        //}
+        if (name.empty()) {
+            name = "__anon" + std::to_string(mach.getPC());
+        }
+
+        auto lastSection = mach.getCurrentSection().name;
+
+        // Create child section
+        if (!in.empty()) {
+            auto& parent = mach.getSection(in);
+            Check(parent.data.empty(), "Parent section must contain no data");
+            auto& s = mach.addSection(name, in);
+            s.flags = flags;
+            s.flags = (s.flags & ~SectionFlags::ReadOnly) |
+                      (parent.flags & SectionFlags::ReadOnly);
+
+            if (s.start == -1) {
+                if (start == -1) {
+                    s.start = parent.pc;
+                } else {
+                    s.start = start;
+                    s.flags |= SectionFlags::FixedStart;
+                }
+            }
+
+            if (s.pc == -1) {
+                if (pc == -1) pc = s.start;
+                s.pc = pc;
+            }
+
+            if (size != -1) {
+                s.size = size;
+                s.flags |= SectionFlags::FixedSize;
+            }
+
+            if (!blocks.empty()) {
+                a.evaluateBlock(blocks[0]);
+                parent.pc = s.pc;
+                mach.setSection(lastSection);
+            }
             return;
         }
 
-        if (args.size() > 1) {
-            start = number<uint16_t>(args[1]);
-        }
-        // LOGI("Section %s at %x", name, start);
-        uint16_t pc = start;
-        int32_t flags = 0;
-        if (args.size() > 2) {
-            auto res = number<uint64_t>(args[2]);
-            if (res >= 0x100000000) {
-                flags = res >> 32;
-            } else {
-                pc = static_cast<uint16_t>(res);
-            }
-        }
+        // Add and set root section
+        Check(start != -1, "Must have start");
         auto& s = mach.addSection(std::string(name), start);
-        s.pc = pc;
         s.flags = flags;
+        s.start = start;
+        s.flags |= SectionFlags::FixedStart;
+
+        if (pc == -1) pc = s.start;
+
+        s.pc = pc;
+        if (size != -1) {
+            s.size = size;
+            s.flags |= SectionFlags::FixedSize;
+        }
     });
 
     a.registerMeta("script", [&](auto const& text, auto const&) {
-        if(a.isFirstPass()) {
+        if (a.isFirstPass()) {
             auto args = a.evaluateList(text);
             Check(args.size() == 1, "Incorrect number of arguments");
             auto name = any_cast<std::string_view>(args[0]);
@@ -334,8 +421,9 @@ void initMeta(Assembler& a)
         auto args = a.evaluateList(text);
         Check(args.size() == 1, "Incorrect number of arguments");
         auto name = any_cast<std::string_view>(args[0]);
-        auto source = a.includeFile(name);
-        a.evaluateBlock(source, name);
+        auto p = a.evaluatePath(name);
+        auto source = a.includeFile(p.string());
+        a.evaluateBlock(source, p.string());
     });
 
     a.registerMeta("incbin", [&](auto const& text, auto const&) {
@@ -352,54 +440,56 @@ void initMeta(Assembler& a)
         }
     });
 
-    a.registerMeta("rept", [&](auto const& text, auto const& blocks) {
-        if (blocks.empty()) {
-            throw parse_error("Expected block");
-        }
+    a.registerMeta("rept",
+                   [&](auto const& text, auto const& blocks, size_t line) {
+                       Check(blocks.size() == 1, "Expected block");
 
-        std::any data;
-        std::string indexVar = "i";
-        auto parts = utils::split(std::string(text), ',');
-        if (parts.size() == 2) {
-            indexVar = utils::lrstrip(parts[0]);
-            data = a.evaluateExpression(parts[1]);
-        } else {
-            data = a.evaluateExpression(text);
-        }
-        auto* vec = any_cast<std::vector<uint8_t>>(&data);
-        size_t count = vec ? vec->size() : number<size_t>(data);
+                       std::any data;
+                       std::string indexVar = "i";
+                       auto parts = utils::split(std::string(text), ',');
+                       if (parts.size() == 2) {
+                           indexVar = utils::lrstrip(parts[0]);
+                           data = a.evaluateExpression(parts[1]);
+                       } else {
+                           data = a.evaluateExpression(text);
+                       }
+                       auto* vec = any_cast<std::vector<uint8_t>>(&data);
+                       size_t count = vec ? vec->size() : number<size_t>(data);
 
-        for (size_t i = 0; i < count; i++) {
-            a.getSymbols().erase(indexVar);
-            a.getSymbols().set(indexVar, any_num(i));
-            if (vec) {
-                a.getSymbols().erase("v");
-                a.getSymbols().set("v", any_num((*vec)[i]));
-            }
-            a.evaluateBlock(blocks[0]);
-        }
-    });
+                       for (size_t i = 0; i < count; i++) {
+                           a.getSymbols().erase(indexVar);
+                           a.getSymbols().set(indexVar, any_num(i));
+                           if (vec) {
+                               a.getSymbols().erase("v");
+                               a.getSymbols().set("v", any_num((*vec)[i]));
+                           }
+                           // localLabel = prefix + std::to_string(i);
+                           a.evaluateBlock(blocks[0], line);
+                       }
+                   });
 
     a.registerMeta("if", [&](auto const& text,
-                             std::vector<std::string_view> const& blocks) {
-        evalIf(a, any_cast<Number>(a.evaluateExpression(text)) != 0, blocks);
+                             std::vector<std::string_view> const& blocks,
+                             size_t line) {
+        evalIf(a, any_cast<Number>(a.evaluateExpression(text)) != 0, blocks,
+               line);
     });
 
     a.registerMeta("ifdef", [&](auto const& text,
-                                std::vector<std::string_view> const& blocks) {
+                                std::vector<std::string_view> const& blocks,
+                                size_t line) {
         auto rc = a.getSymbols().is_defined(text);
-        evalIf(a, rc, blocks);
+        evalIf(a, rc, blocks, line);
     });
 
-    a.registerMeta("ifndef", [&](auto const& text, auto const& blocks) {
-        auto rc = a.getSymbols().is_defined(text);
-        evalIf(a, !rc, blocks);
-    });
+    a.registerMeta("ifndef",
+                   [&](auto const& text, auto const& blocks, size_t line) {
+                       auto rc = a.getSymbols().is_defined(text);
+                       evalIf(a, !rc, blocks, line);
+                   });
 
     a.registerMeta("enum", [&](auto const& text, auto const& blocks) {
-        if (blocks.empty()) {
-            throw parse_error("Expected block");
-        }
+        Check(!blocks.empty(), "Expected block");
         auto s = a.evaluateEnum(blocks[0]);
         if (text.empty()) {
             for (auto const& [name, v] : s) {

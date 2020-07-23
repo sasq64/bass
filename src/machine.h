@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "wrap.h"
 
 #include <cstdint>
 #include <deque>
@@ -27,13 +28,6 @@ template <class POLICY>
 struct Machine;
 } // namespace sixfive
 
-enum SectionFlags
-{
-    NoStorage = 1,
-    WriteToDisk = 2,
-    ReadOnly = 4
-};
-
 enum class AsmResult
 {
     Ok,
@@ -43,14 +37,31 @@ enum class AsmResult
     Failed
 };
 
+enum SectionFlags
+{
+    NoStorage = 1, // May not contain data (non leaf)
+    WriteToDisk = 2,
+    ReadOnly = 4,
+    KeepFirst = 8,   // Keep first even if new First section is added
+    KeepLast = 16,   // Keep last when new sections are added
+    FixedStart = 32, // Section may not moved (specified with Start)
+    FixedSize = 64   // Specified with size
+};
+
 struct Section
 {
-    Section(std::string const& n, uint16_t s) : name(n), start(s), pc(s) {}
+    Section() = default;
+    Section(std::string const& n, uint32_t s) : name(n), start(s), pc(s) {}
+
     std::string name;
-    uint32_t start = 0;
-    uint32_t pc = 0;
+    std::string parent;
+    std::vector<std::string> children;
+    int32_t start = -1;
+    int32_t pc = -1;
+    int32_t size = -1;
     uint32_t flags{};
     std::vector<uint8_t> data;
+    bool valid{true};
 };
 
 enum class OutFmt
@@ -59,23 +70,30 @@ enum class OutFmt
     Raw
 };
 
-using Tuple6 = std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>;
+using Tuple6 =
+    std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>;
 
 class Machine
 {
 public:
-
     Machine();
     ~Machine();
 
     void clear();
 
+    int32_t layoutSection(int32_t start, Section& s);
+    bool layoutSections();
+    Error checkOverlap();
+
     uint32_t writeByte(uint8_t b);
     uint32_t writeChar(uint8_t b);
     AsmResult assemble(Instruction const& instr);
-    Section& addSection(std::string const& name, uint32_t start);
-    void setSection(std::string const& name);
-    Section const& getSection(std::string const& name) const;
+    Section& addSection(std::string const& name, int32_t start);
+    Section& addSection(std::string const& name,
+                        std::string const& parent = "");
+    void removeSection(std::string const& name);
+    Section& setSection(std::string const& name);
+    Section& getSection(std::string const& name);
     Section& getCurrentSection();
     std::deque<Section> const& getSections() const { return sections; }
     uint32_t getPC() const;
@@ -87,7 +105,6 @@ public:
 
     uint32_t run(uint16_t pc);
     std::vector<uint8_t> getRam();
-
 
     Tuple6 getRegs() const;
     void setRegs(Tuple6 const& regs);
@@ -116,4 +133,6 @@ private:
     std::deque<Section> sections;
     Section* currentSection = nullptr;
     FILE* fp = nullptr;
+
+    bool layoutOk{false};
 };

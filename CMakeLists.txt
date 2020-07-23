@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(WIN32)
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_USE_MATH_DEFINES)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_USE_MATH_DEFINES -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
     set(WARN_EXT /W2)
 else()
     set(THREAD_LIB pthread)
@@ -15,8 +15,8 @@ endif()
 # Warning level setup #######################################################
 
 # GCC/Clang common warnings
-set(GCC_CLANG_WARNINGS -Wno-unused-parameter -Wno-unused-variable -Werror
-        -Wall -Wextra -Wnon-virtual-dtor -pedantic)
+set(GCC_CLANG_WARNINGS -Werror -Wall -Wextra -Wnon-virtual-dtor -pedantic
+    -Wno-unused-variable -Wno-unused-parameter)
 
 set(MSVC_WARNINGS /W3)
 
@@ -52,6 +52,9 @@ add_library(lodepng STATIC external/lodepng/lodepng)
 target_include_directories(lodepng PUBLIC external/lodepng)
 target_compile_options(lodepng PRIVATE ${WARN_EXT})
 
+add_library(catch INTERFACE)
+target_include_directories(catch INTERFACE external)
+
 add_library(badlib STATIC
     src/assembler.cpp src/grammar.cpp src/functions.cpp
     src/machine.cpp src/wrap.cpp src/meta.cpp
@@ -64,17 +67,21 @@ target_link_libraries(badlib PUBLIC coreutils
         PRIVATE lua lodepng fmt ${THREAD_LIB} PUBLIC sol2::sol2 )
 
 if(FUZZ)
-    add_executable(bazz fuzz.cpp)
+    add_executable(bazz src/fuzz.cpp)
     target_link_libraries(bazz PRIVATE badlib)
 else()
-    add_executable(bass main.cpp)
+    add_executable(bass src/main.cpp)
     target_link_libraries(bass PRIVATE badlib CLI11::CLI11)
 
-    add_executable(symtest testmain.cpp symtest.cpp)
-    target_include_directories(symtest PRIVATE src)
-    target_link_libraries(symtest PRIVATE coreutils fmt)
+    add_executable(sectiontest src/testmain.cpp src/sectiontest.cpp src/machine.cpp)
+    target_include_directories(sectiontest PRIVATE src)
+    target_link_libraries(sectiontest PRIVATE catch coreutils fmt)
 
-    add_executable(tester testmain.cpp asmtest.cpp)
-    target_link_libraries(tester PRIVATE fmt badlib)
+    add_executable(symtest src/testmain.cpp src/symtest.cpp)
+    target_include_directories(symtest PRIVATE src)
+    target_link_libraries(symtest PRIVATE catch coreutils fmt)
+
+    add_executable(tester src/testmain.cpp src/asmtest.cpp)
+    target_link_libraries(tester PRIVATE catch fmt badlib)
 
 endif(FUZZ)

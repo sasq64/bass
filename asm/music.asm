@@ -1,5 +1,7 @@
 
-    !section "text", $880 ; section.main.end
+    !section "text", $880
+
+    !script "../lua/sid.lua"
 
     data = load("../data/test.sid")
     sid = sid_parse(data)
@@ -11,32 +13,34 @@
     sta $400+xpos+ypos*40,x
     dex
     bpl .l
-    !section "text"
+    !section in="text" {
 .text:
     !fill txt
 .text_end:
-    !section "main"
+    }
 }
 
     !section "main", $801
 
-    !byte $0b, $08,$01,$00,$9e,$32,$30,$36,$31,$00,$00,$00
-start
+    !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
+start:
     lda #0
     sta $d020
     sta $d021
     jsr $e544
-    lda #23
-    sta $d018
+    ;lda #23
+    ;sta $d018
     sei
 
-    print("Playing SID", 1, 1)
-    print(sid.title, 1, 2)
-    print(sid.composer, 1, 3)
+    !chartrans "♥*", 0x53,0x51
+
+    print("* playing * sid ♥", 1, 1)
+    print(to_lower(sid.title), 1, 2)
+    print(to_lower(sid.composer), 1, 3)
 
     lda #0
     jsr sid.init
-.loop
+$
     lda $d012
     cmp #130
     bne .loop
@@ -45,7 +49,7 @@ start
     jsr sid.play
     lda #0
     sta $d020
-    jmp .loop
+    jmp -
 
     !section "music", sid.load
 music:

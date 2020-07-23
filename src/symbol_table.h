@@ -11,7 +11,6 @@
 #include <vector>
 
 #include <cassert>
-#define Assert assert
 
 using AnyMap = std::unordered_map<std::string, std::any>;
 
@@ -28,13 +27,22 @@ private:
 // SymbolTable for use in DSL. Remembers undefined references
 // and value changes. Handles dot notation.
 // Setting specific type checks if value changed
-//
+
+struct Symbol
+{
+    std::any value;
+    bool accessed;
+};
+
 struct SymbolTable
 {
-    std::unordered_map<std::string, std::any> syms;
-    std::unordered_map<std::string, int> undefined;
+    std::unordered_map<std::string, Symbol> syms;
+    std::unordered_set<std::string> undefined;
     std::unordered_set<std::string> accessed;
     bool trace = false;
+    bool undef_ok = true;
+
+    void acceptUndefined(bool ok) { undef_ok = ok; }
 
     bool is_defined(std::string_view name) const
     {
@@ -54,13 +62,13 @@ struct SymbolTable
         }
     }
 
-    void set(std::string_view name, std::any const& val, int line = -1)
+    void set(std::string_view name, std::any const& val)
     {
         auto s = std::string(name);
         if (val.type() == typeid(AnyMap{})) {
-            set(name, std::any_cast<AnyMap>(val), line);
+            set(name, std::any_cast<AnyMap>(val));
         } else if (val.type() == typeid(double)) {
-            set(name, std::any_cast<double>(val), line);
+            set(name, std::any_cast<double>(val));
         } else {
             if (accessed.count(s) > 0) {
                 throw sym_error(
@@ -70,14 +78,13 @@ struct SymbolTable
             if (trace && undefined.find(s) != undefined.end()) {
                 fmt::print("Defined {}\n", s);
             }
-            syms[s] = val;
+            syms[s].value = val;
         }
     }
 
     template <typename T>
-    void set(std::string_view name, T const& val, int line = -1)
+    void set(std::string_view name, T const& val)
     {
-        (void)line;
         auto s = std::string(name);
         if constexpr (std::is_same_v<T, AnyMap>) {
             set_sym(s, static_cast<AnyMap>(val));
@@ -87,31 +94,32 @@ struct SymbolTable
                 LOGD("%s has been accessed", s);
                 auto it = syms.find(s);
                 if (it != syms.end()) {
-                    if (std::any_cast<T>(it->second) != val) {
-                        LOGD("Redefined '%s' in %d", s, line);
+                    if (std::any_cast<T>(it->second.value) != val) {
                         if (trace) {
                             if constexpr (std::is_arithmetic_v<T>) {
-                                fmt::print("Redefined {} in line {} from ${:x} "
-                                           "to ${:x}\n",
-                                           s, line,
-                                           std::any_cast<T>(it->second), val);
+                                fmt::print(
+                                    "Redefined {} from {} "
+                                    "to {}\n",
+                                    s, std::any_cast<double>(it->second.value),
+                                    val);
                             } else {
-                                fmt::print("Redefined {} in line {}\n", s,
-                                           line);
+                                fmt::print("Redefined {} \n", s);
                             }
                         }
-                        undefined.insert({s, line});
+                        undefined.insert(s);
                     }
                 } else {
                     if (trace) {
-                        fmt::print("Defined {} in line {}\n", s, line);
+                        fmt::print("Defined {}\n", s);
                     }
                 }
             }
-            syms[s] = std::any(val);
+            syms[s].value = std::any(val);
         }
     }
 
+    // Return a map containg all symbols beginning with
+    // name.
     AnyMap collect(std::string const& name) const
     {
         AnyMap s;
@@ -119,12 +127,11 @@ struct SymbolTable
             auto dot = p.first.find('.');
             if (dot != std::string::npos) {
                 auto prefix = p.first.substr(0, dot);
-                LOGD("Checking %s vs %s", prefix, name);
                 if (prefix == name) {
                     // rest = one.x
                     auto rest = p.first.substr(dot + 1);
                     // Can never be undefined
-                    s[rest] = syms.at(p.first);
+                    s[rest] = syms.at(p.first).value;
                 }
             }
         }
@@ -132,32 +139,38 @@ struct SymbolTable
     }
 
     template <typename T = std::any>
-    T get(std::string_view name, int line = -1)
+    T& get(std::string_view name)
     {
+        static T empty;
+        static std::any zero(0.0);
+        static AnyMap cres;
         accessed.insert(std::string(name));
         if constexpr (std::is_same_v<T, AnyMap>) {
             auto s = std::string(name);
-            auto res = collect(s);
-            return res;
+            cres = collect(s);
+            return cres;
         }
         auto s = std::string(name);
         auto it = syms.find(s);
         if (it == syms.end()) {
+            if (!undef_ok) {
+                throw sym_error("Undefined:" + std::string(name));
+            }
             LOGD("%s is undefined", name);
             if (trace) {
-                fmt::print("Access undefined '{}' in line {}\n", name, line);
+                fmt::print("Access undefined '{}'\n", name);
             }
-            undefined.insert({s, line});
+            undefined.insert(s);
             if constexpr (std::is_same_v<T, std::any>) {
-                return std::any(static_cast<double>(0));
+                return zero;
             }
             LOGD("Returning default (%s)", typeid(T{}).name());
-            return T{};
+            return empty;
         }
         if constexpr (std::is_same_v<T, std::any>) {
-            return it->second;
+            return it->second.value;
         }
-        return std::any_cast<T>(it->second);
+        return *std::any_cast<T>(&it->second.value);
     }
 
     template <typename T>
@@ -209,7 +222,7 @@ struct SymbolTable
     bool ok() const
     {
         for (auto const& u : undefined) {
-            if (syms.find(u.first) == syms.end()) return false;
+            if (syms.find(u) == syms.end()) return false;
         }
         return true;
     }
@@ -222,13 +235,16 @@ struct SymbolTable
 
     bool done() const { return undefined.empty(); }
 
-    std::unordered_map<std::string, int> const& get_undefined() const
+    std::unordered_set<std::string> const& get_undefined() const
     {
         return undefined;
     }
 
     void clear()
     {
+        for (auto& s : syms) {
+            s.second.accessed = false;
+        }
         accessed.clear();
         undefined.clear();
     }

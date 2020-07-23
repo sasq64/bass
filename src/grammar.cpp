@@ -10,12 +10,12 @@ RootEnum <- ':e:' EnumBlock
 Program <- ((_? WholeLineComment? EOL) / (Line (EOL / &EOT)))*
 Line <- (Script / AssignLine / OpLine / ~Label) _? LineComment?
 AssignLine <- _? ('*' / Assignee) _? '=' (String / Expression)
-Assignee <- DotSymbol _?
+Assignee <- AsmSymbol _?
 
 Script <- '%{' ScriptContents '}%'
 ScriptContents <- (!'}%' .)* 
 
-OpLine <- ~Label? _? (MacroCall / Test / Meta / Instruction)
+OpLine <- ~Label? _? (MacroCall / Meta / Instruction)
 
 Instruction <- Opcode Arg?
 MacroCall <- Call
@@ -23,9 +23,6 @@ MacroCall <- Call
 Meta <- MetaName _  MetaText Block? (_ Symbol _ Block)*
 MetaText <- (!(EOL / '}' / '{' / LineComment) .)*
 MetaName <- '!' Symbol
-
-Test <- "!test" _ TestName _ Block
-TestName <- Symbol
 
 FnDef <- FnName '(' FnArgs ')'
 FnName <- Symbol
@@ -37,9 +34,10 @@ BlockContents <- SkipProgram
 
 SkipProgram <- (SkipLine EOL)* SkipLine?
 SkipLine <- SkipLabel? _? (SkipMeta / SkipInstruction)? _? LineComment?
-SkipLabel <- (_? DotSymbol ':') / (DotSymbol (_ / &EOL))
+SkipLabel <- (_? SkipAsmSymbol ':') / (SkipAsmSymbol (_ / &EOL))
 SkipInstruction <- (!(LineComment / EOL / '}') .)*
 SkipMeta <- MetaName _  (!(EOL / '}' / '{') .)* Block? (_ Symbol _ Block)*
+SkipAsmSymbol <- LabelChar / ( ([._A-Za-z] [_A-Za-z0-9]*) ('[' !']'* ']')? )
 
 String <- _ ["] StringContents ["] _
 StringContents <- (!["] .)*
@@ -47,7 +45,7 @@ StringContents <- (!["] .)*
 EnumBlock <- ((_? LineComment? EOL) / (EnumLine (EOL / &EOT)))*
 EnumLine <- _? Symbol (_ '=' (String / Expression))? _? LineComment?
 
-Label <- (_? DotSymbol ':') / (DotSymbol (_ / &EOL))
+Label <- (_? AsmSymbol ':') / (AsmSymbol (_ / &EOL))
 
 Arg <- _ (LabelRef / Acc / Imm / IndY / IndX / Ind / AbsX / AbsY / Abs)
 
@@ -73,9 +71,10 @@ Opcode <- Symbol
 HexNum <- ('$' / '0x') [0-9a-fA-F]+
 Octal <- '0o' [0-7]+
 Binary <- '0b' [01]+
+Char <- '\'' . '\''
 Decimal <- ([0-9]+ '.')? [0-9]+
 Multi <- '0m' [0-3]+
-Number <-  HexNum / Binary / Octal / Multi / Decimal
+Number <-  HexNum / Binary / Octal / Multi / Decimal / Char
 
 LineComment <- ';' (!EOL .)* &EOL
 WholeLineComment <- (';' / '#') (!EOL .)* &EOL
@@ -83,7 +82,8 @@ WholeLineComment <- (';' / '#') (!EOL .)* &EOL
 ~_ <- [ \t]*
 
 Symbol <- [_A-Za-z] [_A-Za-z0-9]*
-DotSymbol <- LabelChar / ([._A-Za-z] [_A-Za-z0-9]*)
+DotSymbol <- ([._A-Za-z] [_A-Za-z0-9]*)
+AsmSymbol <- LabelChar / ( DotSymbol ('[' Expression ']')? )
 
 LabelChar <- '-' / '+' / '$'
 
@@ -93,6 +93,7 @@ EOT <- !.
 
 Expression  <- Atom (Operator Atom)* {
                          precedence
+                           L :
                            L &&
                            L ||
                            L |
@@ -124,11 +125,12 @@ FnCall <- Call
 Call <- CallName '(' CallArgs ')'
 CallName <- Symbol
 CallArgs <- (CallArg (',' CallArg)*)?
-CallArg <- String / Expression
+CallArg <- (Symbol _? '=' !'=')? (String / Expression)
 Operator <-  
         '&&' / '||' / '<<' / '>>' / '==' / '!=' /
         '+' / '-' / '*' / '/' / '%' / '\\' /
         '|' / '^' / '&' / '<' / '>'
+
 Variable <- '.'? (Symbol '.')* Symbol
 
 )";

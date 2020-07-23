@@ -19,24 +19,26 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
         mach.setBreakFunction(what, fn);
     };
 
-    lua["map_bank_write"] = [&](int what, int len,
-                                std::function<void(uint16_t, uint8_t)> const& fn) {
-        mach.setBankWrite(what, len, fn);
-    };
-    lua["map_bank_read"] = [&](int what, int len, std::function<uint8_t(uint16_t)> const& fn) {
+    lua["map_bank_write"] =
+        [&](int what, int len,
+            std::function<void(uint16_t, uint8_t)> const& fn) {
+            mach.setBankWrite(what, len, fn);
+        };
+    lua["map_bank_read"] = [&](int what, int len,
+                               std::function<uint8_t(uint16_t)> const& fn) {
         mach.setBankRead(what, len, fn);
     };
 
     lua["reg_a"] = [&]() {
-        auto const& [a,x,y,sr,sp,pc] = mach.getRegs();
+        auto const& [a, x, y, sr, sp, pc] = mach.getRegs();
         return a;
     };
     lua["reg_x"] = [&]() {
-        auto const& [a,x,y,sr,sp,pc] = mach.getRegs();
+        auto const& [a, x, y, sr, sp, pc] = mach.getRegs();
         return x;
     };
     lua["reg_y"] = [&]() {
-        auto const& [a,x,y,sr,sp,pc] = mach.getRegs();
+        auto const& [a, x, y, sr, sp, pc] = mach.getRegs();
         return y;
     };
     lua["set_x"] = [&](int x) {
