@@ -104,27 +104,27 @@ public:
 
     basic_bitmap(uint32_t width, uint32_t height) : w(width), h(height)
     {
-        pixels = std::shared_ptr<T[]>(new T[width * height]);
+        pixels = std::shared_ptr<T>(new T[width * height], std::default_delete<T[]>());
     }
 
     basic_bitmap(uint32_t width, uint32_t height, const std::vector<T>& data)
         : w(width), h(height)
     {
-        pixels = std::shared_ptr<T[]>(new T[width * height]);
+        pixels = std::shared_ptr<T>(new T[width * height], std::default_delete<T[]>());
         memcpy(&(*pixels)[0], &data[0], sizeof(T) * width * height);
     }
 
     basic_bitmap(uint32_t width, uint32_t height, const T& color)
         : w(width), h(height)
     {
-        pixels = std::shared_ptr<T[]>(new T[width * height]);
+        pixels = std::shared_ptr<T>(new T[width * height], std::default_delete<T[]>());
         std::fill(pixels->begin(), pixels->end(), color);
     }
 
     basic_bitmap(uint32_t width, uint32_t height, const T* px)
         : w(width), h(height)
     {
-        pixels = std::shared_ptr<T[]>(new T[width * height]);
+        pixels = std::shared_ptr<T>(new T[width * height], std::default_delete<T[]>());
         memcpy(pixels.get(), px, sizeof(T) * width * height);
     }
 
@@ -149,9 +149,9 @@ public:
 
     basic_bitmap clone() { return basic_bitmap(w, h, pixels.get()); }
 
-    T& operator[](const int64_t& i) { return pixels[i]; }
+    T& operator[](const int64_t& i) { return pixels.get()[i]; }
 
-    T operator[](const int64_t& i) const { return pixels[i]; }
+    T operator[](const int64_t& i) const { return pixels.get()[i]; }
 
     // typename T[]::iterator begin() { return begin(pixels); };
 
@@ -208,7 +208,7 @@ public:
     }
 
 private:
-    std::shared_ptr<T[]> pixels;
+    std::shared_ptr<T> pixels;
     uint32_t w;
     uint32_t h;
 };
