@@ -402,6 +402,10 @@ void initMeta(Assembler& a)
             s.size = size;
             s.flags |= SectionFlags::FixedSize;
         }
+        if (!blocks.empty()) {
+            a.evaluateBlock(blocks[0]);
+            mach.setSection(lastSection);
+        }
     });
 
     a.registerMeta("script", [&](auto const& text, auto const&) {
