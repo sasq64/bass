@@ -2,7 +2,7 @@
 #include <cmath>
 #include <coreutils/file.h>
 
-static uint8_t translate(uint8_t c)
+static uint8_t to_pet(uint8_t c)
 {
     if (c >= 'a' && c <= 'z') return c - 'a' + 1;
     if (c >= 'A' && c <= 'Z') return c - 'A' + 0x41;
@@ -70,7 +70,7 @@ void initFunctions(Assembler& a)
         std::vector<uint8_t> res;
         res.reserve(data.size());
         for (auto d : data) {
-            res.push_back(translate(d));
+            res.push_back(to_pet(d));
         }
         return res;
     });
@@ -88,6 +88,14 @@ void initFunctions(Assembler& a)
             res.push_back(number<uint8_t>(a));
         }
         return res;
+    });
+
+    a.registerFunction("to_upper", [](std::string_view sv) {
+      auto s = std::string(sv);
+      for (auto& c : s) {
+          c = toupper(c);
+      }
+      return persist(s);
     });
 
     a.registerFunction("to_lower", [](std::string_view sv) {
