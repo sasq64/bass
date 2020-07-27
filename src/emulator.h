@@ -162,6 +162,7 @@ struct Machine
     {
         while (len > 0) {
             rcallbacks[bank] = cb;  // NOLINT
+            LOGI("Mapping bank %x", bank);
             rcbdata[bank++] = data; // NOLINT
             len--;
         }

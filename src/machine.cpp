@@ -306,11 +306,11 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
         auto offset = section.start;
         auto adr = section.start & 0xffff;
-        auto bank = section.start >> 16;
+        auto hi_adr = section.start >> 16;
 
-        if (bank > 0) {
+        if (hi_adr > 0) {
             if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) {
-                offset = bank * 8192 + adr;
+                offset = hi_adr * 8192 + adr;
             } else {
                 throw machine_error("Illegal address");
             }
@@ -472,11 +472,25 @@ void Machine::setBankWrite(int bank, int len,
     machine->mapWriteCallback(bank, len, this, bankWriteFunction);
 }
 
-void Machine::setBankRead(int bank, int len,
+void Machine::setBankRead(int hi_adr, int len,
                           std::function<uint8_t(uint16_t)> const& fn)
 {
-    bank_read_functions[bank] = fn;
-    machine->mapReadCallback(bank, len, this, bankReadFunction);
+    bank_read_functions[hi_adr] = fn;
+    machine->mapReadCallback(hi_adr, len, this, bankReadFunction);
+}
+
+void Machine::setBankRead(int hi_adr, int len, int bank)
+{
+    Section const* bankSection = nullptr;
+    int32_t adr = (bank << 16) | (hi_adr << 8);
+    for (auto const& section : sections) {
+        if (section.start == adr) {
+            bankSection = &section;
+            break;
+        }
+    }
+    Check(bankSection != nullptr, "Could not map bank");
+    machine->mapRom(hi_adr, bankSection->data.data(), len);
 }
 
 std::vector<uint8_t> Machine::getRam()

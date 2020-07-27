@@ -118,6 +118,7 @@ public:
                       std::function<void(uint16_t, uint8_t)> const& fn);
     void setBankRead(int bank, int len,
                      std::function<uint8_t(uint16_t)> const& fn);
+    void setBankRead(int hi_adr, int len, int bank);
 
 private:
     bool inData = false;

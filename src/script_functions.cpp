@@ -20,14 +20,18 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
     };
 
     lua["map_bank_write"] =
-        [&](int what, int len,
+        [&](int hi_adr, int len,
             std::function<void(uint16_t, uint8_t)> const& fn) {
-            mach.setBankWrite(what, len, fn);
+            mach.setBankWrite(hi_adr, len, fn);
         };
-    lua["map_bank_read"] = [&](int what, int len,
-                               std::function<uint8_t(uint16_t)> const& fn) {
-        mach.setBankRead(what, len, fn);
-    };
+    lua["map_bank_read"] = sol::overload(
+        [&](int hi_adr, int len, std::function<uint8_t(uint16_t)> const& fn) {
+            mach.setBankRead(hi_adr, len, fn);
+        },
+        [&](int hi_adr, int len, int bank) {
+            mach.setBankRead(hi_adr, len, bank);
+        }
+    );
 
     lua["reg_a"] = [&]() {
         auto const& [a, x, y, sr, sp, pc] = mach.getRegs();
