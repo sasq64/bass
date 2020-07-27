@@ -128,6 +128,7 @@ CallArgs <- (CallArg (',' CallArg)*)?
 CallArg <- (Symbol _? '=' !'=')? (String / Expression)
 Operator <-  
         '&&' / '||' / '<<' / '>>' / '==' / '!=' /
+        '>=' / '<=' /
         '+' / '-' / '*' / '/' / '%' / '\\' /
         '|' / '^' / '&' / '<' / '>'
 
