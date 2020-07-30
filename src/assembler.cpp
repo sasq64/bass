@@ -15,7 +15,7 @@
 #include <string_view>
 #include <unordered_set>
 
-extern const char* grammar6502;
+extern char const * grammar6502;
 
 using sixfive::AddressingMode;
 
@@ -201,8 +201,9 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 
     auto saved = save();
 
-    mach->pushSection();
-    auto testSection = mach->addSection("__test", testLocation);
+    auto& testSection = mach->section("__test");
+    testSection.setStart(testLocation).setPC(testLocation);
+    mach->pushSection("__test");
 
     auto start = mach->getPC();
     LOGD("Testing at %x", start);
@@ -210,8 +211,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     syms.acceptUndefined(true);
     while (true) {
         syms.clear();
-        mach->getCurrentSection() = testSection;
-        testSection.pc = testSection.start;
+        testSection.setStart(testLocation).setPC(testLocation);
         testSection.data.clear();
         lastLabel = "__test_" + std::to_string(start);
         if (!parser.parse(contents, fileName)) {
@@ -234,6 +234,8 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     }
     fmt::print("*** Test {} : {} cycles\n", name, cycles);
 
+    mach->popSection();
+
     mach->removeSection("__test");
 
     auto [a, x, y, sr, sp, pc] = mach->getRegs();
@@ -243,7 +245,6 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
                   {"SP", num(sp)},         {"PC", num(pc)},
                   {"cycles", num(cycles)}, {"ram", mach->getRam()}};
 
-    mach->popSection();
     restore(saved);
 
     return res;

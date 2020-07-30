@@ -158,6 +158,8 @@ TEST_CASE("assembler.sections", "[assembler]")
     }
     REQUIRE(errs.empty());
     REQUIRE(syms.get<Number>("hello") == 0x0801 + 5);
+    ass.getMachine().write("_test.prg", OutFmt::Prg);
+    ass.getMachine().write("_test.crt", OutFmt::EasyFlash);
 }
 
 TEST_CASE("assembler.sections2", "[assembler]")
@@ -215,58 +217,6 @@ TEST_CASE("assembler.first", "[assembler]")
     REQUIRE(t.haveSymbol("B", 2));
     REQUIRE(t.haveSymbol("C", "xx"));
 }
-
-TEST_CASE("assembler.basic", "[assembler]")
-{
-    Assembler ass;
-    auto& syms = ass.getSymbols();
-
-    ass.parse(R"(
-    !org $800
-    nop
-label_here  nop
-other_label
-  nop
-  third_label: rts
-    nop
-
-
-loop:
-    bcc .skip
-    lda #45
-    beq loop
-.skip
-    !byte 1,2,3
-    rts
-)");
-
-    LOGI("Parsing done");
-    REQUIRE(std::any_cast<Number>(ass.evaluateExpression("loop+9")) ==
-            0x805 + 9);
-    REQUIRE(ass.evaluateDefinition("test(a, b)").name == "test");
-
-    REQUIRE(syms.at<Number>("label_here") == 0x801);
-    REQUIRE(syms.at<Number>("other_label") == 0x802);
-    REQUIRE(syms.at<Number>("third_label") == 0x803);
-    REQUIRE(syms.at<Number>("loop") == 0x805);
-    REQUIRE(syms.at<Number>("loop.skip") == 0x80b);
-}
-
-TEST_CASE("assembler.syntax", "[assembler]")
-{
-    Assembler ass;
-    ass.parse(R"(
-; this is a COMMENT
-    rts
-; end
-    !ifdef NO {
-        nop
-    } else {
-        lda #45
-    }
-    )");
-}
-
 TEST_CASE("assembler.section_move", "[assembler]")
 {
     Assembler ass;
@@ -297,29 +247,6 @@ print:
     REQUIRE(syms.at<Number>("print.skip") == 0xd);
 }
 
-TEST_CASE("assembler.block", "[assembler]")
-{
-    using std::any_cast;
-    Assembler ass;
-    ass.parse(R"(
-    !section "main", 0
-    lda #4
-    !rept 4 {
-        nop
-    }
-    sta $3
-    !if 2 {
-        !rept 2 {
-            rts
-        }
-    }
-    rts
-)");
-
-    auto& mach = ass.getMachine();
-    REQUIRE((int)mach.getSection("main").data.size() == 11);
-}
-
 TEST_CASE("assembler.sine_table", "[assembler]")
 {
     using std::any_cast;
@@ -343,72 +270,6 @@ amplitude = round(endValue-startValue)
     for (auto x : data) {
         fmt::print("{:0x} ", x);
     }
-}
-
-TEST_CASE("assembler.macro", "[assembler]")
-{
-    using std::any_cast;
-    Assembler ass;
-    // logging::setLevel(logging::Level::Debug);
-    ass.parse(R"(
-
-    !section "x", 0
-    y = 99
-
-!macro apa(x,y) {
-    ldx #x
-    !rept 5 { nop }
-    !if (x ==3) {
-        sta $d020
-    }
-    ldy #y
-}
-
-!macro test(a) {
-    lda #a
-    jsr other
-}
-    !section "main" , $800
-    apa(3,4)
-    test(3)
-    rts
-other:
-    rts
-)");
-
-    auto& mach = ass.getMachine();
-    auto const& data = mach.getSection("main").data;
-
-    REQUIRE((int)data[2] == 0xea);
-    REQUIRE((int)data[6] == 0xea);
-    REQUIRE((int)data[8] == 0x20);
-    REQUIRE((int)data[9] == 0xd0);
-
-    auto& syms = ass.getSymbols();
-    REQUIRE(syms.at<Number>("y") == 99);
-}
-
-TEST_CASE("assembler.if_macro", "[assembler]")
-{
-    using std::any_cast;
-    Assembler ass;
-    ass.parse(R"(
-    !macro SetVAdr(adr) {
-        lda #(adr & $ff)
-        sta $9f20
-        !if ((adr & 0xff) != (adr>>8)) {
-            lda #(adr>>8)
-        }
-        sta $9f21
-    }
-    !org $800
-
-    nop
-    SetVAdr(0x1212)
-    SetVAdr(0x3456)
-    rts
-
-)");
 }
 
 TEST_CASE("assembler.math", "[assembler]")
@@ -438,47 +299,6 @@ sine_table:
     }
 }
 
-TEST_CASE("assembler.test", "[assembler]")
-{
-    Assembler ass;
-    ass.parse(R"(
-    !section "main", $800
-start:
-    ldx #0
-.loop
-    lda $1000,x
-    sta $2000,x
-    inx
-    cpx #12
-    bne .loop
-    rts
-    !section "data", $1000
-    !byte 1,2,3,4,5,6,7
-
-!test $3000
-
-!test "my_test" {
-    jsr start
-    jmp xxx
-    nop
-xxx:
-    lda #4
-    rts
-}
-
-!assert compare(tests.my_test.ram[0x2000:0x2007], bytes(1,2,3,4,5,6,7))
-
-!assert tests.my_test.A == 4
-!assert tests.my_test.ram[0x2006] == 7
-!assert tests.my_test.cycles < 200
-
-)");
-
-    auto& mach = ass.getMachine();
-    REQUIRE(mach.readRam(0x2000) == 1);
-    REQUIRE(mach.readRam(0x2001) == 2);
-}
-
 TEST_CASE("assembler.functions", "[assembler]")
 {
     Assembler ass;
@@ -506,123 +326,4 @@ TEST_CASE("assembler.functions", "[assembler]")
 
     REQUIRE(ass.getMachine().getSection("main").data[1] == 0xf);
     REQUIRE(ass.getMachine().getSection("main").data[3] == 66);
-}
-
-TEST_CASE("assembler.errors", "[assembler]")
-{
-    Assembler ass;
-
-    std::vector<std::pair<std::string, int>> sources = {
-        {R"(!org $800
-            ldz #3
-             rts)",
-         2},
-        //
-        {R"(!org $800
-        !macro test(x) {
-            nop
-            stq x
-        }
-        test(2)
-        rts)",
-         4},
-        //
-        {R"(!org $800
-        nop
-        !if 0 {
-            stq 0
-        }
-        !if 1 {
-            nop
-            stq 0
-        }
-        rts)",
-         8},
-        //
-        {R"(!org $800
-        lda #15
-        ldx #a
-        ldy #b
-a       !byte 3
-        rts)",
-         4},
-        //
-        {R"(!org $800
-        !section
-        rts)",
-         2},
-        //
-        {R"(!org $800
-        !macro beta(z,y) {
-            nop
-            .if z == y {
-                nop
-                }
-        }
-        beta(1,2)
-        rts)",
-         7},
-    };
-
-    for (auto const& s : sources) {
-        ass.parse(s.first, "test.asm");
-        LOGI("Code:%s", s.first);
-        auto const& errs = ass.getErrors();
-        REQUIRE(!errs.empty());
-        bool ok = false;
-        for (auto& e : errs) {
-            fmt::print("{} in {}:{}\n", e.message, e.line, e.column);
-            if (e.line == (size_t)s.second) ok = true;
-        }
-        REQUIRE(ok);
-    }
-}
-
-TEST_CASE("assembler.special_labels", "[assembler]")
-{
-    Assembler ass;
-    ass.parse(R"(
-    !section "a", $1000
-    nop
-$   lda $d012
-    cmp #30
-    bne -
-    lda $c000
-    beq +
-    jmp -
-$   rts
-    nop
-
-    !section "b", $1000
-    nop
-loop:
-    lda $d012
-    cmp #30
-    bne loop
-    lda $c000
-    beq skip
-    jmp loop
-skip
-    rts
-$   nop
-
-    !section "c", $1000
-    !macro dummy(a) {
-.x   lda $d012
-    cmp #30
-    bne .x
-    lda $c000
-    beq .y
-    jmp .x
-.y  rts
-}
-$   nop
-    dummy(0)
-$   nop
-
-)");
-
-    auto& mach = ass.getMachine();
-    REQUIRE(mach.getSection("a").data == mach.getSection("b").data);
-    REQUIRE(mach.getSection("b").data == mach.getSection("c").data);
 }

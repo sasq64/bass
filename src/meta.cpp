@@ -356,6 +356,11 @@ void initMeta(Assembler& a)
             sectionArgs;
 
         auto& section = mach.section(sectionArgs.name);
+        section.flags = flags;
+        if (size != -1) {
+            section.size = size;
+            section.flags |= SectionFlags::FixedSize;
+        }
 
         // Create child section
         if (!in.empty()) {
@@ -367,7 +372,6 @@ void initMeta(Assembler& a)
                 parent.children.push_back(section.name);
             }
 
-            section.flags = flags;
             section.flags = (section.flags & ~SectionFlags::ReadOnly) |
                             (parent.flags & SectionFlags::ReadOnly);
 
@@ -385,11 +389,6 @@ void initMeta(Assembler& a)
                 section.pc = pc;
             }
 
-            if (size != -1) {
-                section.size = size;
-                section.flags |= SectionFlags::FixedSize;
-            }
-
             if (!blocks.empty()) {
                 mach.pushSection(section.name);
                 a.evaluateBlock(blocks[0]);
@@ -405,17 +404,12 @@ void initMeta(Assembler& a)
         Check(start != -1, "Must have start");
         // auto& s = mach.addSection(std::string(name), start);
 
-        section.flags = flags;
         section.start = start;
         section.flags |= SectionFlags::FixedStart;
 
         if (pc == -1) pc = section.start;
-
         section.pc = pc;
-        if (size != -1) {
-            section.size = size;
-            section.flags |= SectionFlags::FixedSize;
-        }
+
         if (!blocks.empty()) {
             mach.pushSection(section.name);
             a.evaluateBlock(blocks[0]);

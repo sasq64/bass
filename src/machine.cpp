@@ -1,6 +1,7 @@
 #include "machine.h"
 #include "defines.h"
 #include "emulator.h"
+#include "cart.h"
 
 #include <coreutils/algorithm.h>
 #include <coreutils/file.h>
@@ -51,9 +52,8 @@ Section& Machine::section(std::string const& name)
                            [&](auto const& s) { return s.name == name; });
     if (it == sections.end()) {
         return sections.emplace_back(name, -1);
-    } else {
-        return *it;
     }
+    return *it;
 }
 
 Section& Machine::addSection(std::string const& name, int32_t start)
@@ -274,47 +274,6 @@ constexpr static std::array modeTemplate = {
 };
 // clang-format on
 
-enum
-{
-    Normalcartridge,
-    ActionReplay,
-    KCSPowerCartridge,
-    FinalCartridgeIII,
-    SimonsBasic,
-    Oceantype1,
-    ExpertCartridge,
-    FunPlay,
-    PowerPlay,
-    SuperGames,
-    AtomicPower,
-    EpyxFastload,
-    WestermannLearning,
-    RexUtility,
-    FinalCartridgeI,
-    MagicFormel,
-    C64GameSystem,
-    WarpSpeed,
-    Dinamic,
-    Zaxxon,
-    MagicDesk,
-    SuperSnapshot5,
-    Comal80,
-    StructuredBasic,
-    Ross,
-    DelaEP64,
-    DelaEP7x8,
-    DelaEP256,
-    RexEP256,
-    EasyFlash = 32
-};
-
-enum ChipType : uint16_t
-{
-    Rom,
-    Ram,
-    Flash
-};
-
 void writeChip(utils::File const& outFile, int bank, int startAddress,
                std::vector<uint8_t> const& data)
 {
@@ -338,7 +297,7 @@ void Machine::writeCrt(utils::File const& outFile)
 {
     const uint32_t headerLength = 0x40;
     const uint16_t version = 0x0100;
-    const uint16_t hardware = EasyFlash;
+    const uint16_t hardware = CartType::EasyFlash;
 
     std::string name = "TEST";
     std::array<char, 32> label{};
@@ -401,8 +360,10 @@ void Machine::write(std::string const& name, OutFmt fmt)
         return;
     }
 
-    // writeCrt(outFile);
-    // return;
+    if(fmt == OutFmt::EasyFlash) {
+        writeCrt(outFile);
+        return;
+    }
 
     if (fmt == OutFmt::Prg) {
         outFile.write<uint8_t>(start & 0xff);
