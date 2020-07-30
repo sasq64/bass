@@ -47,6 +47,43 @@ static void evalIf(Assembler& a, bool cond,
     }
 }
 
+Section parseArgs(std::vector<std::any> args)
+{
+    Section s;
+    int i = 0;
+
+    if (args.empty()) {
+        throw parse_error("Too few arguments");
+    }
+    for (auto const& arg : args) {
+        if (auto* p =
+                std::any_cast<std::pair<std::string_view, std::any>>(&arg)) {
+            if (p->first == "start") {
+                s.start = number<int32_t>(p->second);
+            } else if (p->first == "size") {
+                s.size = number<int32_t>(p->second);
+            } else if (p->first == "in") {
+                s.parent = std::any_cast<std::string_view>(p->second);
+            }
+        } else {
+            if (i == 0) {
+                s.name = std::any_cast<std::string_view>(arg);
+            } else if (i == 1) {
+                s.start = number<uint32_t>(arg);
+            } else if (i == 2) {
+                auto res = number<uint64_t>(arg);
+                if (res >= 0x100000000) {
+                    s.flags = res >> 32;
+                } else {
+                    s.pc = static_cast<uint32_t>(res);
+                }
+            }
+            i++;
+        }
+    }
+    return s;
+}
+
 void initMeta(Assembler& a)
 {
     using std::any_cast;
@@ -257,7 +294,7 @@ void initMeta(Assembler& a)
 
     a.registerMeta("org", [&](auto const& text, auto const&) {
         auto org = number<int32_t>(a.evaluateExpression(text));
-        mach.addSection("", org);
+        mach.getCurrentSection().setPC(org);
     });
 
     a.registerMeta("align", [&](auto const& text, auto const&) {
@@ -305,107 +342,87 @@ void initMeta(Assembler& a)
         syms.set("RO", num(0x400000000));
         auto args = a.evaluateList(text);
 
-        int32_t start = -1;
-        std::string name;
-        std::string in;
-        int32_t pc = -1;
-        int32_t flags = 0;
-        int32_t size = -1;
-        int i = 0;
-
         if (args.empty()) {
             throw parse_error("Too few arguments");
         }
-        for (auto const& arg : args) {
-            if (auto* p =
-                    any_cast<std::pair<std::string_view, std::any>>(&arg)) {
-                if (p->first == "start") {
-                    start = number<int32_t>(p->second);
-                } else if (p->first == "size") {
-                    size = number<int32_t>(p->second);
-                } else if (p->first == "in") {
-                    in = any_cast<std::string_view>(p->second);
-                }
-            } else {
-                if (i == 0) {
-                    name = any_cast<std::string_view>(arg);
-                } else if (i == 1) {
-                    start = number<uint32_t>(arg);
-                } else if (i == 2) {
-                    auto res = number<uint64_t>(arg);
-                    if (res >= 0x100000000) {
-                        flags = res >> 32;
-                    } else {
-                        pc = static_cast<uint32_t>(res);
-                    }
-                }
-                i++;
-            }
+        auto sectionArgs = parseArgs(args);
+
+        if (sectionArgs.name.empty()) {
+            sectionArgs.name = "__anon" + std::to_string(mach.getPC());
         }
 
-        // if (pc == -1) {
-        //    pc = start;
-        //}
-        if (name.empty()) {
-            name = "__anon" + std::to_string(mach.getPC());
-        }
+        // mach.addSection(section);
+        auto [name, in, children, start, pc, size, flags, data, valid] =
+            sectionArgs;
 
-        auto lastSection = mach.getCurrentSection().name;
+        auto& section = mach.section(sectionArgs.name);
 
         // Create child section
         if (!in.empty()) {
-            auto& parent = mach.getSection(in);
+            auto& parent = mach.section(in);
             Check(parent.data.empty(), "Parent section must contain no data");
-            auto& s = mach.addSection(name, in);
-            s.flags = flags;
-            s.flags = (s.flags & ~SectionFlags::ReadOnly) |
-                      (parent.flags & SectionFlags::ReadOnly);
 
-            if (s.start == -1) {
+            if (section.parent.empty()) {
+                section.parent = in;
+                parent.children.push_back(section.name);
+            }
+
+            section.flags = flags;
+            section.flags = (section.flags & ~SectionFlags::ReadOnly) |
+                            (parent.flags & SectionFlags::ReadOnly);
+
+            if (section.start == -1) {
                 if (start == -1) {
-                    s.start = parent.pc;
+                    section.start = parent.pc;
                 } else {
-                    s.start = start;
-                    s.flags |= SectionFlags::FixedStart;
+                    section.start = start;
+                    section.flags |= SectionFlags::FixedStart;
                 }
             }
 
-            if (s.pc == -1) {
-                if (pc == -1) pc = s.start;
-                s.pc = pc;
+            if (section.pc == -1) {
+                if (pc == -1) pc = section.start;
+                section.pc = pc;
             }
 
             if (size != -1) {
-                s.size = size;
-                s.flags |= SectionFlags::FixedSize;
+                section.size = size;
+                section.flags |= SectionFlags::FixedSize;
             }
 
             if (!blocks.empty()) {
+                mach.pushSection(section.name);
                 a.evaluateBlock(blocks[0]);
-                parent.pc = s.pc;
-                mach.setSection(lastSection);
+                parent.pc = section.pc;
+                mach.popSection();
+                return;
             }
+            mach.setSection(section.name);
             return;
         }
 
         // Add and set root section
         Check(start != -1, "Must have start");
-        auto& s = mach.addSection(std::string(name), start);
-        s.flags = flags;
-        s.start = start;
-        s.flags |= SectionFlags::FixedStart;
+        // auto& s = mach.addSection(std::string(name), start);
 
-        if (pc == -1) pc = s.start;
+        section.flags = flags;
+        section.start = start;
+        section.flags |= SectionFlags::FixedStart;
 
-        s.pc = pc;
+        if (pc == -1) pc = section.start;
+
+        section.pc = pc;
         if (size != -1) {
-            s.size = size;
-            s.flags |= SectionFlags::FixedSize;
+            section.size = size;
+            section.flags |= SectionFlags::FixedSize;
         }
         if (!blocks.empty()) {
+            mach.pushSection(section.name);
             a.evaluateBlock(blocks[0]);
-            mach.setSection(lastSection);
+            mach.popSection();
+            return;
         }
+        mach.setSection(section.name);
     });
 
     a.registerMeta("script", [&](auto const& text, auto const&) {

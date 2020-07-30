@@ -3,6 +3,8 @@
 #include "defines.h"
 #include "wrap.h"
 
+#include <coreutils/file.h>
+
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -53,6 +55,30 @@ struct Section
     Section() = default;
     Section(std::string const& n, uint32_t s) : name(n), start(s), pc(s) {}
 
+    Section& addByte(uint8_t b)
+    {
+        data.push_back(b);
+        pc++;
+        return *this;
+    }
+
+    Section& setStart(int32_t s)
+    {
+        start = s;
+        return *this;
+    }
+
+    Section& setPC(int32_t s)
+    {
+        if(start == pc) {
+            start = s;
+        }
+        pc = s;
+        return *this;
+    }
+
+
+
     std::string name;
     std::string parent;
     std::vector<std::string> children;
@@ -67,6 +93,7 @@ struct Section
 enum class OutFmt
 {
     Prg,
+    EasyFlash,
     Raw
 };
 
@@ -85,14 +112,23 @@ public:
     bool layoutSections();
     Error checkOverlap();
 
+    void writeCrt(utils::File const& outFile);
+
     uint32_t writeByte(uint8_t b);
     uint32_t writeChar(uint8_t b);
     AsmResult assemble(Instruction const& instr);
+
+    Section& section(std::string const& name);
+
+    Section& addSection(Section const& s);
     Section& addSection(std::string const& name, int32_t start);
     Section& addSection(std::string const& name,
                         std::string const& parent = "");
     void removeSection(std::string const& name);
-    Section& setSection(std::string const& name);
+    void setSection(std::string const& name);
+    void popSection();
+    void dropSection();
+    void pushSection(std::string const& name);
     Section& getSection(std::string const& name);
     Section& getCurrentSection();
     std::deque<Section> const& getSections() const { return sections; }
@@ -121,6 +157,7 @@ public:
     void setBankRead(int hi_adr, int len, int bank);
 
 private:
+    std::deque<Section*> savedSections;
     bool inData = false;
     std::unordered_map<uint8_t, std::function<void(uint8_t)>> break_functions;
     std::unordered_map<uint8_t, std::function<uint8_t(uint16_t)>>

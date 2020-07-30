@@ -201,7 +201,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 
     auto saved = save();
 
-    auto oldSection = mach->getCurrentSection();
+    mach->pushSection();
     auto testSection = mach->addSection("__test", testLocation);
 
     auto start = mach->getPC();
@@ -211,6 +211,8 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     while (true) {
         syms.clear();
         mach->getCurrentSection() = testSection;
+        testSection.pc = testSection.start;
+        testSection.data.clear();
         lastLabel = "__test_" + std::to_string(start);
         if (!parser.parse(contents, fileName)) {
             throw parse_error("Syntax error in test block");
@@ -241,7 +243,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
                   {"SP", num(sp)},         {"PC", num(pc)},
                   {"cycles", num(cycles)}, {"ram", mach->getRam()}};
 
-    mach->setSection(oldSection.name);
+    mach->popSection();
     restore(saved);
 
     return res;

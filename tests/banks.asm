@@ -39,7 +39,11 @@
         }
     }
 
-    !section "farjump", 0x200 {
+    !section "bootbank", 0xa000
+
+    !section "farjump",in="bootbank" {
+ram_code:
+    * = $200
 far_jsr:
     sta BANK_SELECT
     pla
@@ -50,8 +54,30 @@ jump_adr:
     sta BANK_SELECT
     pla
     rts
+far_end:
 }
 
+
+    !section name="code",in="bootbank" {
+;game_start:
+
+    ldx #(far_end-far_jsr)
+$   lda ram_code,x
+    sta far_jsr,x
+    dex
+    bne -
+
+$   lda $d012
+    sta $d020
+    jmp -
+}
+
+    !section "boot",in="bootbank",start=$bffc {
+    !word $e000
+}
+
+    !section "banky", 0x18000
+    nop
     ; ------------------------
 
     !section "bank1", 0x01a000
@@ -60,6 +86,9 @@ func1:
     !check A == 99
     lda #10
     rts
+
+    !section "bankp", 0x28000
+    nop
 
     !section "bank2", 0x02a000
 
@@ -73,27 +102,3 @@ far_jumps:
     !check A == 10
     rts
 
-
-!test "banks" {
-    
-    lda #1
-    sta $01
-    lda #99
-    jsr $a000
-    !check A == 10
-
-    lda #2
-    sta $01
-    jsr $a000
-    !check A == 20
-}
-
-!test "far" {
-    lda #2
-    sta $01
-    jsr far_jumps
-
-    jsrf func2
-    !check A == 20
-
-}

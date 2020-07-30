@@ -43,7 +43,7 @@ start:
 $
     lda $d012
     cmp #130
-    bne .loop
+    bne -
     lda #2
     sta $d020
     jsr sid.play

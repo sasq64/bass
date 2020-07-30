@@ -214,6 +214,13 @@ public:
 
     // Writing
 
+    template <typename T> void writeBE(const T& t) const
+    {
+        for(size_t i=1; i<=sizeof(T); i++) {
+            fputc((t >> (sizeof(T)-i)*8) & 0xff, fp);
+        }
+    }
+
     template <typename T> void write(const T& t) const
     {
         if (fwrite(&t, 1, sizeof(T), fp) != sizeof(T)) {
@@ -222,6 +229,11 @@ public:
     }
 
     void write(std::vector<uint8_t> const& data) const {
+        write(data.data(), data.size());
+    }
+
+    template <size_t N>
+    void write(std::array<uint8_t, N> const& data) const {
         write(data.data(), data.size());
     }
 

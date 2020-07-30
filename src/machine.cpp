@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
 #include <vector>
 
 inline void Check(bool v, std::string const& txt)
@@ -18,7 +19,8 @@ inline void Check(bool v, std::string const& txt)
 Machine::Machine()
 {
     machine = std::make_unique<sixfive::Machine<>>();
-    addSection("default", 0).flags = FixedStart;
+    section("default").setStart(0).flags = FixedStart;
+    setSection("default");
     machine->setBreakFunction(breakFunction, this);
 }
 
@@ -41,6 +43,17 @@ void Machine::setBreakFunction(uint8_t what,
                                std::function<void(uint8_t)> const& fn)
 {
     break_functions[what] = fn;
+}
+
+Section& Machine::section(std::string const& name)
+{
+    auto it = std::find_if(sections.begin(), sections.end(),
+                           [&](auto const& s) { return s.name == name; });
+    if (it == sections.end()) {
+        return sections.emplace_back(name, -1);
+    } else {
+        return *it;
+    }
 }
 
 Section& Machine::addSection(std::string const& name, int32_t start)
@@ -81,17 +94,10 @@ Section& Machine::addSection(std::string const& name,
     return s;
 }
 
-Section& Machine::setSection(std::string const& name)
+Section& Machine::addSection(Section const& s)
 {
-    if (!name.empty()) {
-        auto it = std::find_if(sections.begin(), sections.end(),
-                               [&](auto const& s) { return s.name == name; });
-        if (it != sections.end()) {
-            currentSection = &(*it);
-            return *currentSection;
-        }
-    }
-    throw machine_error(fmt::format("Unknown section {}", name));
+    auto& section = addSection(s.name, -1);
+    return section;
 }
 
 void Machine::removeSection(std::string const& name)
@@ -202,6 +208,28 @@ Section& Machine::getCurrentSection()
 {
     return *currentSection;
 }
+void Machine::pushSection(std::string const& name)
+{
+    savedSections.push_back(currentSection);
+    setSection(name);
+}
+
+void Machine::dropSection()
+{
+    savedSections.pop_back();
+}
+
+void Machine::popSection()
+{
+    currentSection = savedSections.back();
+    savedSections.pop_back();
+}
+
+void Machine::setSection(std::string const& name)
+{
+    currentSection = &section(name);
+    currentSection->valid = true;
+}
 
 void Machine::clear()
 {
@@ -213,7 +241,7 @@ void Machine::clear()
         s.pc = s.start;
         s.valid = false;
     }
-    setSection("default").valid = true;
+    setSection("default");
 }
 
 uint32_t Machine::getPC() const
@@ -246,6 +274,106 @@ constexpr static std::array modeTemplate = {
 };
 // clang-format on
 
+enum
+{
+    Normalcartridge,
+    ActionReplay,
+    KCSPowerCartridge,
+    FinalCartridgeIII,
+    SimonsBasic,
+    Oceantype1,
+    ExpertCartridge,
+    FunPlay,
+    PowerPlay,
+    SuperGames,
+    AtomicPower,
+    EpyxFastload,
+    WestermannLearning,
+    RexUtility,
+    FinalCartridgeI,
+    MagicFormel,
+    C64GameSystem,
+    WarpSpeed,
+    Dinamic,
+    Zaxxon,
+    MagicDesk,
+    SuperSnapshot5,
+    Comal80,
+    StructuredBasic,
+    Ross,
+    DelaEP64,
+    DelaEP7x8,
+    DelaEP256,
+    RexEP256,
+    EasyFlash = 32
+};
+
+enum ChipType : uint16_t
+{
+    Rom,
+    Ram,
+    Flash
+};
+
+void writeChip(utils::File const& outFile, int bank, int startAddress,
+               std::vector<uint8_t> const& data)
+{
+    outFile.writeString("CHIP");
+    outFile.writeBE<uint32_t>(data.size() + 0x10);
+    outFile.writeBE<uint16_t>(ChipType::Flash);
+    outFile.writeBE<uint16_t>(bank);
+    outFile.writeBE<uint16_t>(startAddress);
+    outFile.writeBE<uint16_t>(data.size());
+    outFile.write(data);
+}
+
+struct Chip
+{
+    int bank;
+    uint16_t start;
+    std::vector<uint8_t> data = std::vector<uint8_t>(0x2000);
+};
+
+void Machine::writeCrt(utils::File const& outFile)
+{
+    const uint32_t headerLength = 0x40;
+    const uint16_t version = 0x0100;
+    const uint16_t hardware = EasyFlash;
+
+    std::string name = "TEST";
+    std::array<char, 32> label{};
+    std::copy(name.begin(), name.end(), label.data());
+
+    outFile.writeString("C64 CARTRIDGE   ");
+    outFile.writeBE(headerLength);
+    outFile.writeBE(version);
+    outFile.writeBE(hardware);
+    outFile.write<uint8_t>(1);
+    outFile.write<uint8_t>(0);
+    outFile.write(std::vector<uint8_t>{0, 0, 0, 0, 0, 0});
+    outFile.write(label);
+
+    std::map<uint32_t, Chip> chips;
+
+    for (auto const& section : sections) {
+        LOGI("Start %x", section.start);
+        auto start = section.start & 0xffff;
+        auto bank = section.start & 0xffffe000;
+        auto& chip = chips[bank];
+        auto offset = section.start - bank;
+        LOGI("Putting section %s in %x at offset %x", section.name, bank,
+             offset);
+        memcpy(&chip.data[offset], section.data.data(), section.data.size());
+    }
+
+    for (auto const& e : chips) {
+        auto bank = e.first >> 16;
+        auto start = e.first & 0xffff;
+        LOGI("Writing %x/%x", bank, start);
+        writeChip(outFile, bank, start, e.second.data);
+    }
+}
+
 void Machine::write(std::string const& name, OutFmt fmt)
 {
     auto filtered = utils::filter_to(
@@ -272,6 +400,9 @@ void Machine::write(std::string const& name, OutFmt fmt)
         puts("**Warning: No code generated");
         return;
     }
+
+    // writeCrt(outFile);
+    // return;
 
     if (fmt == OutFmt::Prg) {
         outFile.write<uint8_t>(start & 0xff);
@@ -309,11 +440,12 @@ void Machine::write(std::string const& name, OutFmt fmt)
         auto hi_adr = section.start >> 16;
 
         if (hi_adr > 0) {
-            if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) {
-                offset = hi_adr * 8192 + adr;
-            } else {
-                throw machine_error("Illegal address");
-            }
+            offset = section.start & 0xffff;
+            /* if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) { */
+            /*     offset = hi_adr * 8192 + adr; */
+            /* } else { */
+            /*     throw machine_error("Illegal address"); */
+            /* } */
         }
 
         if (last_end >= 0) {
