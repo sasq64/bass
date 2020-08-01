@@ -221,10 +221,9 @@ struct SymbolTable
 
     bool ok() const
     {
-        for (auto const& u : undefined) {
-            if (syms.find(u) == syms.end()) return false;
-        }
-        return true;
+        return std::none_of(
+            undefined.begin(), undefined.end(),
+            [&](auto const& u) { return syms.find(u) == syms.end(); });
     }
 
     void erase(std::string_view name)

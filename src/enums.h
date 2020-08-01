@@ -18,6 +18,7 @@ enum AddressingMode : uint8_t
     INDX,
     INDY,
     IND,
+    INDZ,
     ABS,
     ABSX,
     ABSY,

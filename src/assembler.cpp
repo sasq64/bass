@@ -15,7 +15,7 @@
 #include <string_view>
 #include <unordered_set>
 
-extern char const * grammar6502;
+extern char const * const grammar6502;
 
 using sixfive::AddressingMode;
 

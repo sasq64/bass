@@ -3,11 +3,11 @@
 Sections form a tree, where the leaves are the only one allowed
 to have content.
 
-A leaf section is defined using `in=parent`.
+A leaf section is defined using `in="parent"`.
 
 A root section has no `in` and usually have a fixed size.
 
-Secttion layout options:
+Section layout options:
  First - Put this section first in the list of children
  Last - Keep this section last
 
@@ -55,5 +55,3 @@ was moved we are done.
 * First child is expected to start at parent start
 * Lay out all children in order
 * If any child was moved, we need another pass
-
-

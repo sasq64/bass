@@ -85,6 +85,7 @@ struct Machine
     Machine()
     {
         sp = 0xff;
+        pc = 0;
         ram.fill(0);
         stack = &ram[0x100];
         a = x = y = 0;
@@ -116,10 +117,7 @@ struct Machine
 
     // Access ram directly
 
-    const Word& Ram(const Adr& a) const { return ram[a]; }
-    Word& Ram(const Adr& a) { return ram[a]; }
-
-    const Word& Stack(const Word& a) const { return stack[a]; }
+    const Word& Stack(const Word& adr) const { return stack[adr]; }
 
     void writeRam(uint16_t org, const Word data) { ram[org] = data; }
 
@@ -158,17 +156,17 @@ struct Machine
     }
 
     void mapReadCallback(uint8_t bank, int len, void* data,
-                         uint8_t (*cb)(uint16_t a, void*))
+                         uint8_t (*cb)(uint16_t, void*))
     {
         while (len > 0) {
-            rcallbacks[bank] = cb;  // NOLINT
+            rcallbacks[bank] = cb; // NOLINT
             LOGI("Mapping bank %x", bank);
             rcbdata[bank++] = data; // NOLINT
             len--;
         }
     }
     void mapWriteCallback(uint8_t bank, int len, void* data,
-                          void (*cb)(uint16_t a, uint8_t v, void*))
+                          void (*cb)(uint16_t, uint8_t, void*))
     {
         while (len > 0) {
             wcallbacks[bank] = cb;  // NOLINT
@@ -222,8 +220,7 @@ private:
         A = 20,
         X,
         Y,
-        SP,
-        SR
+        SP
     };
 
     template <int MODE>
@@ -303,7 +300,6 @@ private:
         if constexpr (REG == Y) return y;
         if constexpr (REG == SP) return sp;
     }
-
     /////////////////////////////////////////////////////////////////////////
     ///
     /// THE STATUS REGISTER
@@ -460,6 +456,7 @@ private:
         if constexpr (MODE == INDX) return Read16(ReadPC8(x));
         if constexpr (MODE == INDY) return Read16(ReadPC8(), y);
         if constexpr (MODE == IND) return Read16(ReadPC16());
+        if constexpr (MODE == INDZ) return Read16(ReadPC8());
     }
 
     template <int MODE>
@@ -874,6 +871,7 @@ private:
                 { 0x79, 4, ABSY, Adc<ABSY, USE_BCD>},
                 { 0x61, 6, INDX, Adc<INDX, USE_BCD>},
                 { 0x71, 5, INDY, Adc<INDY, USE_BCD>},
+                { 0x72, 5, INDZ, Adc<INDZ, USE_BCD>},
             } },
 
             { "sbc", {
@@ -1058,6 +1056,14 @@ private:
         };
 
         std::vector<Instruction> instructions65c02 = {
+            {"adc", {{0x72, 5, INDZ, Adc<INDZ, USE_BCD>}}},
+            {"and", {{0x32, 5, INDZ, And<INDZ>}}},
+            {"cmp", {{0xd2, 5, INDZ, Cmp<A, INDZ>}}},
+            {"eor", {{0x52, 5, INDZ, Eor<INDZ>}}},
+            {"lda", {{0xb2, 5, INDZ, Load<A, INDZ>}}},
+            {"ora", {{0x12, 5, INDZ, Ora<INDZ>}}},
+            {"sbc", {{0xf2, 5, INDZ, Sbc<INDZ, USE_BCD>}}},
+            {"sta", {{0x92, 5, INDZ, Store<A, INDZ>}}},
             {"phx",
              {{0xda, 3, NONE, [](Machine& m) { m.stack[m.sp--] = m.x; }}}},
             {"phy",
@@ -1113,9 +1119,21 @@ private:
 
         };
 
-        instructionTable.insert(instructionTable.end(),
-                                instructions65c02.begin(),
-                                instructions65c02.end());
+        auto mergeInstructions = [&](std::vector<Instruction> const& vec) {
+            for (auto const& v : vec) {
+                auto it = std::find_if(
+                    instructionTable.begin(), instructionTable.end(),
+                    [&](auto const& i) { return strcmp(i.name, v.name) == 0; });
+                if (it != instructionTable.end()) {
+                    it->opcodes.insert(it->opcodes.begin(), v.opcodes.begin(),
+                              v.opcodes.end());
+                } else {
+                    instructionTable.push_back(v);
+                }
+            }
+        };
+
+        mergeInstructions(instructions65c02);
 
         return instructionTable;
     }

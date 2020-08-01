@@ -13,7 +13,7 @@ increments = {
 }
 
 map_bank_read(0x9f, 1, function(adr)
-    offset = adr & 0xff
+    local offset = adr & 0xff
     -- print("Read", offset)
     if offset >= 0x20 and offset < 0x40 then
         if offset == 0x20 then

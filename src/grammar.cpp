@@ -1,5 +1,6 @@
+extern char const * const grammar6502;
 
-char const * grammar6502 = R"(
+char const * const grammar6502 = R"(
 Root <- (RootEnum / RootExpression / RootDefinition / RootList / Program) _? EOT
 
 RootExpression <- ':x:' Expression
