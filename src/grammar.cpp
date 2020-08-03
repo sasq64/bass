@@ -1,6 +1,4 @@
-extern char const * const grammar6502;
-
-char const * const grammar6502 = R"(
+extern char const * const grammar6502 = R"(
 Root <- (RootEnum / RootExpression / RootDefinition / RootList / Program) _? EOT
 
 RootExpression <- ':x:' Expression
@@ -48,7 +46,7 @@ EnumLine <- _? Symbol (_ '=' (String / Expression))? _? LineComment?
 
 Label <- (_? AsmSymbol ':') / (AsmSymbol (_ / &EOL))
 
-Arg <- _ (LabelRef / Acc / Imm / IndY / IndX / Ind / AbsX / AbsY / Abs)
+Arg <- _ (ZRel / Acc / Imm / IndY / IndX / Ind / AbsX / AbsY / Abs)
 
 IndX <- '(' Expression (TailX0 / TailX1)
 TailX0 <- ')' _? ',' _? 'X'i
@@ -60,9 +58,12 @@ TailY1 <- ',' _? 'Y'i _? ')'
 
 Ind <- '(' Expression ')' &(!Operator)
 Acc <- 'a'i &(![a-zA-Z0-9])
-Abs <- Expression
+Abs <- LabelRef / Expression
 AbsX <- Expression ',' _? 'X'i
 AbsY <- Expression ',' _? 'Y'i
+
+ZRel <- Expression ',' _? Expression ',' _? (LabelRef / Expression)
+
 Imm <- '#' Expression
 
 LabelRef <- '-'+ / '+'+

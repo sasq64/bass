@@ -716,7 +716,14 @@ void Assembler::setupRules()
         parser[name.c_str()] = buildArg;
     }
 
-    parser["LabelRef"] = [&](SV& sv) -> Instruction {
+    parser["ZRel"] = [&](SV& sv) -> Instruction {
+        int32_t v = (number<int32_t>(sv[0]) << 24) |
+            (number<int32_t>(sv[1]) << 16) |
+            number<int32_t>(sv[2]);
+        return {"", AddressingMode::ZP_REL, (double)v};
+    };
+
+    parser["LabelRef"] = [&](SV& sv) {
         auto label = sv.token_view();
 
         std::any val;
@@ -728,8 +735,7 @@ void Assembler::setupRules()
             if (inMacro != 0) throw parse_error("No special labels in macro");
             l = "__special_" + std::to_string(labelNum - 1);
         }
-        val = syms.get(l);
-        return {"", AddressingMode::ABS, any_cast<Number>(val)};
+        return syms.get(l);
     };
 
     parser["Decimal"] = [&](SV& sv) -> Number {

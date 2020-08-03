@@ -117,6 +117,7 @@ public:
     uint32_t writeByte(uint8_t b);
     uint32_t writeChar(uint8_t b);
     AsmResult assemble(Instruction const& instr);
+    std::string disassemble(uint32_t* pc);
 
     Section& section(std::string const& name);
 

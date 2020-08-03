@@ -192,6 +192,7 @@ struct Machine
         while (cycles < toCycles) {
             if (POLICY::eachOp(p)) break;
             auto code = ReadPC();
+            //LOGI("%04x: %02x", pc-1, code);
             auto& op = jumpTable[code];
             op.op(*this);
             cycles += op.cycles;
@@ -694,7 +695,7 @@ private:
     {
         auto val = m.LoadEA<ZP>();
         auto pc = m.pc;
-        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++);
+        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++) - 1;
         if (!(val & 1 << BIT)) {
             pc += diff;
             m.cycles++;
@@ -707,7 +708,7 @@ private:
     {
         auto val = m.LoadEA<ZP>();
         auto pc = m.pc;
-        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++);
+        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++) - 1;
         if (val & 1 << BIT) {
             pc += diff;
             m.cycles++;

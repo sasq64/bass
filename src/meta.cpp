@@ -356,63 +356,57 @@ void initMeta(Assembler& a)
             sectionArgs;
 
         auto& section = mach.section(sectionArgs.name);
+
+        Check(section.data.empty(), "Section already populated");
+
         section.flags = flags;
+        section.pc = pc;
         if (size != -1) {
             section.size = size;
             section.flags |= SectionFlags::FixedSize;
         }
 
+        if (start != -1) {
+            section.start = start;
+            section.flags |= SectionFlags::FixedStart;
+        }
+
+        Section* parent = nullptr;
+
         // Create child section
         if (!in.empty()) {
-            auto& parent = mach.section(in);
-            Check(parent.data.empty(), "Parent section must contain no data");
+            parent = &mach.section(in);
+            LOGI("Parent %s at %x/%x", parent->name, parent->start, parent->pc);
+            Check(parent->data.empty(), "Parent section must contain no data");
 
             if (section.parent.empty()) {
                 section.parent = in;
-                parent.children.push_back(section.name);
+                parent->children.push_back(section.name);
             }
 
-            section.flags = (section.flags & ~SectionFlags::ReadOnly) |
-                            (parent.flags & SectionFlags::ReadOnly);
+            if (parent->flags & SectionFlags::ReadOnly) {
+                section.flags |= SectionFlags::ReadOnly;
+            }
 
             if (section.start == -1) {
-                if (start == -1) {
-                    section.start = parent.pc;
-                } else {
-                    section.start = start;
-                    section.flags |= SectionFlags::FixedStart;
-                }
+                LOGI("Setting start to %x", parent->pc);
+                section.start = parent->pc;
             }
-
-            if (section.pc == -1) {
-                if (pc == -1) pc = section.start;
-                section.pc = pc;
-            }
-
-            if (!blocks.empty()) {
-                mach.pushSection(section.name);
-                a.evaluateBlock(blocks[0]);
-                parent.pc = section.pc;
-                mach.popSection();
-                return;
-            }
-            mach.setSection(section.name);
-            return;
         }
 
-        // Add and set root section
-        Check(start != -1, "Must have start");
-        // auto& s = mach.addSection(std::string(name), start);
+        if (section.pc == -1) {
+            section.pc = section.start;
+        }
 
-        section.start = start;
-        section.flags |= SectionFlags::FixedStart;
-
-        if (pc == -1) pc = section.start;
-        section.pc = pc;
+        Check(section.start != -1, "Section must have start");
 
         if (!blocks.empty()) {
             mach.pushSection(section.name);
+            auto sz = section.data.size();
             a.evaluateBlock(blocks[0]);
+            if (parent) {
+                parent->pc += section.data.size() - sz;
+            }
             mach.popSection();
             return;
         }

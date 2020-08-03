@@ -2,14 +2,17 @@
     BANK_SELECT = $01
     BANK_SAVE = $02
 
-    ; We emulate bank switching at $a000 by writing bank to $01
-    ; We map the zero page write to our funtion
+    ; We map the zero page write to bank switching
 %{
     map_bank_write(0, 1, function(adr, val)
         -- Always write through to zero page
         mem_write(adr, val)
         if adr == 0x01 then
-            map_bank_read(0xa0, 1, val)
+            print("BANK", val)
+            -- Map a000-c000 -> bank 'val'
+            map_bank_read(0xa0, 32, val)
+            -- Map 8000-a000 -> bank 'val'
+            map_bank_read(0x80, 32, val)
         end
     end)
 }%
@@ -18,8 +21,8 @@
     !macro jsrf(adr) {
         .PC = *
         pha
-        ; Jump from unbanked memory
-        !if .PC < 0xa000 {
+        !if .PC < 0x8000 {
+            ; Jump from unbanked memory
             lda #adr>>16
             sta BANK_SELECT
             jsr adr & 0xffff
@@ -41,7 +44,7 @@
 
     !section "bootbank", 0xa000
 
-    !section "farjump",in="bootbank" {
+    !section "trampoline",in="bootbank" {
 ram_code:
     * = $200
 far_jsr:
@@ -58,18 +61,19 @@ far_end:
 }
 
 
-    !section name="code",in="bootbank" {
-;game_start:
+    !section "code",in="bootbank" {
+game_start:
 
     ldx #(far_end-far_jsr)
-$   lda ram_code,x
+$   dex
+    lda ram_code,x
     sta far_jsr,x
-    dex
     bne -
+    rts
 
-$   lda $d012
-    sta $d020
-    jmp -
+;$   ;lda $d012
+    ;sta $d020
+    ;jmp -
 }
 
     !section "boot",in="bootbank",start=$bffc {
@@ -77,7 +81,8 @@ $   lda $d012
 }
 
     !section "banky", 0x18000
-    nop
+    ldy #$10
+    rts
     ; ------------------------
 
     !section "bank1", 0x01a000
@@ -88,7 +93,8 @@ func1:
     rts
 
     !section "bankp", 0x28000
-    nop
+    ldy #$20
+    rts
 
     !section "bank2", 0x02a000
 
@@ -100,5 +106,19 @@ far_jumps:
     lda #99
     jsrf func1
     !check A == 10
+    jsr $8000
+    !check Y == $20
     rts
 
+    !test $2000
+
+    !test "test" {
+        jsr game_start
+        lda #2
+        sta $01
+        jsr far_jumps
+        lda #1
+        sta $01
+        jsr $8000
+        !check Y == $10
+    }
