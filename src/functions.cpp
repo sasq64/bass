@@ -91,11 +91,11 @@ void initFunctions(Assembler& a)
     });
 
     a.registerFunction("to_upper", [](std::string_view sv) {
-      auto s = std::string(sv);
-      for (auto& c : s) {
-          c = toupper(c);
-      }
-      return persist(s);
+        auto s = std::string(sv);
+        for (auto& c : s) {
+            c = toupper(c);
+        }
+        return persist(s);
     });
 
     a.registerFunction("to_lower", [](std::string_view sv) {

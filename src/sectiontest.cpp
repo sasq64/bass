@@ -7,6 +7,7 @@
 
 using namespace std::string_literals;
 
+#if 0
 TEST_CASE("sections.basic", "[sections]")
 {
     Machine m;
@@ -45,9 +46,5 @@ TEST_CASE("sections.basic", "[sections]")
     m.layoutSections();
     REQUIRE(utils.start == 0x1000 + 0x200 + 0x50);
     REQUIRE(b.start == 0x1000 + 0x200 + 0x20);
-
-
-
-
 }
-
+#endif

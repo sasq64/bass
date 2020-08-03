@@ -15,7 +15,7 @@
 #include <string_view>
 #include <unordered_set>
 
-extern char const * const grammar6502;
+extern char const* const grammar6502;
 
 using sixfive::AddressingMode;
 
@@ -220,6 +220,10 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
         auto result = checkUndefined();
         if (result == DONE) break;
         if (result == PASS) continue;
+
+        for (auto const& s : syms.get_undefined()) {
+            fmt::print("{} undefined\n", s);
+        }
         throw parse_error("Undefined symbol in test");
     }
     syms.acceptUndefined(false);
@@ -302,10 +306,11 @@ void Assembler::applyMacro(Call const& call)
     for (unsigned i = 0; i < call.args.size(); i++) {
 
         if (syms.is_defined(m.args[i])) {
-            errors.emplace_back(0, 0,
-                              fmt::format("Macro '{}' shadows global symbol {}",
-                                          call.name, m.args[i]),
-                              ErrLevel::Warning);
+            errors.emplace_back(
+                0, 0,
+                fmt::format("Macro '{}' shadows global symbol {}", call.name,
+                            m.args[i]),
+                ErrLevel::Warning);
             shadowed[m.args[i]] = syms.get(m.args[i]);
             syms.erase(m.args[i]);
         }
@@ -606,6 +611,7 @@ void Assembler::setupRules()
 
     parser["CallArgs"] = [&](SV& sv) {
         std::vector<std::any> v;
+        v.reserve(sv.size());
         for (size_t i = 0; i < sv.size(); i++) {
             v.push_back(sv[i]);
         }
@@ -717,10 +723,9 @@ void Assembler::setupRules()
     }
 
     parser["ZRel"] = [&](SV& sv) -> Instruction {
-        int32_t v = (number<int32_t>(sv[0]) << 24) |
-            (number<int32_t>(sv[1]) << 16) |
-            number<int32_t>(sv[2]);
-        return {"", AddressingMode::ZP_REL, (double)v};
+        int32_t v = (number<int32_t>(sv[1]) << 24) |
+                    (number<int32_t>(sv[0]) << 16) | number<int32_t>(sv[2]);
+        return {"", AddressingMode::ZP_REL, static_cast<Number>(v)};
     };
 
     parser["LabelRef"] = [&](SV& sv) {
@@ -812,7 +817,7 @@ void Assembler::setupRules()
         }
 
         auto ope = any_cast<std::string_view>(sv[1]);
-        if(ope == "+") {
+        if (ope == "+") {
             if (sv[0].type() == typeid(std::string_view)) {
                 auto a = any_cast<std::string_view>(sv[0]);
                 if (sv[1].type() == typeid(std::string_view)) {
@@ -986,8 +991,6 @@ bool Assembler::parse(std::string_view const& source, std::string const& fname)
         auto layoutOk = mach->layoutSections();
 
         for (auto const& s : mach->getSections()) {
-            // auto& secsyms =
-            // syms.at<AnyMap>("section").at<AnyMap>(s.name);
             LOGD("%s : %x -> %x (%d) [%x]\n", s.name, s.start, s.start + s.size,
                  s.data.size(), s.flags);
 
@@ -1049,5 +1052,4 @@ void Assembler::addCheck(std::string_view text)
 {
     mach->assemble({"brk", sixfive::AddressingMode::IMM, 255});
     checks[mach->getPC()] = std::string(text);
-    // LOGI("ADD REQUIRE %x=%s", mach->getPC(), text);
 }

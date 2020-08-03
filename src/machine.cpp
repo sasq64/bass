@@ -1,7 +1,7 @@
 #include "machine.h"
+#include "cart.h"
 #include "defines.h"
 #include "emulator.h"
-#include "cart.h"
 
 #include <coreutils/algorithm.h>
 #include <coreutils/file.h>
@@ -38,8 +38,6 @@ void Machine::breakFunction(int what, void* data)
         fmt::print("A:{:x} X:{:x} Y:{:x} PC={:04x}\n", a, x, y, pc);
         fmt::print("{:04x}: {}\n", pc, thiz->disassemble(&pc));
 
-        
-
         exit(0);
     }
 }
@@ -62,47 +60,53 @@ Section& Machine::section(std::string const& name)
     return *it;
 }
 
-Section& Machine::addSection(std::string const& name, int32_t start)
-{
-    if (!name.empty()) {
-        if (fp != nullptr) {
-            // printf(fp, "SECTION %s\n", name.c_str());
-        }
-        auto it = std::find_if(sections.begin(), sections.end(),
-                               [&](auto const& s) { return s.name == name; });
-        if (it == sections.end()) {
-            currentSection = &sections.emplace_back(name, start);
-        } else {
-            currentSection = &(*it);
-            if (!currentSection->data.empty()) {
-                throw machine_error(
-                    fmt::format("Section {} already exists", name));
-            }
-            currentSection->valid = true;
-            if (start != -1) {
-                currentSection->start = start;
-            }
-        }
-    } else {
-        currentSection = &sections.emplace_back("", start);
-    }
-    return *currentSection;
-}
-Section& Machine::addSection(std::string const& name,
-                             std::string const& parentName)
-{
-    auto& s = addSection(name, -1);
-    if (s.parent.empty() && !parentName.empty()) {
-        auto& parent = getSection(parentName);
-        s.parent = parent.name;
-        parent.children.push_back(name);
-    }
-    return s;
-}
-
 Section& Machine::addSection(Section const& s)
 {
-    auto& section = addSection(s.name, -1);
+    auto [name, in, children, start, pc, size, flags, data, valid] = s;
+
+    auto& section = this->section(s.name);
+
+    Check(section.data.empty(), "Section already populated");
+
+    section.flags = flags;
+    section.pc = pc;
+    if (size != -1) {
+        section.size = size;
+        section.flags |= SectionFlags::FixedSize;
+    }
+
+    if (start != -1) {
+        section.start = start;
+        section.flags |= SectionFlags::FixedStart;
+    }
+
+    // Create child section
+    if (!in.empty()) {
+        auto& parent = this->section(in);
+        LOGI("Parent %s at %x/%x", parent.name, parent.start, parent.pc);
+        Check(parent.data.empty(), "Parent section must contain no data");
+
+        if (section.parent.empty()) {
+            section.parent = in;
+            parent.children.push_back(section.name);
+        }
+
+        if ((parent.flags & SectionFlags::ReadOnly) != 0) {
+            section.flags |= SectionFlags::ReadOnly;
+        }
+
+        if (section.start == -1) {
+            LOGI("Setting start to %x", parent.pc);
+            section.start = parent.pc;
+        }
+    }
+
+    if (section.pc == -1) {
+        section.pc = section.start;
+    }
+
+    Check(section.start != -1, "Section must have start");
+
     return section;
 }
 
@@ -323,7 +327,7 @@ void Machine::writeCrt(utils::File const& outFile)
 
     for (auto const& section : sections) {
         LOGI("Start %x", section.start);
-        auto start = section.start & 0xffff;
+        // auto start = section.start & 0xffff;
         auto bank = section.start & 0xffffe000;
         auto& chip = chips[bank];
         auto offset = section.start - bank;
@@ -367,7 +371,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
         return;
     }
 
-    if(fmt == OutFmt::EasyFlash) {
+    if (fmt == OutFmt::EasyFlash) {
         writeCrt(outFile);
         return;
     }
@@ -434,11 +438,11 @@ void Machine::write(std::string const& name, OutFmt fmt)
 uint32_t Machine::run(uint16_t pc)
 {
     for (auto const& section : sections) {
-        if(section.start < 0x10000 && !section.data.empty()) {
+        if (section.start < 0x10000 && !section.data.empty()) {
             LOGI("Writing '%s' to %x", section.name, section.start);
             machine->writeRam(section.start, section.data.data(),
                               section.data.size());
-            }
+        }
     }
     fmt::print("Running code at ${:x}\n", pc);
     machine->setPC(pc);
@@ -476,12 +480,12 @@ std::string Machine::disassemble(uint32_t* pc)
     auto code = machine->readMem(*pc);
     pc++;
     auto const& instructions = sixfive::Machine<>::getInstructions();
-    sixfive::Machine<>::Opcode opcode;
+    sixfive::Machine<>::Opcode opcode{};
 
     std::string name = "???";
-    for(auto const& i : instructions) {
-        for(auto const& o : i.opcodes) {
-            if(o.code == code) {
+    for (auto const& i : instructions) {
+        for (auto const& o : i.opcodes) {
+            if (o.code == code) {
                 name = i.name;
                 opcode = o;
                 break;
@@ -490,10 +494,10 @@ std::string Machine::disassemble(uint32_t* pc)
     }
     auto sz = opSize(opcode.mode);
     int32_t arg = 0;
-    if(sz == 3) {
-        arg = machine->readMem(pc[0]) | (machine->readMem(pc[1])<<8);
+    if (sz == 3) {
+        arg = machine->readMem(pc[0]) | (machine->readMem(pc[1]) << 8);
         pc += 2;
-    } else if(sz == 2) {
+    } else if (sz == 2) {
         arg = machine->readMem(*pc++);
     }
 
@@ -501,10 +505,10 @@ std::string Machine::disassemble(uint32_t* pc)
         arg = (static_cast<int8_t>(arg)) + *pc;
     }
 
-    char argstr[16];
-    sprintf(argstr, modeTemplate.at(opcode.mode), arg);
+    std::array<char, 16> argstr; // NOLINT
+    sprintf(argstr.data(), modeTemplate.at(opcode.mode), arg);
 
-    return fmt::format("{} {}", name, argstr);
+    return fmt::format("{} {}", name, argstr.data());
 }
 
 AsmResult Machine::assemble(Instruction const& instr)
@@ -516,7 +520,7 @@ AsmResult Machine::assemble(Instruction const& instr)
 
     auto const& instructions = sixfive::Machine<>::getInstructions();
 
-    if(arg.mode == AddressingMode::ZP_REL) {
+    if (arg.mode == AddressingMode::ZP_REL) {
         auto bit = arg.val >> 24;
         arg.val &= 0xffffff;
         opcode = opcode + std::to_string(bit);
@@ -531,7 +535,8 @@ AsmResult Machine::assemble(Instruction const& instr)
 
     auto it1 = std::find_if(
         it0->opcodes.begin(), it0->opcodes.end(), [&](auto const& o) {
-            if (o.mode == AddressingMode::INDZ && arg.mode == AddressingMode::IND && arg.val <= 0xff) {
+            if (o.mode == AddressingMode::INDZ &&
+                arg.mode == AddressingMode::IND && arg.val <= 0xff) {
                 arg.mode = AddressingMode::INDZ;
             }
             if (o.mode == AddressingMode::ZPX &&
@@ -556,10 +561,9 @@ AsmResult Machine::assemble(Instruction const& instr)
             }
             if (o.mode == AddressingMode::ZP_REL) {
                 auto adr = arg.val & 0xffff;
-                auto val = (arg.val >>16) & 0xff;
+                auto val = (arg.val >> 16) & 0xff;
                 auto diff = adr - static_cast<int32_t>(currentSection->pc) - 2;
                 arg.val = diff << 8 | val;
-
             }
             return o.mode == arg.mode;
         });

@@ -42,7 +42,7 @@ AnyMap loadPng(std::string_view const& name)
             pal12.push_back(c >> 8);
         }
 
-        LOGD("Loaded %dx%d flle, %d colors", w, h, colors);
+        LOGD("Loaded %dx%d file, %d colors", w, h, colors);
 
         res["width"] = num(w);
         res["height"] = num(h);

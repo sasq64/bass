@@ -16,7 +16,7 @@ const char* banner = R"(
 | '_ \ / _` |/ _` |/ _` / __/ __|
 | |_) | (_| | (_| | (_| \__ \__ \
 |_.__/ \__,_|\__,_|\__,_|___/___/
-6502 assembler (beta4)      /sasq
+6502 assembler (beta5)      /sasq
 )";
 
 int main(int argc, char** argv)

@@ -62,7 +62,7 @@ Abs <- LabelRef / Expression
 AbsX <- Expression ',' _? 'X'i
 AbsY <- Expression ',' _? 'Y'i
 
-ZRel <- Expression ',' _? Expression ',' _? (LabelRef / Expression)
+ZRel <- Expression ':' _? Expression ',' _? (LabelRef / Expression)
 
 Imm <- '#' Expression
 

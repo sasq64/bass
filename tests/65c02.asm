@@ -26,16 +26,16 @@ $
     lda $04
     !check A == $55
     ldx #1
-    bbr 1,$04,.s0
+    bbr $04:1,.s0
     inx
 .s0
-    bbr 0,$04,+
+    bbr $04:0,+
     inx
 $
     !check X == 2
 
     lda #34
-    bbs 6,$04,+
+    bbs $04:6,+
     lda #12
 $
     !check A == 34

@@ -30,8 +30,7 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
         },
         [&](int hi_adr, int len, int bank) {
             mach.setBankRead(hi_adr, len, bank);
-        }
-    );
+        });
 
     lua["reg_a"] = [&]() {
         auto const& [a, x, y, sr, sp, pc] = mach.getRegs();

@@ -58,7 +58,9 @@ Section parseArgs(std::vector<std::any> args)
     for (auto const& arg : args) {
         if (auto* p =
                 std::any_cast<std::pair<std::string_view, std::any>>(&arg)) {
-            if (p->first == "start") {
+            if (p->first == "name") {
+                s.name = std::any_cast<std::string_view>(p->second);
+            } else if (p->first == "start") {
                 s.start = number<int32_t>(p->second);
             } else if (p->first == "size") {
                 s.size = number<int32_t>(p->second);
@@ -351,61 +353,14 @@ void initMeta(Assembler& a)
             sectionArgs.name = "__anon" + std::to_string(mach.getPC());
         }
 
-        // mach.addSection(section);
-        auto [name, in, children, start, pc, size, flags, data, valid] =
-            sectionArgs;
-
-        auto& section = mach.section(sectionArgs.name);
-
-        Check(section.data.empty(), "Section already populated");
-
-        section.flags = flags;
-        section.pc = pc;
-        if (size != -1) {
-            section.size = size;
-            section.flags |= SectionFlags::FixedSize;
-        }
-
-        if (start != -1) {
-            section.start = start;
-            section.flags |= SectionFlags::FixedStart;
-        }
-
-        Section* parent = nullptr;
-
-        // Create child section
-        if (!in.empty()) {
-            parent = &mach.section(in);
-            LOGI("Parent %s at %x/%x", parent->name, parent->start, parent->pc);
-            Check(parent->data.empty(), "Parent section must contain no data");
-
-            if (section.parent.empty()) {
-                section.parent = in;
-                parent->children.push_back(section.name);
-            }
-
-            if (parent->flags & SectionFlags::ReadOnly) {
-                section.flags |= SectionFlags::ReadOnly;
-            }
-
-            if (section.start == -1) {
-                LOGI("Setting start to %x", parent->pc);
-                section.start = parent->pc;
-            }
-        }
-
-        if (section.pc == -1) {
-            section.pc = section.start;
-        }
-
-        Check(section.start != -1, "Section must have start");
+        auto& section = mach.addSection(sectionArgs);
 
         if (!blocks.empty()) {
             mach.pushSection(section.name);
             auto sz = section.data.size();
             a.evaluateBlock(blocks[0]);
-            if (parent) {
-                parent->pc += section.data.size() - sz;
+            if (!section.parent.empty()) {
+                mach.section(section.parent).pc += section.data.size() - sz;
             }
             mach.popSection();
             return;

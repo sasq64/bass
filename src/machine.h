@@ -70,14 +70,12 @@ struct Section
 
     Section& setPC(int32_t s)
     {
-        if(start == pc) {
+        if (start == pc) {
             start = s;
         }
         pc = s;
         return *this;
     }
-
-
 
     std::string name;
     std::string parent;
@@ -120,11 +118,8 @@ public:
     std::string disassemble(uint32_t* pc);
 
     Section& section(std::string const& name);
-
     Section& addSection(Section const& s);
-    Section& addSection(std::string const& name, int32_t start);
-    Section& addSection(std::string const& name,
-                        std::string const& parent = "");
+
     void removeSection(std::string const& name);
     void setSection(std::string const& name);
     void popSection();

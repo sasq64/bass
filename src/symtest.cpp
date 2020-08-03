@@ -48,7 +48,6 @@ TEST_CASE("symbol_table.basic", "[symbols]")
 
     REQUIRE_THROWS(st.set("a", "hey"s));
 
-
     REQUIRE_THROWS(st.set("deep.two", syms));
 
     REQUIRE(!st.ok());
@@ -70,6 +69,4 @@ TEST_CASE("symbol_table.basic", "[symbols]")
     REQUIRE(st.get<std::string>("c") == "hey");
 
     REQUIRE(st.done());
-
 }
-

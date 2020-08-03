@@ -27,8 +27,6 @@ end
 scr_dest = 0x6000
 bitmap_dest = 0x4000
 
-    !print xx
-
     !section "main", 0x801
     !byte $0b, $08,$01,$00,$9e,str(start)," BY SASQ", $00,$00,$00
 start:
