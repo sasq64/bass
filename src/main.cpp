@@ -59,7 +59,7 @@ int main(int argc, char** argv)
         app.exit(e);
     }
     Assembler assem;
-    assem.debugflags((showUndef ? Assembler::DEB_PASS : 0) |
+    assem.debug_flags((showUndef ? Assembler::DEB_PASS : 0) |
                      (showTrace ? Assembler::DEB_TRACE : 0));
 
     if (outFile.empty()) {

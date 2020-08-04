@@ -101,7 +101,7 @@ public:
         DEB_PASS = 2
     };
 
-    void debugflags(uint32_t flags);
+    void debug_flags(uint32_t flags);
 
     void addCheck(std::string_view text);
     void addLog(std::string_view text);

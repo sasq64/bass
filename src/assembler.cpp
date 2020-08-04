@@ -70,7 +70,7 @@ void Assembler::trace(SVWrap const& sv) const
     }
 }
 
-void Assembler::debugflags(uint32_t flags)
+void Assembler::debug_flags(uint32_t flags)
 {
     doTrace = (flags & DEB_TRACE) != 0;
     passDebug = (flags & DEB_PASS) != 0;
@@ -501,10 +501,10 @@ void Assembler::setupRules()
     parser["Label"] = [&](SV& sv) {
         trace(sv);
 
-        auto lany = sv[0];
+        auto label_any = sv[0];
 
         if (auto* p =
-                std::any_cast<std::pair<std::string_view, int32_t>>(&lany)) {
+                std::any_cast<std::pair<std::string_view, int32_t>>(&label_any)) {
             // Indexed symbol: Label is array of values
             if (!syms.is_defined(p->first)) {
                 syms.set(p->first, std::vector<Number>{});
@@ -517,22 +517,22 @@ void Assembler::setupRules()
             // LOGI("setting %s[%d] -> %d", p->first, p->second, (int)vec[0]);
             return sv[0];
         }
-        auto labelv = std::any_cast<std::string_view>(sv[0]);
+        auto label_sv = std::any_cast<std::string_view>(sv[0]);
 
         std::string label;
-        if (labelv == "$" || labelv == "-" || labelv == "+") {
+        if (label_sv == "$" || label_sv == "-" || label_sv == "+") {
             if (inMacro != 0) throw parse_error("No special labels in macro");
             label = "__special_" + std::to_string(labelNum);
             labelNum++;
         } else {
-            label = std::string(labelv);
-            if (labelv[0] == '.') {
+            label = std::string(label_sv);
+            if (label_sv[0] == '.') {
                 if (lastLabel.empty()) {
                     throw parse_error("Local label without global label");
                 }
                 label = std::string(lastLabel) + label;
             } else {
-                lastLabel = labelv;
+                lastLabel = label_sv;
             }
         }
         // LOGI("Label %s=%x", label, mach->getPC());
@@ -936,7 +936,7 @@ void Assembler::setupRules()
         }
 
         val = syms.get(full);
-        // Set undefined numbers to PC, to increase likelyhood of
+        // Set undefined numbers to PC, to increase likelihood of
         // correct code generation (less passes)
         if (val.type() == typeid(Number) && !syms.is_defined(full)) {
             val = static_cast<Number>(mach->getPC());

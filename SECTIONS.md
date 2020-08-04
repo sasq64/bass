@@ -8,8 +8,8 @@ A leaf section is defined using `in="parent"`.
 A root section has no `in` and usually have a fixed size.
 
 Section layout options:
- First - Put this section first in the list of children
- Last - Keep this section last
+ * _First_ : Put this section first in the list of children
+ * _Last_ : Keep this section last
 
 Before any pass, clear the data of all sections
 
