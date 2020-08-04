@@ -93,10 +93,10 @@ struct Section
 
 enum class OutFmt
 {
+    Raw,
     Prg,
     Crt,
     EasyFlash,
-    Raw
 };
 
 using Tuple6 =

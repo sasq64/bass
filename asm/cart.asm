@@ -11,3 +11,6 @@ $   lda $d012
     sta $d021
     jmp -
 
+!section "dummy", $9ffc
+
+    !byte 0,0,0,0,0,0,0,0

@@ -256,7 +256,7 @@ void initMeta(Assembler& assem)
             }
         } else {
             auto size = number<size_t>(data);
-            LOGI("Fill %d bytes", size);
+            LOGD("Fill %d bytes", size);
             for (size_t i = 0; i < size; i++) {
                 syms.erase("i");
                 syms.set("i", any_num(i));

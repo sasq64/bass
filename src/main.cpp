@@ -29,12 +29,18 @@ int main(int argc, char** argv)
     bool dumpSyms = false;
     bool showUndef = false;
     bool showTrace = false;
-    std::string format;
+    OutFmt outFmt = OutFmt::Prg;
+    std::map<std::string, OutFmt> tr{
+        {"raw"s, OutFmt::Raw},
+        {"prg"s, OutFmt::Prg},
+        {"crt"s, OutFmt::Crt},
+    };
 
     puts(banner + 1);
 
     CLI::App app{"badass"};
-    app.add_option("-f,--format", format, "Output format");
+    app.add_option("-f,--format", outFmt, "Output format")
+        ->transform(CLI::CheckedTransformer(tr, CLI::ignore_case));
     app.add_flag("--trace", showTrace, "Trace rule invocations");
     app.add_flag("--show-undefined", showUndef,
                  "Show undefined after each pass");
@@ -54,14 +60,12 @@ int main(int argc, char** argv)
     }
     Assembler assem;
     assem.debugflags((showUndef ? Assembler::DEB_PASS : 0) |
-                   (showTrace ? Assembler::DEB_TRACE : 0));
-
-    OutFmt outFmt = OutFmt::Prg;
-    if(format == "raw") outFmt = OutFmt::Raw;
-    else if (format == "crt") outFmt = OutFmt::Crt;
+                     (showTrace ? Assembler::DEB_TRACE : 0));
 
     if (outFile.empty()) {
-        outFile = outFmt == OutFmt::Prg ? "result.prg" : (outFmt == OutFmt::Crt ? "result.crt" : "result.bin");
+        outFile = outFmt == OutFmt::Prg
+                      ? "result.prg"
+                      : (outFmt == OutFmt::Crt ? "result.crt" : "result.bin");
     }
 
     auto& mach = assem.getMachine();

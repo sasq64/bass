@@ -54,10 +54,12 @@ Section& Machine::addSection(Section const& s)
 {
     auto [name, in, children, start, pc, size, flags, data, valid] = s;
 
-    auto it = std::find_if(sections.begin(), sections.end(),
-                           [name=name](auto const& as) { return as.name == name; });
+    auto it =
+        std::find_if(sections.begin(), sections.end(),
+                     [name = name](auto const& as) { return as.name == name; });
 
-    Section& section = it == sections.end() ? sections.emplace_back(name, -1) : *it;
+    Section& section =
+        it == sections.end() ? sections.emplace_back(name, -1) : *it;
 
     Check(section.data.empty(), "Section already populated");
 
@@ -300,31 +302,38 @@ void Machine::writeCrt(utils::File const& outFile)
 {
     std::map<uint32_t, Chip> chips;
     bool banked = false;
+    uint8_t exrom = 0;
+    uint8_t game = 1;
 
-    // 8000 -> bfff 
+    // 8000 -> bfff
     // e000 -> ffff
     for (auto const& section : sections) {
-        if(section.data.empty()) {
+        if (section.data.empty()) {
             continue;
         }
         LOGI("Start %x", section.start);
         auto bank = section.start >> 16;
-        auto adr = section.start & 0xffff;
+        auto start = section.start & 0xffff;
+        auto end = start + section.data.size();
         // bank : 01a000,01c000,01e000
-        if(adr < 0x8000 || (adr + section.data.size()) > 0xc000) {
+        if (start < 0x8000 || end > 0xc000) {
             throw machine_error("Can't write crt");
         }
 
-        auto offset = adr - 0x8000;
+        if(end >= 0xa000) {
+            game = 0;
+        }
 
-        if(bank > 0) {
+        auto offset = start - 0x8000;
+
+        if (bank > 0) {
             banked = true;
         }
 
-        auto& chip = chips[bank<<16 | 0x8000];
+        auto& chip = chips[bank << 16 | 0x8000];
         LOGI("Putting section %s in %x at offset %x", section.name, bank,
              offset);
-        if((int32_t)chip.data.size() <= offset) {
+        if (static_cast<int32_t>(chip.data.size()) <= offset) {
             chip.data.resize(0x4000);
         }
         memcpy(&chip.data[offset], section.data.data(), section.data.size());
@@ -332,7 +341,8 @@ void Machine::writeCrt(utils::File const& outFile)
 
     const uint32_t headerLength = 0x40;
     const uint16_t version = 0x0100;
-    const uint16_t hardware = banked ? CartType::EasyFlash : CartType::Normalcartridge;
+    const uint16_t hardware =
+        banked ? CartType::EasyFlash : CartType::Normalcartridge;
 
     std::string name = "TEST";
     std::array<char, 32> label{};
@@ -342,16 +352,15 @@ void Machine::writeCrt(utils::File const& outFile)
     outFile.writeBE(headerLength);
     outFile.writeBE(version);
     outFile.writeBE(hardware);
-    outFile.write<uint8_t>(0);
-    outFile.write<uint8_t>(0);
+    outFile.write<uint8_t>(exrom);
+    outFile.write<uint8_t>(game);
     outFile.write(std::vector<uint8_t>{0, 0, 0, 0, 0, 0});
     outFile.write(label);
-
 
     for (auto const& e : chips) {
         auto bank = e.first >> 16;
         auto start = e.first & 0xffff;
-        LOGI("Writing %x/%x", bank, start);
+        LOGD("Writing %x/%x", bank, start);
         writeChip(outFile, bank, start, e.second.data);
     }
 }
