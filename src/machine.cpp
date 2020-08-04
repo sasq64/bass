@@ -20,7 +20,7 @@ inline void Check(bool v, std::string const& txt)
 Machine::Machine()
 {
     machine = std::make_unique<sixfive::Machine<>>();
-    section("default").setStart(0).flags = FixedStart;
+    addSection({"default", 0});
     setSection("default");
     machine->setBreakFunction(breakFunction, this);
 }
@@ -50,21 +50,14 @@ void Machine::setBreakFunction(uint8_t what,
     break_functions[what] = fn;
 }
 
-Section& Machine::section(std::string const& name)
-{
-    auto it = std::find_if(sections.begin(), sections.end(),
-                           [&](auto const& s) { return s.name == name; });
-    if (it == sections.end()) {
-        return sections.emplace_back(name, -1);
-    }
-    return *it;
-}
-
 Section& Machine::addSection(Section const& s)
 {
     auto [name, in, children, start, pc, size, flags, data, valid] = s;
 
-    auto& section = this->section(s.name);
+    auto it = std::find_if(sections.begin(), sections.end(),
+                           [name=name](auto const& as) { return as.name == name; });
+
+    Section& section = it == sections.end() ? sections.emplace_back(name, -1) : *it;
 
     Check(section.data.empty(), "Section already populated");
 
@@ -80,9 +73,8 @@ Section& Machine::addSection(Section const& s)
         section.flags |= SectionFlags::FixedStart;
     }
 
-    // Create child section
     if (!in.empty()) {
-        auto& parent = this->section(in);
+        auto& parent = getSection(in);
         LOGI("Parent %s at %x/%x", parent.name, parent.start, parent.pc);
         Check(parent.data.empty(), "Parent section must contain no data");
 
@@ -237,7 +229,7 @@ void Machine::popSection()
 
 void Machine::setSection(std::string const& name)
 {
-    currentSection = &section(name);
+    currentSection = &getSection(name);
     currentSection->valid = true;
 }
 
@@ -327,7 +319,7 @@ void Machine::writeCrt(utils::File const& outFile)
 
     for (auto const& section : sections) {
         LOGI("Start %x", section.start);
-        // auto start = section.start & 0xffff;
+        auto start = section.start & 0xffff;
         auto bank = section.start & 0xffffe000;
         auto& chip = chips[bank];
         auto offset = section.start - bank;
@@ -413,11 +405,11 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
         if (hi_adr > 0) {
             offset = section.start & 0xffff;
-            /* if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) { */
-            /*     offset = hi_adr * 8192 + adr; */
-            /* } else { */
-            /*     throw machine_error("Illegal address"); */
-            /* } */
+            if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) {
+                offset = hi_adr * 8192 + adr;
+            } else {
+                throw machine_error("Illegal address");
+            }
         }
 
         if (last_end >= 0) {

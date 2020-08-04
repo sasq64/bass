@@ -55,6 +55,9 @@ struct Section
     Section() = default;
     Section(std::string const& n, uint32_t s) : name(n), start(s), pc(s) {}
 
+    Section(std::string const& name_, std::string const& parent_) :
+        name(name_), parent(parent_) {}
+
     Section& addByte(uint8_t b)
     {
         data.push_back(b);
@@ -117,7 +120,6 @@ public:
     AsmResult assemble(Instruction const& instr);
     std::string disassemble(uint32_t* pc);
 
-    Section& section(std::string const& name);
     Section& addSection(Section const& s);
 
     void removeSection(std::string const& name);
@@ -153,6 +155,7 @@ public:
     void setBankRead(int hi_adr, int len, int bank);
 
 private:
+
     std::deque<Section*> savedSections;
     bool inData = false;
     std::unordered_map<uint8_t, std::function<void(uint8_t)>> break_functions;

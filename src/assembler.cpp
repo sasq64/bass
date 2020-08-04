@@ -201,8 +201,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 
     auto saved = save();
 
-    auto& testSection = mach->section("__test");
-    testSection.setStart(testLocation).setPC(testLocation);
+    auto& testSection = mach->addSection({"__test", testLocation});
     mach->pushSection("__test");
 
     auto start = mach->getPC();
@@ -351,7 +350,7 @@ void Assembler::addDefine(std::string_view name,
     definitions[name] = {name, args, contents, line};
 }
 
-void initMeta(Assembler& ass);
+void initMeta(Assembler& assem);
 void initFunctions(Assembler& ass);
 void registerLuaFunctions(Assembler& a, Scripting& s);
 

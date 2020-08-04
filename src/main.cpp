@@ -10,7 +10,7 @@
 
 #include <CLI/CLI.hpp>
 
-const char* banner = R"(
+static const char* const banner = R"(
  _               _
 | |__   __ _  __| | __ _ ___ ___
 | '_ \ / _` |/ _` |/ _` / __/ __|
@@ -31,6 +31,7 @@ int main(int argc, char** argv)
     bool dumpSyms = false;
     bool showUndef = false;
     bool showTrace = false;
+
     puts(banner + 1);
 
     CLI::App app{"badass"};
@@ -53,8 +54,8 @@ int main(int argc, char** argv)
     } catch (const CLI::ParseError& e) {
         app.exit(e);
     }
-    Assembler ass;
-    ass.debugflags((showUndef ? Assembler::DEB_PASS : 0) |
+    Assembler assem;
+    assem.debugflags((showUndef ? Assembler::DEB_PASS : 0) |
                    (showTrace ? Assembler::DEB_TRACE : 0));
 
     OutFmt outFmt = raw ? OutFmt::Raw : OutFmt::Prg;
@@ -62,14 +63,14 @@ int main(int argc, char** argv)
         outFile = outFmt == OutFmt::Prg ? "result.prg" : "result.bin";
     }
 
-    auto& mach = ass.getMachine();
-    auto& syms = ass.getSymbols();
+    auto& mach = assem.getMachine();
+    auto& syms = assem.getSymbols();
 
     utils::File defFile{"out.def", utils::File::Write};
     mach.setOutput(defFile.filePointer());
 
     for (auto const& sf : scriptFiles) {
-        ass.addScript(utils::path(sf));
+        assem.addScript(utils::path(sf));
     }
 
     for (auto const& d : definitions) {
@@ -85,8 +86,8 @@ int main(int argc, char** argv)
     bool failed = false;
     for (auto const& sourceFile : sourceFiles) {
         auto sp = utils::path(sourceFile);
-        if (!ass.parse_path(sp)) {
-            for (auto const& e : ass.getErrors()) {
+        if (!assem.parse_path(sp)) {
+            for (auto const& e : assem.getErrors()) {
                 if (e.level == ErrLevel::Error) failed = true;
                 fmt::print("{}:{}: {}: {}\n", sourceFile, e.line,
                            e.level == ErrLevel::Warning ? "warning" : "error",
@@ -104,7 +105,7 @@ int main(int argc, char** argv)
                    section.start + section.data.size(), section.name);
     }
 
-    if (dumpSyms) ass.printSymbols();
+    if (dumpSyms) assem.printSymbols();
 
     return 0;
 }
