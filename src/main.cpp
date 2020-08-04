@@ -26,17 +26,15 @@ int main(int argc, char** argv)
     std::vector<std::string> scriptFiles;
     std::vector<std::string> definitions;
     std::string outFile;
-    bool raw = false;
-    bool prg = false;
     bool dumpSyms = false;
     bool showUndef = false;
     bool showTrace = false;
+    std::string format;
 
     puts(banner + 1);
 
     CLI::App app{"badass"};
-    app.add_flag("-p,--prg", prg, "Output PRG");
-    app.add_flag("-b,--bin", raw, "Output RAW");
+    app.add_option("-f,--format", format, "Output format");
     app.add_flag("--trace", showTrace, "Trace rule invocations");
     app.add_flag("--show-undefined", showUndef,
                  "Show undefined after each pass");
@@ -58,9 +56,12 @@ int main(int argc, char** argv)
     assem.debugflags((showUndef ? Assembler::DEB_PASS : 0) |
                    (showTrace ? Assembler::DEB_TRACE : 0));
 
-    OutFmt outFmt = raw ? OutFmt::Raw : OutFmt::Prg;
+    OutFmt outFmt = OutFmt::Prg;
+    if(format == "raw") outFmt = OutFmt::Raw;
+    else if (format == "crt") outFmt = OutFmt::Crt;
+
     if (outFile.empty()) {
-        outFile = outFmt == OutFmt::Prg ? "result.prg" : "result.bin";
+        outFile = outFmt == OutFmt::Prg ? "result.prg" : (outFmt == OutFmt::Crt ? "result.crt" : "result.bin");
     }
 
     auto& mach = assem.getMachine();

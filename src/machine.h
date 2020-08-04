@@ -94,6 +94,7 @@ struct Section
 enum class OutFmt
 {
     Prg,
+    Crt,
     EasyFlash,
     Raw
 };

@@ -282,7 +282,7 @@ void writeChip(utils::File const& outFile, int bank, int startAddress,
 {
     outFile.writeString("CHIP");
     outFile.writeBE<uint32_t>(data.size() + 0x10);
-    outFile.writeBE<uint16_t>(ChipType::Flash);
+    outFile.writeBE<uint16_t>(ChipType::Rom);
     outFile.writeBE<uint16_t>(bank);
     outFile.writeBE<uint16_t>(startAddress);
     outFile.writeBE<uint16_t>(data.size());
@@ -298,9 +298,41 @@ struct Chip
 
 void Machine::writeCrt(utils::File const& outFile)
 {
+    std::map<uint32_t, Chip> chips;
+    bool banked = false;
+
+    // 8000 -> bfff 
+    // e000 -> ffff
+    for (auto const& section : sections) {
+        if(section.data.empty()) {
+            continue;
+        }
+        LOGI("Start %x", section.start);
+        auto bank = section.start >> 16;
+        auto adr = section.start & 0xffff;
+        // bank : 01a000,01c000,01e000
+        if(adr < 0x8000 || (adr + section.data.size()) > 0xc000) {
+            throw machine_error("Can't write crt");
+        }
+
+        auto offset = adr - 0x8000;
+
+        if(bank > 0) {
+            banked = true;
+        }
+
+        auto& chip = chips[bank<<16 | 0x8000];
+        LOGI("Putting section %s in %x at offset %x", section.name, bank,
+             offset);
+        if((int32_t)chip.data.size() <= offset) {
+            chip.data.resize(0x4000);
+        }
+        memcpy(&chip.data[offset], section.data.data(), section.data.size());
+    }
+
     const uint32_t headerLength = 0x40;
     const uint16_t version = 0x0100;
-    const uint16_t hardware = CartType::EasyFlash;
+    const uint16_t hardware = banked ? CartType::EasyFlash : CartType::Normalcartridge;
 
     std::string name = "TEST";
     std::array<char, 32> label{};
@@ -310,23 +342,11 @@ void Machine::writeCrt(utils::File const& outFile)
     outFile.writeBE(headerLength);
     outFile.writeBE(version);
     outFile.writeBE(hardware);
-    outFile.write<uint8_t>(1);
+    outFile.write<uint8_t>(0);
     outFile.write<uint8_t>(0);
     outFile.write(std::vector<uint8_t>{0, 0, 0, 0, 0, 0});
     outFile.write(label);
 
-    std::map<uint32_t, Chip> chips;
-
-    for (auto const& section : sections) {
-        LOGI("Start %x", section.start);
-        auto start = section.start & 0xffff;
-        auto bank = section.start & 0xffffe000;
-        auto& chip = chips[bank];
-        auto offset = section.start - bank;
-        LOGI("Putting section %s in %x at offset %x", section.name, bank,
-             offset);
-        memcpy(&chip.data[offset], section.data.data(), section.data.size());
-    }
 
     for (auto const& e : chips) {
         auto bank = e.first >> 16;
@@ -363,7 +383,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
         return;
     }
 
-    if (fmt == OutFmt::EasyFlash) {
+    if (fmt == OutFmt::Crt) {
         writeCrt(outFile);
         return;
     }
