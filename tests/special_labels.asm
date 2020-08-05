@@ -44,9 +44,29 @@ $   nop
     dummy(0)
 $   nop
 
+
+many:
+
+    ldx #0
+    bra +++
+    nop
+$
+    bra .out
+$
+    inx
+    bra .out
+$
+    ldx #3
+    bra --
+    rts
+.out
+    rts
+
     !test {
         !log "We are here"
         jsr first
         !log "X=",X
+        jsr many
+        !check X == 4
         nop
     }

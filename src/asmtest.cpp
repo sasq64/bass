@@ -7,7 +7,6 @@
 
 #include "machine.h"
 #include <cmath>
-#include <coreutils/log.h>
 #include <fmt/color.h>
 #include <fmt/format.h>
 #include <string>
@@ -207,9 +206,9 @@ sine_table:
 )");
 
     auto& mach = ass.getMachine();
-    int sine_table = (int)syms.get<Number>("sine_table");
+    int sine_table = static_cast<int>(syms.get<Number>("sine_table"));
     for (int i = 0; i < 256; i++) {
-        unsigned v = (int)(sin(i * M_PI / 180) * 127);
+        unsigned v = static_cast<int>(sin(i * M_PI / 180) * 127);
         REQUIRE(mach.getSection("main").data[sine_table + i - 0x800] ==
                 (v & 0xff));
     }

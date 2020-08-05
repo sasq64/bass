@@ -503,8 +503,8 @@ void Assembler::setupRules()
 
         auto label_any = sv[0];
 
-        if (auto* p =
-                std::any_cast<std::pair<std::string_view, int32_t>>(&label_any)) {
+        if (auto* p = std::any_cast<std::pair<std::string_view, int32_t>>(
+                &label_any)) {
             // Indexed symbol: Label is array of values
             if (!syms.is_defined(p->first)) {
                 syms.set(p->first, std::vector<Number>{});
@@ -732,12 +732,12 @@ void Assembler::setupRules()
 
         std::any val;
         std::string l = std::string(label);
-        if (label == "+") {
+        if (label[0] == '+') {
             if (inMacro != 0) throw parse_error("No special labels in macro");
-            l = "__special_" + std::to_string(labelNum);
-        } else if (label == "-") {
+            l = "__special_" + std::to_string(labelNum + label.length()-1);
+        } else if (label[0] == '-') {
             if (inMacro != 0) throw parse_error("No special labels in macro");
-            l = "__special_" + std::to_string(labelNum - 1);
+            l = "__special_" + std::to_string(labelNum - label.length());
         }
         return syms.get(l);
     };
