@@ -19,6 +19,18 @@ extern char const* const grammar6502;
 
 using sixfive::AddressingMode;
 
+
+// OpenBSD
+#ifdef _N
+#undef _N
+#endif
+
+Number operator"" _N(unsigned long long a)
+{
+    return static_cast<Number>(a);
+}
+
+
 std::string to_string(std::any const& val)
 {
     if (auto const* n = std::any_cast<Number>(&val)) {
@@ -184,11 +196,6 @@ int Assembler::checkUndefined()
         return ERROR;
     }
     return PASS;
-}
-
-Number operator"" _N(unsigned long long a)
-{
-    return static_cast<Number>(a);
 }
 
 AnyMap Assembler::runTest(std::string_view name, std::string_view contents)

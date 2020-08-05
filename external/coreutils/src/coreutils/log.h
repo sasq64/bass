@@ -3,6 +3,7 @@
 #include "format.h"
 #include <cstring>
 #include <string>
+#include <cstdarg>
 
 namespace logging {
 
