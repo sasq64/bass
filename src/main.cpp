@@ -60,7 +60,7 @@ int main(int argc, char** argv)
     }
     Assembler assem;
     assem.debug_flags((showUndef ? Assembler::DEB_PASS : 0) |
-                     (showTrace ? Assembler::DEB_TRACE : 0));
+                      (showTrace ? Assembler::DEB_TRACE : 0));
 
     if (outFile.empty()) {
         outFile = outFmt == OutFmt::Prg

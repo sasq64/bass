@@ -64,6 +64,13 @@ bool checkErrors(std::vector<Error> errs)
     return errs.empty();
 }
 
+TEST_CASE("png", "[assembler]") {
+
+    auto png = loadPng("../data/tiles.png");
+    auto v = std::any_cast<std::vector<uint8_t>>(png["tiles"]);
+    REQUIRE(v[0] == 0);
+}
+
 TEST_CASE("all", "[assembler]")
 {
     for (auto const& p : utils::listFiles(projDir() / "tests")) {

@@ -73,11 +73,11 @@ else()
     add_executable(bass src/main.cpp)
     target_link_libraries(bass PRIVATE badlib CLI11::CLI11)
 
-    add_executable(sectiontest src/testmain.cpp src/sectiontest.cpp src/machine.cpp)
+    add_executable(sectiontest EXCLUDE_FROM_ALL src/testmain.cpp src/sectiontest.cpp src/machine.cpp)
     target_include_directories(sectiontest PRIVATE src)
     target_link_libraries(sectiontest PRIVATE catch coreutils fmt)
 
-    add_executable(symtest src/testmain.cpp src/symtest.cpp)
+    add_executable(symtest EXCLUDE_FROM_ALL src/testmain.cpp src/symtest.cpp)
     target_include_directories(symtest PRIVATE src)
     target_link_libraries(symtest PRIVATE catch coreutils fmt)
 

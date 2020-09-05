@@ -40,10 +40,10 @@ class basic_bitmap
         const const_split_iterator& operator++()
         {
             xpos += width;
-            if (xpos > (int)(bm.width() - width)) {
+            if (xpos > (bm.width() - width)) {
                 xpos = 0;
                 ypos += height;
-                if (ypos > (int)(bm.height() - height)) {
+                if (ypos > bm.height() - height) {
                     xpos = ypos = -1;
                 }
             }
@@ -52,8 +52,8 @@ class basic_bitmap
 
     private:
         const basic_bitmap& bm;
-        uint32_t width;
-        uint32_t height;
+        int32_t width;
+        int32_t height;
         int32_t xpos;
         int32_t ypos;
     };
@@ -61,7 +61,7 @@ class basic_bitmap
     class splitter
     {
     public:
-        splitter(const basic_bitmap& bm, uint32_t w, uint32_t h)
+        splitter(const basic_bitmap& bm, int32_t w, int32_t h)
             : bm(bm), width(w), height(h)
         {}
         const_split_iterator begin()
@@ -76,24 +76,23 @@ class basic_bitmap
 
     private:
         const basic_bitmap& bm;
-        uint32_t width;
-        uint32_t height;
+        int32_t width;
+        int32_t height;
     };
 
 public:
-    splitter split(uint32_t sw, uint32_t sh) const
+    splitter split(int32_t sw, int32_t sh) const
     {
         return splitter(*this, sw, sh);
     }
 
-    basic_bitmap() : w(0), h(0) {}
+    basic_bitmap() = default;
 
-    basic_bitmap(uint32_t width, uint32_t height,
-                 std::function<T(uint32_t, uint32_t)> const& f)
+    basic_bitmap(int32_t width, int32_t height,
+                 std::function<T(int32_t, int32_t)> const& f)
+        : w{width}, h{height}, pixels{
+                                   std::shared_ptr<T[]>(new T[width * height])}
     {
-        w = width;
-        h = height;
-        pixels = std::shared_ptr<T[]>(new T[width * height]);
         auto* ptr = pixels.get();
         for (int32_t yy = 0; yy < h; yy++) {
             for (int32_t xx = 0; xx < w; xx++) {
@@ -102,33 +101,38 @@ public:
         }
     }
 
-    basic_bitmap(uint32_t width, uint32_t height) : w(width), h(height)
+    basic_bitmap(int32_t width, int32_t height) : w(width), h(height)
     {
-        pixels = std::shared_ptr<T>(new T[width * height], std::default_delete<T[]>());
+        pixels = std::shared_ptr<T>(new T[width * height],
+                                    std::default_delete<T[]>());
     }
 
-    basic_bitmap(uint32_t width, uint32_t height, const std::vector<T>& data)
+    basic_bitmap(int32_t width, int32_t height, const std::vector<T>& data)
         : w(width), h(height)
     {
-        pixels = std::shared_ptr<T>(new T[width * height], std::default_delete<T[]>());
+        pixels = std::shared_ptr<T>(new T[width * height],
+                                    std::default_delete<T[]>());
         memcpy(&(*pixels)[0], &data[0], sizeof(T) * width * height);
     }
 
-    basic_bitmap(uint32_t width, uint32_t height, const T& color)
+    basic_bitmap(int32_t width, int32_t height, const T& color)
         : w(width), h(height)
     {
-        pixels = std::shared_ptr<T>(new T[width * height], std::default_delete<T[]>());
+        pixels = std::shared_ptr<T>(new T[width * height],
+                                    std::default_delete<T[]>());
         std::fill(pixels->begin(), pixels->end(), color);
     }
 
-    basic_bitmap(uint32_t width, uint32_t height, const T* px)
+    basic_bitmap(int32_t width, int32_t height, const T* px)
         : w(width), h(height)
     {
-        pixels = std::shared_ptr<T>(new T[width * height], std::default_delete<T[]>());
+        pixels = std::shared_ptr<T>(new T[width * height],
+                                    std::default_delete<T[]>());
         memcpy(pixels.get(), px, sizeof(T) * width * height);
     }
 
-    /* basic_bitmap(uint32_t width, uint32_t height, int32_t n, const uint8_t* px) */
+    /* basic_bitmap(int32_t width, int32_t height, int32_t n, const int8_t* px)
+     */
     /*     : w(width), h(height) */
     /* { */
     /*     pixels = std::shared_ptr<T[]>(new T[width * height]); */
@@ -170,12 +174,12 @@ public:
     }
 
     //! Return a cut out of the bitmap
-    basic_bitmap cut(int32_t x, int32_t y, uint32_t ww, uint32_t hh) const
+    basic_bitmap cut(int32_t x, int32_t y, int32_t ww, int32_t hh) const
     {
         basic_bitmap dest(ww, hh);
         T* p = pixels.get();
-        for (uint32_t yy = 0; yy < hh; yy++)
-            for (uint32_t xx = 0; xx < ww; xx++) {
+        for (int32_t yy = 0; yy < hh; yy++)
+            for (int32_t xx = 0; xx < ww; xx++) {
                 if (xx + x >= w || yy + y >= h)
                     dest[xx + yy * ww] = 0;
                 else
@@ -197,8 +201,8 @@ public:
         return result;
     }
 
-    uint32_t width() const { return w; }
-    uint32_t height() const { return h; }
+    int32_t width() const { return w; }
+    int32_t height() const { return h; }
     int64_t size() const { return w * h; }
 
     uint32_t crc() const
@@ -209,8 +213,8 @@ public:
 
 private:
     std::shared_ptr<T> pixels;
-    uint32_t w;
-    uint32_t h;
+    int32_t w;
+    int32_t h;
 };
 
 typedef basic_bitmap<uint32_t> bitmap;
