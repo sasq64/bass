@@ -95,7 +95,7 @@ public:
     void evaluateBlock(std::string_view block, size_t line);
     AnyMap runTest(std::string_view name, std::string_view contents);
 
-    enum
+    enum DebugFlags
     {
         DEB_TRACE = 1,
         DEB_PASS = 2

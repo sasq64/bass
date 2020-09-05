@@ -320,7 +320,7 @@ void Machine::writeCrt(utils::File const& outFile)
             throw machine_error("Can't write crt");
         }
 
-        if(end >= 0xa000) {
+        if (end >= 0xa000) {
             game = 0;
         }
 
@@ -367,25 +367,25 @@ void Machine::writeCrt(utils::File const& outFile)
 
 void Machine::write(std::string const& name, OutFmt fmt)
 {
-    auto filtered = utils::filter_to(
+    auto non_empty = utils::filter_to(
         sections, [](auto const& s) { return !s.data.empty(); });
 
-    if (filtered.empty()) {
+    if (non_empty.empty()) {
         puts("**Warning: No sections");
         return;
     }
 
-    LOGD("%d data sections", filtered.size());
+    LOGD("%d data sections", non_empty.size());
 
-    std::sort(filtered.begin(), filtered.end(),
+    std::sort(non_empty.begin(), non_empty.end(),
               [](auto const& a, auto const& b) { return a.start < b.start; });
 
     int32_t last_end = -1;
     utils::File outFile{name, utils::File::Mode::Write};
 
-    auto start = filtered.front().start;
-    auto end = filtered.back().start +
-               static_cast<int32_t>(filtered.back().data.size());
+    auto start = non_empty.front().start;
+    auto end = non_empty.back().start +
+               static_cast<int32_t>(non_empty.back().data.size());
 
     if (end <= start) {
         puts("**Warning: No code generated");
@@ -404,7 +404,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
     // bool bankFile = false;
 
-    for (auto const& section : filtered) {
+    for (auto const& section : non_empty) {
 
         if (section.start < last_end) {
             throw machine_error(
@@ -547,6 +547,7 @@ AsmResult Machine::assemble(Instruction const& instr)
         opcode = opcode + std::to_string(bit);
     }
 
+    // Find a matching opcode
     auto it0 = std::find_if(instructions.begin(), instructions.end(),
                             [&](auto const& i) { return i.name == opcode; });
 
@@ -554,43 +555,51 @@ AsmResult Machine::assemble(Instruction const& instr)
         return AsmResult::NoSuchOpcode;
     }
 
-    auto it1 = std::find_if(
-        it0->opcodes.begin(), it0->opcodes.end(), [&](auto const& o) {
-            if (o.mode == AddressingMode::INDZ &&
-                arg.mode == AddressingMode::IND && arg.val <= 0xff) {
-                arg.mode = AddressingMode::INDZ;
+    auto modeMatches = [&](auto const& opcode, auto const& instruction) {
+        if (instruction.mode == opcode.mode) {
+            return true;
+        }
+
+        // Adressing mode did not match directly. See if we can
+        // 'optimize it' depending on the instruction value
+
+        static std::unordered_map<AddressingMode, AddressingMode> conv{
+            {AddressingMode::INDZ, AddressingMode::IND},
+            {AddressingMode::ZPX, AddressingMode::ABSX},
+            {AddressingMode::ZPY, AddressingMode::ABSY},
+            {AddressingMode::ZP, AddressingMode::ABS}};
+
+        if (instruction.val >= 0 && instruction.val <= 0xff) {
+            if (conv[opcode.mode] == instruction.mode) {
+                return true;
             }
-            if (o.mode == AddressingMode::ZPX &&
-                arg.mode == AddressingMode::ABSX && arg.val >= 0 &&
-                arg.val <= 0xff) {
-                arg.mode = AddressingMode::ZPX;
-            }
-            if (o.mode == AddressingMode::ZPY &&
-                arg.mode == AddressingMode::ABSY && arg.val >= 0 &&
-                arg.val <= 0xff) {
-                arg.mode = AddressingMode::ZPY;
-            }
-            if (o.mode == AddressingMode::ZP &&
-                arg.mode == AddressingMode::ABS && arg.val >= 0 &&
-                arg.val <= 0xff) {
-                arg.mode = AddressingMode::ZP;
-            }
-            if (o.mode == AddressingMode::REL) {
-                arg.mode = AddressingMode::REL;
-                arg.val =
-                    arg.val - static_cast<int32_t>(currentSection->pc) - 2;
-            }
-            if (o.mode == AddressingMode::ZP_REL) {
-                auto adr = arg.val & 0xffff;
-                auto val = (arg.val >> 16) & 0xff;
-                auto diff = adr - static_cast<int32_t>(currentSection->pc) - 2;
-                arg.val = diff << 8 | val;
-            }
-            return o.mode == arg.mode;
-        });
+        }
+
+        if (instruction.mode == AddressingMode::ABS &&
+            opcode.mode == AddressingMode::REL) {
+            return true;
+        }
+        return false;
+    };
+
+    // Find a matching addressing mode
+    auto it1 = std::find_if(it0->opcodes.begin(), it0->opcodes.end(),
+                            [&](auto const& o) { return modeMatches(o, arg); });
 
     if (it1 == it0->opcodes.end()) {
         return AsmResult::IllegalAdressingMode;
+    }
+    arg.mode = it1->mode;
+
+    if (arg.mode == AddressingMode::REL) {
+        arg.val = arg.val - currentSection->pc - 2;
+    }
+
+    if (arg.mode == AddressingMode::ZP_REL) {
+        auto adr = arg.val & 0xffff;
+        auto val = (arg.val >> 16) & 0xff;
+        auto diff = adr - currentSection->pc - 2;
+        arg.val = diff << 8 | val;
     }
 
     auto sz = opSize(arg.mode);

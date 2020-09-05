@@ -63,10 +63,10 @@ struct Machine
         Opcode(uint8_t code, int cycles, AddressingMode mode, OpFunc op)
             : code(code), cycles(cycles), mode(mode), op(op)
         {}
-        uint8_t code;
-        uint8_t cycles;
-        AddressingMode mode;
-        OpFunc op;
+        uint8_t code = 0;
+        uint8_t cycles = 0;
+        AddressingMode mode = AddressingMode::NONE;
+        OpFunc op = nullptr;
     };
 
     struct Instruction
@@ -192,7 +192,7 @@ struct Machine
         while (cycles < toCycles) {
             if (POLICY::eachOp(p)) break;
             auto code = ReadPC();
-            //LOGI("%04x: %02x", pc-1, code);
+            // LOGI("%04x: %02x", pc-1, code);
             auto& op = jumpTable[code];
             op.op(*this);
             cycles += op.cycles;
@@ -337,7 +337,7 @@ private:
 
     uint8_t get_SR() const
     {
-        return sr | ((result | (result >> 2)) & 0x80) | (!(result & 0xff) << 1);
+        return sr | ((result | (result >> 2)) & 0x80) | (result == 0 ? 2 : 0);
     }
 
     template <bool DEC>
@@ -1127,7 +1127,7 @@ private:
                     [&](auto const& i) { return strcmp(i.name, v.name) == 0; });
                 if (it != instructionTable.end()) {
                     it->opcodes.insert(it->opcodes.begin(), v.opcodes.begin(),
-                              v.opcodes.end());
+                                       v.opcodes.end());
                 } else {
                     instructionTable.push_back(v);
                 }
