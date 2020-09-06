@@ -22,14 +22,3 @@ inline utils::path projDir()
    return projectDir;
 }
 
-inline utils::path testFilePath(std::string const& name)
-{
-   return projDir() / "data" / "test" / name;
-
-}
-
-inline std::string readTestFile(std::string const& name)
-{
-   return utils::File{projDir() / "data" / "test" / name}.readAllString();
-
-}

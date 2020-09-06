@@ -5,6 +5,8 @@
 #include "assembler.h"
 #include "test_utils.h"
 
+#include "test_utils.h"
+
 #include "machine.h"
 #include <cmath>
 #include <fmt/color.h>
@@ -59,16 +61,35 @@ bool checkErrors(std::vector<Error> errs)
             it = errs.erase(it);
         } else {
             it++;
-        }
+       }
     }
     return errs.empty();
 }
 
-TEST_CASE("png", "[assembler]") {
+TEST_CASE("png", "[assembler]")
+{
 
-    auto png = loadPng("../data/tiles.png");
+    auto png = loadPng((projDir() / "data" / "tiles.png").string());
     auto v = std::any_cast<std::vector<uint8_t>>(png["tiles"]);
+    auto pixels = std::any_cast<std::vector<uint8_t>>(png["pixels"]);
     REQUIRE(v[0] == 0);
+    auto tiles = layoutTiles(pixels, 96, 2, 16);
+
+    uint8_t* tile8 = &tiles[8*2*16];
+
+    for(int i=0; i<256; i+=2) {
+        if(i % 32 == 0)
+            puts("--------");
+        fmt::print("{:02x} {:02x}\n", tiles[i], tiles[i+1]);
+    }
+
+    LOGI("%x %x %x", tile8[0], tile8[1], tiles[2]);
+
+    REQUIRE(tile8[0] == 0b01011111);
+    REQUIRE(tile8[1] == 0b11111010);
+
+    auto tiles8 = layoutTiles(tiles, 2, 1, 8);
+
 }
 
 TEST_CASE("all", "[assembler]")

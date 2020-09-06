@@ -113,6 +113,12 @@ void initFunctions(Assembler& a)
         return sv;
     });
 
+    a.registerFunction("layout_tiles", [&](const std::vector<uint8_t>& pixels,
+                                           double stride, double w, double h) {
+        std::vector<uint8_t> v = layoutTiles(pixels, stride, w, h);
+        return v;
+    });
+
     a.registerFunction("load_png", [&](std::string_view name) {
         auto p = utils::path(name);
         if (p.is_relative()) {

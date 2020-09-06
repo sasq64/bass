@@ -101,6 +101,41 @@ std::vector<uint8_t> toMonochrome(image::bitmap8 const& bm)
     return result;
 }
 
+std::vector<uint8_t> layoutTiles(std::vector<uint8_t> const& pixels, int stride,
+                                 int w, int h)
+{
+    std::vector<uint8_t> result(pixels.size());
+    uint8_t* target = result.data();
+    auto* src = pixels.data();
+    int line = 0;
+
+    LOGI("%d bytes at %p, stride %d", pixels.size(), (void*)pixels.data(),
+         stride);
+
+    while (true) {
+        if ((line + 1) * h * stride > (int64_t)pixels.size()) {
+            break;
+        }
+        
+        auto* start = pixels.data() + line * h * stride;
+        src = start;
+        while (src - start < stride) {
+            LOGI("Reading from %p", (void*)src);
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    *target++ = *src++;
+                }
+                src = (src - w) + stride;
+            }
+            src = src - stride * h + w;
+        }
+        LOGI("Next Line");
+        line++;
+    }
+    result.resize(target - result.data());
+    return result;
+}
+
 AnyMap loadPng(std::string_view const& name)
 {
     unsigned w{};
@@ -137,7 +172,7 @@ AnyMap loadPng(std::string_view const& name)
         res["colors"] = pal12;
 
         image::bitmap8 bm;
-        if(bpp == 1)  {
+        if (bpp == 1) {
             bm = fromMonochrome(w, h, out.get());
         } else {
             bm = image::bitmap8(w, h, out.get());
@@ -158,11 +193,12 @@ AnyMap loadPng(std::string_view const& name)
             if (it == tiles_crc.end()) {
                 index = count;
                 tiles_crc[crc] = count++;
-                if(bpp == 1) {
+                if (bpp == 1) {
                     auto pixels = toMonochrome(tile);
                     tiles.insert(tiles.end(), pixels.begin(), pixels.end());
                 } else {
-                    tiles.insert(tiles.end(), tile.data(), tile.data() + splitSize * splitSize);
+                    tiles.insert(tiles.end(), tile.data(),
+                                 tile.data() + splitSize * splitSize);
                 }
             } else {
                 index = it->second;
