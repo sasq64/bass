@@ -70,9 +70,7 @@ TEST_CASE("png", "[assembler]")
 {
 
     auto png = loadPng((projDir() / "data" / "tiles.png").string());
-    auto v = std::any_cast<std::vector<uint8_t>>(png["tiles"]);
     auto pixels = std::any_cast<std::vector<uint8_t>>(png["pixels"]);
-    REQUIRE(v[0] == 0);
     auto tiles = layoutTiles(pixels, 96, 2, 16);
 
     uint8_t* tile8 = &tiles[8*2*16];

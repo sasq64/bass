@@ -238,7 +238,8 @@ pixels:
     !if USE_BITMAP {
         !fill png.pixels
     } else {
-        !fill png.tiles
+        tiles = layout_tiles(png.pixels, png.width, 8, 8)
+        !fill tiles
     }
 
 
