@@ -9,7 +9,6 @@
 
     !script "../lua/x16.lua"
 
-    png = load_png("../data/face.png")
 
 
 tileMem = $1e000
@@ -209,9 +208,15 @@ scales:
 
 save: !byte 0,0
 
+    png = load_png("../data/face.png")
+    png_tiles = layout_tiles(png.pixels, png.width, 8, 8)
+    png_indexes = index_tiles(png_tiles, 8*8)
+
     ;!section "indexes", *
 indexes:
-    !fill png.indexes
+!if !USE_BITMAP {
+    !fill png_indexes
+}
 indexes_end:
 
 ;------------------- INDEX COPY UNIT TEST -----------------
@@ -238,8 +243,7 @@ pixels:
     !if USE_BITMAP {
         !fill png.pixels
     } else {
-        tiles = layout_tiles(png.pixels, png.width, 8, 8)
-        !fill tiles
+        !fill png_tiles
     }
 
 
