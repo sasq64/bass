@@ -54,3 +54,18 @@ $
     !section "music", sid.load
 music:
     !fill sid.data
+
+    !script last {
+
+    frame = 0
+
+    map_bank_write(0xd4, 1, function(adr, val)
+        print("SID", adr - 0xd400, val)
+    end)
+
+    for 1 to 10*50 do
+        call(sym("sid.play"))
+        frame++
+    end
+
+    }

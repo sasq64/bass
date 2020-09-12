@@ -66,6 +66,35 @@ bool checkErrors(std::vector<Error> errs)
     return errs.empty();
 }
 
+TEST_CASE("png.layout", "[assembler]")
+{
+
+    auto png = loadPng((projDir() / "data" / "test.png").string());
+    auto pixels = std::any_cast<std::vector<uint8_t>>(png["pixels"]);
+    auto tiles = layoutTiles(pixels, 32, 8, 8);
+
+    LOGI("TILES %d", tiles.size());
+    for(int i=0; i<8*8; i++) {
+        fmt::print("{:02x} ", tiles[i]);
+    }
+    puts("");
+    for(int i=0; i<8*8; i++) {
+        fmt::print("{:02x} ", tiles[i+8*8]);
+    }
+
+    auto indexes = index_tiles(tiles, 8*8);
+
+    auto get = [&](int n) -> uint16_t {
+        return indexes[n*2] | (indexes[n*2+1] << 8);
+    };
+
+    REQUIRE(get(0) == get(15));
+    REQUIRE(get(8) == get(10));
+    REQUIRE(get(2) == get(13));
+    REQUIRE(tiles.size() == 8*8*8);
+
+}
+
 TEST_CASE("png", "[assembler]")
 {
 

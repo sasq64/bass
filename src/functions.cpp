@@ -113,11 +113,16 @@ void initFunctions(Assembler& a)
         return sv;
     });
 
-    a.registerFunction("index_tiles",
-                       [&](std::vector<uint8_t>& pixels, double size) {
-                           std::vector<uint8_t> v = index_tiles(pixels, size);
-                           return v;
-                       });
+    a.registerFunction(
+        "index_tiles", [&](std::vector<uint8_t> const& pixels, double size) {
+            AnyMap result;
+            auto pixelCopy = pixels;
+            std::vector<uint8_t> v = index_tiles(pixelCopy, size);
+            result["indexes"] = v;
+            result["tiles"] = pixelCopy;
+            return result;
+        });
+
     a.registerFunction("layout_tiles", [&](const std::vector<uint8_t>& pixels,
                                            double stride, double w, double h) {
         std::vector<uint8_t> v = layoutTiles(pixels, stride, w, h);

@@ -160,25 +160,30 @@ std::vector<uint8_t> index_tiles(std::vector<uint8_t>& pixels, int size)
     int count = 0;
     uint8_t const* ptr = pixels.data();
     auto tileCount = pixels.size() / size;
+    LOGI("COUNT %d", tileCount);
     for (size_t i = 0; i < tileCount; i++) {
-        auto crc = crc32(reinterpret_cast<const uint32_t*>(ptr), size);
-        ptr += size;
+        auto crc = crc32(reinterpret_cast<const uint32_t*>(ptr), size/4);
+        LOGI("CRC %x from %p", crc, (void*)ptr);
         auto it = tiles_crc.find(crc);
         int index = -1;
         if (it == tiles_crc.end()) {
             index = count;
             tiles_crc[crc] = count++;
+            ptr += size;
         } else {
             index = it->second;
             memcpy((void*)ptr, (const void*)(ptr + size),
                    (tileCount - i - 1) * size);
-            ptr -= size;
-            tileCount--;
+            //tileCount--;
         }
         index++;
+        LOGI("INDEX %d", index);
         indexes.push_back(index & 0xff);
         indexes.push_back((index >> 8) & 0x3);
     }
+    size_t newSize = (ptr - pixels.data());
+    LOGI("NEW SIZE %d", newSize/size);
+    pixels.resize(newSize);
     return indexes;
 }
 
