@@ -5,9 +5,8 @@
 namespace sixfive {
 
 // Addressing modes
-enum AddressingMode : uint8_t
+enum class Mode : uint8_t
 {
-    BAD,
     NONE,
     ACC,
     IMM,
@@ -24,4 +23,15 @@ enum AddressingMode : uint8_t
     ABSY,
     ZP_REL,
 };
+
+enum class Reg
+{
+    A,
+    X,
+    Y,
+    SP,
+    SR,
+    PC
+};
+
 } // namespace sixfive

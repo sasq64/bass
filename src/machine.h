@@ -144,6 +144,9 @@ public:
     Tuple6 getRegs() const;
     void setRegs(Tuple6 const& regs);
 
+    unsigned getReg(sixfive::Reg reg);
+    void setReg(sixfive::Reg reg, unsigned v);
+
     void setBreakFunction(uint8_t what, std::function<void(uint8_t)> const& fn);
 
     static void bankWriteFunction(uint16_t adr, uint8_t val, void* data);

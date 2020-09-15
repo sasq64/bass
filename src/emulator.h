@@ -12,9 +12,9 @@
 
 namespace sixfive {
 
-static constexpr inline int opSize(AddressingMode am)
+static constexpr inline int opSize(Mode am)
 {
-    return am >= IND ? 3 : (am >= IMM ? 2 : 1);
+    return am >= Mode::IND ? 3 : (am >= Mode::IMM ? 2 : 1);
 }
 
 template <typename POLICY>
@@ -60,12 +60,12 @@ struct Machine
     struct Opcode
     {
         Opcode() = default;
-        Opcode(uint8_t code, int cycles, AddressingMode mode, OpFunc op)
+        Opcode(uint8_t code, int cycles, Mode mode, OpFunc op)
             : code(code), cycles(cycles), mode(mode), op(op)
         {}
         uint8_t code = 0;
         uint8_t cycles = 0;
-        AddressingMode mode = AddressingMode::NONE;
+        Mode mode = Mode::NONE;
         OpFunc op = nullptr;
     };
 
@@ -175,14 +175,12 @@ struct Machine
         }
     }
 
-    uint8_t regA() const { return a; }
-    uint8_t regX() const { return x; }
-    uint8_t regY() const { return y; }
-    uint8_t regSP() const { return sp; }
+    template <enum Reg REG>
+    unsigned get() const { return Reg<REG>(); }
+    template <enum Reg REG>
+    void set(unsigned v)  { Reg<REG>() = v; }
+
     Adr regPC() const { return pc; }
-
-    uint8_t regSR() const { return get_SR(); }
-
     void setPC(const uint16_t& p) { pc = p; }
 
     uint32_t run(uint32_t toCycles = 0x01000000)
@@ -216,19 +214,6 @@ struct Machine
     }
 
 private:
-    enum REGNAME
-    {
-        A = 20,
-        X,
-        Y,
-        SP
-    };
-
-    template <int MODE>
-    constexpr static bool IsReg()
-    {
-        return MODE >= A;
-    }
 
     // The 6502 registers
     unsigned pc;
@@ -284,22 +269,26 @@ private:
         return m->rbank[adr >> 8][adr & 0xff];
     }
 
-    template <int REG>
+    template <enum Reg REG>
     constexpr auto& Reg() const
     {
-        if constexpr (REG == A) return a;
-        if constexpr (REG == X) return x;
-        if constexpr (REG == Y) return y;
-        if constexpr (REG == SP) return sp;
+        if constexpr (REG == Reg::A) return a;
+        if constexpr (REG == Reg::X) return x;
+        if constexpr (REG == Reg::Y) return y;
+        if constexpr (REG == Reg::SR) return sr;
+        if constexpr (REG == Reg::SP) return sp;
+        if constexpr (REG == Reg::PC) return pc;
     }
 
-    template <int REG>
+    template <enum Reg REG>
     constexpr auto& Reg()
     {
-        if constexpr (REG == A) return a;
-        if constexpr (REG == X) return x;
-        if constexpr (REG == Y) return y;
-        if constexpr (REG == SP) return sp;
+        if constexpr (REG == Reg::A) return a;
+        if constexpr (REG == Reg::X) return x;
+        if constexpr (REG == Reg::Y) return y;
+        if constexpr (REG == Reg::SR) return sr;
+        if constexpr (REG == Reg::SP) return sp;
+        if constexpr (REG == Reg::PC) return pc;
     }
     /////////////////////////////////////////////////////////////////////////
     ///
@@ -443,30 +432,30 @@ private:
         return to_adr(Read(adr), Read(adr + 1)) + offs;
     }
 
-    // Read operand from PC and create effective adress depeding on 'MODE'
-    template <int MODE>
+    // Read operand from PC and create effective address depending on 'MODE'
+    template <enum Mode MODE>
     unsigned ReadEA()
     {
-        if constexpr (MODE == IMM) return pc++;
-        if constexpr (MODE == ZP) return ReadPC8();
-        if constexpr (MODE == ZPX) return ReadPC8(x);
-        if constexpr (MODE == ZPY) return ReadPC8(y);
-        if constexpr (MODE == ABS) return ReadPC16();
-        if constexpr (MODE == ABSX) return ReadPC16(x);
-        if constexpr (MODE == ABSY) return ReadPC16(y);
-        if constexpr (MODE == INDX) return Read16(ReadPC8(x));
-        if constexpr (MODE == INDY) return Read16(ReadPC8(), y);
-        if constexpr (MODE == IND) return Read16(ReadPC16());
-        if constexpr (MODE == INDZ) return Read16(ReadPC8());
+        if constexpr (MODE == Mode::IMM) return pc++;
+        if constexpr (MODE == Mode::ZP) return ReadPC8();
+        if constexpr (MODE == Mode::ZPX) return ReadPC8(x);
+        if constexpr (MODE == Mode::ZPY) return ReadPC8(y);
+        if constexpr (MODE == Mode::ABS) return ReadPC16();
+        if constexpr (MODE == Mode::ABSX) return ReadPC16(x);
+        if constexpr (MODE == Mode::ABSY) return ReadPC16(y);
+        if constexpr (MODE == Mode::INDX) return Read16(ReadPC8(x));
+        if constexpr (MODE == Mode::INDY) return Read16(ReadPC8(), y);
+        if constexpr (MODE == Mode::IND) return Read16(ReadPC16());
+        if constexpr (MODE == Mode::INDZ) return Read16(ReadPC8());
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     void StoreEA(unsigned v)
     {
         Write(ReadEA<MODE>(), v);
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     unsigned LoadEA()
     {
         return Read(ReadEA<MODE>());
@@ -486,19 +475,19 @@ private:
         m.sr = (m.sr & ~(1 << FLAG)) | (ON << FLAG);
     }
 
-    template <int REG, int MODE>
+    template <enum Reg REG,  enum Mode MODE>
     static constexpr void Store(Machine& m)
     {
         m.StoreEA<MODE>(m.Reg<REG>());
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Store0(Machine& m)
     {
         m.StoreEA<MODE>(0);
     }
 
-    template <int REG, int MODE>
+    template <enum Reg REG,  enum Mode MODE>
     static constexpr void Load(Machine& m)
     {
         m.Reg<REG>() = m.LoadEA<MODE>();
@@ -525,23 +514,25 @@ private:
         m.pc = pc;
     }
 
-    template <int MODE, int INC>
+    template <enum Mode MODE, int INC>
     static constexpr void Inc(Machine& m)
     {
-        if constexpr (IsReg<MODE>()) {
-            m.Reg<MODE>() = (m.Reg<MODE>() + INC) & 0xff;
-            m.set<SZ>(m.Reg<MODE>());
-        } else {
-            auto adr = m.ReadEA<MODE>();
-            auto rc = (m.Read(adr) + INC);
-            m.Write(adr, rc);
-            m.set<SZ>(rc);
-        }
+        auto adr = m.ReadEA<MODE>();
+        auto rc = (m.Read(adr) + INC);
+        m.Write(adr, rc);
+        m.set<SZ>(rc);
+    }
+
+    template <enum Reg REG, int INC>
+    static constexpr void Inc(Machine& m)
+    {
+            m.Reg<REG>() = (m.Reg<REG>() + INC) & 0xff;
+            m.set<SZ>(m.Reg<REG>());
     }
 
     // === COMPARE, ADD & SUBTRACT
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Bit(Machine& m)
     {
         unsigned z = m.LoadEA<MODE>();
@@ -549,7 +540,7 @@ private:
         m.sr = (m.sr & ~V) | (z & V);
     }
 
-    template <int REG, int MODE>
+    template <enum Reg REG,  enum Mode MODE>
     static constexpr void Cmp(Machine& m)
     {
         unsigned z = (~m.LoadEA<MODE>()) & 0xff;
@@ -557,7 +548,7 @@ private:
         m.set<SZC>(rc);
     }
 
-    template <int MODE, bool DEC = false>
+    template <enum Mode MODE, bool DEC = false>
     static constexpr void Sbc(Machine& m)
     {
         if constexpr (DEC) {
@@ -580,7 +571,7 @@ private:
         }
     }
 
-    template <int MODE, bool DEC = false>
+    template <enum Mode MODE, bool DEC = false>
     static constexpr void Adc(Machine& m)
     {
         unsigned z = m.LoadEA<MODE>();
@@ -593,21 +584,21 @@ private:
         m.a = rc & 0xff;
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void And(Machine& m)
     {
         m.a &= m.LoadEA<MODE>();
         m.set<SZ>(m.a);
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Ora(Machine& m)
     {
         m.a |= m.LoadEA<MODE>();
         m.set<SZ>(m.a);
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Eor(Machine& m)
     {
         m.a ^= m.LoadEA<MODE>();
@@ -616,10 +607,10 @@ private:
 
     // === SHIFTS & ROTATES
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Asl(Machine& m)
     {
-        if constexpr (MODE == A) {
+        if constexpr (MODE == Mode::ACC) {
             int rc = m.a << 1;
             m.set<SZC>(rc);
             m.a = rc & 0xff;
@@ -631,10 +622,10 @@ private:
         }
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Lsr(Machine& m)
     {
-        if constexpr (MODE == A) {
+        if constexpr (MODE == Mode::ACC) {
             m.sr = (m.sr & 0xfe) | (m.a & 1);
             m.a >>= 1;
             m.set<SZ>(m.a);
@@ -648,10 +639,10 @@ private:
         }
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Ror(Machine& m)
     {
-        if constexpr (MODE == A) {
+        if constexpr (MODE == Mode::ACC) {
             unsigned rc = (((m.sr << 8) & 0x100) | m.a) >> 1;
             m.sr = (m.sr & 0xfe) | (m.a & 1);
             m.a = rc & 0xff;
@@ -666,10 +657,10 @@ private:
         }
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Rol(Machine& m)
     {
-        if constexpr (MODE == A) {
+        if constexpr (MODE == Mode::ACC) {
             unsigned rc = (m.a << 1) | m.carry();
             m.set<SZC>(rc);
             m.a = rc & 0xff;
@@ -681,11 +672,11 @@ private:
         }
     }
 
-    template <int FROM, int TO>
+    template <enum Reg FROM, enum Reg TO>
     static constexpr void Transfer(Machine& m)
     {
         m.Reg<TO>() = m.Reg<FROM>();
-        if constexpr (TO != SP) m.set<SZ>(m.Reg<TO>());
+        if constexpr (TO != Reg::SP) m.set<SZ>(m.Reg<TO>());
     }
 
     // 65c02 opcodes
@@ -693,7 +684,7 @@ private:
     template <int BIT>
     static constexpr void Bbr(Machine& m)
     {
-        auto val = m.LoadEA<ZP>();
+        auto val = m.LoadEA<Mode::ZP>();
         auto pc = m.pc;
         int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++) - 1;
         if (!(val & 1 << BIT)) {
@@ -706,7 +697,7 @@ private:
     template <int BIT>
     static constexpr void Bbs(Machine& m)
     {
-        auto val = m.LoadEA<ZP>();
+        auto val = m.LoadEA<Mode::ZP>();
         auto pc = m.pc;
         int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++) - 1;
         if (val & 1 << BIT) {
@@ -719,7 +710,7 @@ private:
     template <int BIT>
     static constexpr void Rmb(Machine& m)
     {
-        auto adr = m.ReadEA<ZP>();
+        auto adr = m.ReadEA<Mode::ZP>();
         auto val = m.Read(adr) & ~(1 << BIT);
         m.Write(adr, val);
     }
@@ -727,12 +718,12 @@ private:
     template <int BIT>
     static constexpr void Smb(Machine& m)
     {
-        auto adr = m.ReadEA<ZP>();
+        auto adr = m.ReadEA<Mode::ZP>();
         auto val = m.Read(adr) | (1 << BIT);
         m.Write(adr, val);
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Trb(Machine& m)
     {
         auto adr = m.ReadEA<MODE>();
@@ -741,7 +732,7 @@ private:
         m.Write(adr, val & (~m.a));
     }
 
-    template <int MODE>
+    template <enum Mode MODE>
     static constexpr void Tsb(Machine& m)
     {
         auto adr = m.ReadEA<MODE>();
@@ -761,238 +752,236 @@ private:
     {
         std::vector<Instruction> instructionTable = {
 
-            { "nop", {{ 0xea, 2, NONE, [](Machine& ) {} }} },
+            { "nop", {{ 0xea, 2, Mode::NONE, [](Machine& ) {} }} },
 
             { "lda", {
-                { 0xa9, 2, IMM, Load<A, IMM>},
-                { 0xa5, 2, ZP, Load<A, ZP>},
-                { 0xb5, 4, ZPX, Load<A, ZPX>},
-                { 0xad, 4, ABS, Load<A, ABS>},
-                { 0xbd, 4, ABSX, Load<A, ABSX>},
-                { 0xb9, 4, ABSY, Load<A, ABSY>},
-                { 0xa1, 6, INDX, Load<A, INDX>},
-                { 0xb1, 5, INDY, Load<A, INDY>},
+                { 0xa9, 2, Mode::IMM, Load<Reg::A, Mode::IMM>},
+                { 0xa5, 2, Mode::ZP, Load<Reg::A, Mode::ZP>},
+                { 0xb5, 4, Mode::ZPX, Load<Reg::A, Mode::ZPX>},
+                { 0xad, 4, Mode::ABS, Load<Reg::A, Mode::ABS>},
+                { 0xbd, 4, Mode::ABSX, Load<Reg::A, Mode::ABSX>},
+                { 0xb9, 4, Mode::ABSY, Load<Reg::A, Mode::ABSY>},
+                { 0xa1, 6, Mode::INDX, Load<Reg::A, Mode::INDX>},
+                { 0xb1, 5, Mode::INDY, Load<Reg::A, Mode::INDY>},
             } },
-
             { "ldx", {
-                { 0xa2, 2, IMM, Load<X, IMM>},
-                { 0xa6, 3, ZP, Load<X, ZP>},
-                { 0xb6, 4, ZPY, Load<X, ZPY>},
-                { 0xae, 4, ABS, Load<X, ABS>},
-                { 0xbe, 4, ABSY, Load<X, ABSY>},
+                { 0xa2, 2, Mode::IMM, Load<Reg::X, Mode::IMM>},
+                { 0xa6, 3, Mode::ZP, Load<Reg::X, Mode::ZP>},
+                { 0xb6, 4, Mode::ZPY, Load<Reg::X, Mode::ZPY>},
+                { 0xae, 4, Mode::ABS, Load<Reg::X, Mode::ABS>},
+                { 0xbe, 4, Mode::ABSY, Load<Reg::X, Mode::ABSY>},
             } },
 
             { "ldy", {
-                { 0xa0, 2, IMM, Load<Y, IMM>},
-                { 0xa4, 3, ZP, Load<Y, ZP>},
-                { 0xb4, 4, ZPX, Load<Y, ZPX>},
-                { 0xac, 4, ABS, Load<Y, ABS>},
-                { 0xbc, 4, ABSX, Load<Y, ABSX>},
+                { 0xa0, 2, Mode::IMM, Load<Reg::Y, Mode::IMM>},
+                { 0xa4, 3, Mode::ZP, Load<Reg::Y, Mode::ZP>},
+                { 0xb4, 4, Mode::ZPX, Load<Reg::Y, Mode::ZPX>},
+                { 0xac, 4, Mode::ABS, Load<Reg::Y, Mode::ABS>},
+                { 0xbc, 4, Mode::ABSX, Load<Reg::Y, Mode::ABSX>},
             } },
 
             { "sta", {
-                { 0x85, 3, ZP, Store<A, ZP>},
-                { 0x95, 4, ZPX, Store<A, ZPX>},
-                { 0x8d, 4, ABS, Store<A, ABS>},
-                { 0x9d, 5, ABSX, Store<A, ABSX>},
-                { 0x99, 5, ABSY, Store<A, ABSY>},
-                { 0x81, 6, INDX, Store<A, INDX>},
-                { 0x91, 6, INDY, Store<A, INDY>},
+                { 0x85, 3, Mode::ZP, Store<Reg::A, Mode::ZP>},
+                { 0x95, 4, Mode::ZPX, Store<Reg::A, Mode::ZPX>},
+                { 0x8d, 4, Mode::ABS, Store<Reg::A, Mode::ABS>},
+                { 0x9d, 5, Mode::ABSX, Store<Reg::A, Mode::ABSX>},
+                { 0x99, 5, Mode::ABSY, Store<Reg::A, Mode::ABSY>},
+                { 0x81, 6, Mode::INDX, Store<Reg::A, Mode::INDX>},
+                { 0x91, 6, Mode::INDY, Store<Reg::A, Mode::INDY>},
             } },
 
             { "stx", {
-                { 0x86, 3, ZP, Store<X, ZP>},
-                { 0x96, 4, ZPY, Store<X, ZPY>},
-                { 0x8e, 4, ABS, Store<X, ABS>},
+                { 0x86, 3, Mode::ZP, Store<Reg::X, Mode::ZP>},
+                { 0x96, 4, Mode::ZPY, Store<Reg::X, Mode::ZPY>},
+                { 0x8e, 4, Mode::ABS, Store<Reg::X, Mode::ABS>},
             } },
 
             { "sty", {
-                { 0x84, 3, ZP, Store<Y, ZP>},
-                { 0x94, 4, ZPX, Store<Y, ZPX>},
-                { 0x8c, 4, ABS, Store<Y, ABS>},
+                { 0x84, 3, Mode::ZP, Store<Reg::Y, Mode::ZP>},
+                { 0x94, 4, Mode::ZPX, Store<Reg::Y, Mode::ZPX>},
+                { 0x8c, 4, Mode::ABS, Store<Reg::Y, Mode::ABS>},
             } },
 
             { "dec", {
-                { 0xc6, 5, ZP, Inc<ZP, -1>},
-                { 0xd6, 6, ZPX, Inc<ZPX, -1>},
-                { 0xce, 6, ABS, Inc<ABS, -1>},
-                { 0xde, 7, ABSX, Inc<ABSX, -1>},
+                { 0xc6, 5, Mode::ZP, Inc<Mode::ZP, -1>},
+                { 0xd6, 6, Mode::ZPX, Inc<Mode::ZPX, -1>},
+                { 0xce, 6, Mode::ABS, Inc<Mode::ABS, -1>},
+                { 0xde, 7, Mode::ABSX, Inc<Mode::ABSX, -1>},
             } },
 
             { "inc", {
-                { 0xe6, 5, ZP, Inc<ZP, 1>},
-                { 0xf6, 6, ZPX, Inc<ZPX, 1>},
-                { 0xee, 6, ABS, Inc<ABS, 1>},
-                { 0xfe, 7, ABSX, Inc<ABSX, 1>},
+                { 0xe6, 5, Mode::ZP, Inc<Mode::ZP, 1>},
+                { 0xf6, 6, Mode::ZPX, Inc<Mode::ZPX, 1>},
+                { 0xee, 6, Mode::ABS, Inc<Mode::ABS, 1>},
+                { 0xfe, 7, Mode::ABSX, Inc<Mode::ABSX, 1>},
             } },
 
-            { "tax", { { 0xaa, 2, NONE, Transfer<A, X> } } },
-            { "txa", { { 0x8a, 2, NONE, Transfer<X, A> } } },
-            { "tay", { { 0xa8, 2, NONE, Transfer<A, Y> } } },
-            { "tya", { { 0x98, 2, NONE, Transfer<Y, A> } } },
-            { "txs", { { 0x9a, 2, NONE, Transfer<X, SP> } } },
-            { "tsx", { { 0xba, 2, NONE, Transfer<SP, X> } } },
+            { "tax", { { 0xaa, 2, Mode::NONE, Transfer<Reg::A, Reg::X> } } },
+            { "txa", { { 0x8a, 2, Mode::NONE, Transfer<Reg::X, Reg::A> } } },
+            { "tay", { { 0xa8, 2, Mode::NONE, Transfer<Reg::A, Reg::Y> } } },
+            { "tya", { { 0x98, 2, Mode::NONE, Transfer<Reg::Y, Reg::A> } } },
+            { "txs", { { 0x9a, 2, Mode::NONE, Transfer<Reg::X, Reg::SP> } } },
+            { "tsx", { { 0xba, 2, Mode::NONE, Transfer<Reg::SP, Reg::X> } } },
 
-            { "dex", { { 0xca, 2, NONE, Inc<X, -1> } } },
-            { "inx", { { 0xe8, 2, NONE, Inc<X, 1> } } },
-            { "dey", { { 0x88, 2, NONE, Inc<Y, -1> } } },
-            { "iny", { { 0xc8, 2, NONE, Inc<Y, 1> } } },
+            { "dex", { { 0xca, 2, Mode::NONE, Inc<Reg::X, -1> } } },
+            { "inx", { { 0xe8, 2, Mode::NONE, Inc<Reg::X, 1> } } },
+            { "dey", { { 0x88, 2, Mode::NONE, Inc<Reg::Y, -1> } } },
+            { "iny", { { 0xc8, 2, Mode::NONE, Inc<Reg::Y, 1> } } },
 
-            { "pha", { { 0x48, 3, NONE, [](Machine& m) {
+            { "pha", { { 0x48, 3, Mode::NONE, [](Machine& m) {
                 m.stack[m.sp--] = m.a;
             } } } },
 
-            { "pla", { { 0x68, 4, NONE, [](Machine& m) {
+            { "pla", { { 0x68, 4, Mode::NONE, [](Machine& m) {
                 m.a = m.stack[++m.sp];
             } } } },
 
-            { "php", { { 0x08, 3, NONE, [](Machine& m) {
+            { "php", { { 0x08, 3, Mode::NONE, [](Machine& m) {
                 m.stack[m.sp--] = m.get_SR();
             } } } },
 
-            { "plp", { { 0x28, 4, NONE, [](Machine& m) {
+            { "plp", { { 0x28, 4, Mode::NONE, [](Machine& m) {
                 m.set_SR(m.stack[++m.sp]);
             } } } },
 
-            { "bcc", { { 0x90, 2, REL, Branch<CARRY, CLEAR> }, } },
-            { "bcs", { { 0xb0, 2, REL, Branch<CARRY, SET> }, } },
-            { "bne", { { 0xd0, 2, REL, Branch<ZERO, CLEAR> }, } },
-            { "beq", { { 0xf0, 2, REL, Branch<ZERO, SET> }, } },
-            { "bpl", { { 0x10, 2, REL, Branch<SIGN, CLEAR> }, } },
-            { "bmi", { { 0x30, 2, REL, Branch<SIGN, SET> }, } },
-            { "bvc", { { 0x50, 2, REL, Branch<OVER, CLEAR> }, } },
-            { "bvs", { { 0x70, 2, REL, Branch<OVER, SET> }, } },
-
+            { "bcc", { { 0x90, 2, Mode::REL, Branch<CARRY, CLEAR> }, } },
+            { "bcs", { { 0xb0, 2, Mode::REL, Branch<CARRY, SET> }, } },
+            { "bne", { { 0xd0, 2, Mode::REL, Branch<ZERO, CLEAR> }, } },
+            { "beq", { { 0xf0, 2, Mode::REL, Branch<ZERO, SET> }, } },
+            { "bpl", { { 0x10, 2, Mode::REL, Branch<SIGN, CLEAR> }, } },
+            { "bmi", { { 0x30, 2, Mode::REL, Branch<SIGN, SET> }, } },
+            { "bvc", { { 0x50, 2, Mode::REL, Branch<OVER, CLEAR> }, } },
+            { "bvs", { { 0x70, 2, Mode::REL, Branch<OVER, SET> }, } },
             { "adc", {
-                { 0x69, 2, IMM, Adc<IMM, USE_BCD>},
-                { 0x65, 3, ZP, Adc<ZP, USE_BCD>},
-                { 0x75, 4, ZPX, Adc<ZPX, USE_BCD>},
-                { 0x6d, 4, ABS, Adc<ABS, USE_BCD>},
-                { 0x7d, 4, ABSX, Adc<ABSX, USE_BCD>},
-                { 0x79, 4, ABSY, Adc<ABSY, USE_BCD>},
-                { 0x61, 6, INDX, Adc<INDX, USE_BCD>},
-                { 0x71, 5, INDY, Adc<INDY, USE_BCD>},
-                { 0x72, 5, INDZ, Adc<INDZ, USE_BCD>},
+                { 0x69, 2, Mode::IMM, Adc<Mode::IMM, USE_BCD>},
+                { 0x65, 3, Mode::ZP, Adc<Mode::ZP, USE_BCD>},
+                { 0x75, 4, Mode::ZPX, Adc<Mode::ZPX, USE_BCD>},
+                { 0x6d, 4, Mode::ABS, Adc<Mode::ABS, USE_BCD>},
+                { 0x7d, 4, Mode::ABSX, Adc<Mode::ABSX, USE_BCD>},
+                { 0x79, 4, Mode::ABSY, Adc<Mode::ABSY, USE_BCD>},
+                { 0x61, 6, Mode::INDX, Adc<Mode::INDX, USE_BCD>},
+                { 0x71, 5, Mode::INDY, Adc<Mode::INDY, USE_BCD>},
+                { 0x72, 5, Mode::INDZ, Adc<Mode::INDZ, USE_BCD>},
             } },
 
             { "sbc", {
-                { 0xe9, 2, IMM, Sbc<IMM, USE_BCD>},
-                { 0xe5, 3, ZP, Sbc<ZP, USE_BCD>},
-                { 0xf5, 4, ZPX, Sbc<ZPX, USE_BCD>},
-                { 0xed, 4, ABS, Sbc<ABS, USE_BCD>},
-                { 0xfd, 4, ABSX, Sbc<ABSX, USE_BCD>},
-                { 0xf9, 4, ABSY, Sbc<ABSY, USE_BCD>},
-                { 0xe1, 6, INDX, Sbc<INDX, USE_BCD>},
-                { 0xf1, 5, INDY, Sbc<INDY, USE_BCD>},
+                { 0xe9, 2, Mode::IMM, Sbc<Mode::IMM, USE_BCD>},
+                { 0xe5, 3, Mode::ZP, Sbc<Mode::ZP, USE_BCD>},
+                { 0xf5, 4, Mode::ZPX, Sbc<Mode::ZPX, USE_BCD>},
+                { 0xed, 4, Mode::ABS, Sbc<Mode::ABS, USE_BCD>},
+                { 0xfd, 4, Mode::ABSX, Sbc<Mode::ABSX, USE_BCD>},
+                { 0xf9, 4, Mode::ABSY, Sbc<Mode::ABSY, USE_BCD>},
+                { 0xe1, 6, Mode::INDX, Sbc<Mode::INDX, USE_BCD>},
+                { 0xf1, 5, Mode::INDY, Sbc<Mode::INDY, USE_BCD>},
             } },
 
             { "cmp", {
-                { 0xc9, 2, IMM, Cmp<A, IMM>},
-                { 0xc5, 3, ZP, Cmp<A, ZP>},
-                { 0xd5, 4, ZPX, Cmp<A, ZPX>},
-                { 0xcd, 4, ABS, Cmp<A, ABS>},
-                { 0xdd, 4, ABSX, Cmp<A, ABSX>},
-                { 0xd9, 4, ABSY, Cmp<A, ABSY>},
-                { 0xc1, 6, INDX, Cmp<A, INDX>},
-                { 0xd1, 5, INDY, Cmp<A, INDY>},
+                { 0xc9, 2, Mode::IMM, Cmp<Reg::A, Mode::IMM>},
+                { 0xc5, 3, Mode::ZP, Cmp<Reg::A, Mode::ZP>},
+                { 0xd5, 4, Mode::ZPX, Cmp<Reg::A, Mode::ZPX>},
+                { 0xcd, 4, Mode::ABS, Cmp<Reg::A, Mode::ABS>},
+                { 0xdd, 4, Mode::ABSX, Cmp<Reg::A, Mode::ABSX>},
+                { 0xd9, 4, Mode::ABSY, Cmp<Reg::A, Mode::ABSY>},
+                { 0xc1, 6, Mode::INDX, Cmp<Reg::A, Mode::INDX>},
+                { 0xd1, 5, Mode::INDY, Cmp<Reg::A, Mode::INDY>},
             } },
 
             { "cpx", {
-                { 0xe0, 2, IMM, Cmp<X, IMM>},
-                { 0xe4, 3, ZP, Cmp<X, ZP>},
-                { 0xec, 4, ABS, Cmp<X, ABS>},
+                { 0xe0, 2, Mode::IMM, Cmp<Reg::X, Mode::IMM>},
+                { 0xe4, 3, Mode::ZP, Cmp<Reg::X, Mode::ZP>},
+                { 0xec, 4, Mode::ABS, Cmp<Reg::X, Mode::ABS>},
             } },
 
             { "cpy", {
-                { 0xc0, 2, IMM, Cmp<Y, IMM>},
-                { 0xc4, 3, ZP, Cmp<Y, ZP>},
-                { 0xcc, 4, ABS, Cmp<Y, ABS>},
+                { 0xc0, 2, Mode::IMM, Cmp<Reg::Y, Mode::IMM>},
+                { 0xc4, 3, Mode::ZP, Cmp<Reg::Y, Mode::ZP>},
+                { 0xcc, 4, Mode::ABS, Cmp<Reg::Y, Mode::ABS>},
             } },
 
             { "and", {
-                { 0x29, 2, IMM, And<IMM>},
-                { 0x25, 3, ZP, And<ZP>},
-                { 0x35, 4, ZPX, And<ZPX>},
-                { 0x2d, 4, ABS, And<ABS>},
-                { 0x3d, 4, ABSX, And<ABSX>},
-                { 0x39, 4, ABSY, And<ABSY>},
-                { 0x21, 6, INDX, And<INDX>},
-                { 0x31, 5, INDY, And<INDY>},
+                { 0x29, 2, Mode::IMM, And<Mode::IMM>},
+                { 0x25, 3, Mode::ZP, And<Mode::ZP>},
+                { 0x35, 4, Mode::ZPX, And<Mode::ZPX>},
+                { 0x2d, 4, Mode::ABS, And<Mode::ABS>},
+                { 0x3d, 4, Mode::ABSX, And<Mode::ABSX>},
+                { 0x39, 4, Mode::ABSY, And<Mode::ABSY>},
+                { 0x21, 6, Mode::INDX, And<Mode::INDX>},
+                { 0x31, 5, Mode::INDY, And<Mode::INDY>},
             } },
 
             { "eor", {
-                { 0x49, 2, IMM, Eor<IMM>},
-                { 0x45, 3, ZP, Eor<ZP>},
-                { 0x55, 4, ZPX, Eor<ZPX>},
-                { 0x4d, 4, ABS, Eor<ABS>},
-                { 0x5d, 4, ABSX, Eor<ABSX>},
-                { 0x59, 4, ABSY, Eor<ABSY>},
-                { 0x41, 6, INDX, Eor<INDX>},
-                { 0x51, 5, INDY, Eor<INDY>},
+                { 0x49, 2, Mode::IMM, Eor<Mode::IMM>},
+                { 0x45, 3, Mode::ZP, Eor<Mode::ZP>},
+                { 0x55, 4, Mode::ZPX, Eor<Mode::ZPX>},
+                { 0x4d, 4, Mode::ABS, Eor<Mode::ABS>},
+                { 0x5d, 4, Mode::ABSX, Eor<Mode::ABSX>},
+                { 0x59, 4, Mode::ABSY, Eor<Mode::ABSY>},
+                { 0x41, 6, Mode::INDX, Eor<Mode::INDX>},
+                { 0x51, 5, Mode::INDY, Eor<Mode::INDY>},
             } },
 
             { "ora", {
-                { 0x09, 2, IMM, Ora<IMM>},
-                { 0x05, 3, ZP, Ora<ZP>},
-                { 0x15, 4, ZPX, Ora<ZPX>},
-                { 0x0d, 4, ABS, Ora<ABS>},
-                { 0x1d, 4, ABSX, Ora<ABSX>},
-                { 0x19, 4, ABSY, Ora<ABSY>},
-                { 0x01, 6, INDX, Ora<INDX>},
-                { 0x11, 5, INDY, Ora<INDY>},
+                { 0x09, 2, Mode::IMM, Ora<Mode::IMM>},
+                { 0x05, 3, Mode::ZP, Ora<Mode::ZP>},
+                { 0x15, 4, Mode::ZPX, Ora<Mode::ZPX>},
+                { 0x0d, 4, Mode::ABS, Ora<Mode::ABS>},
+                { 0x1d, 4, Mode::ABSX, Ora<Mode::ABSX>},
+                { 0x19, 4, Mode::ABSY, Ora<Mode::ABSY>},
+                { 0x01, 6, Mode::INDX, Ora<Mode::INDX>},
+                { 0x11, 5, Mode::INDY, Ora<Mode::INDY>},
             } },
 
-            { "sec", { { 0x38, 2, NONE, Set<CARRY, true> } } },
-            { "clc", { { 0x18, 2, NONE, Set<CARRY, false> } } },
-            { "sei", { { 0x78, 2, NONE, Set<IRQ, true> } } },
-            { "cli", { { 0x58, 2, NONE, Set<IRQ, false> } } },
-            { "sed", { { 0xf8, 2, NONE, Set<DECIMAL, true> } } },
-            { "cld", { { 0xd8, 2, NONE, Set<DECIMAL, false> } } },
-            { "clv", { { 0xb8, 2, NONE, Set<OVER, false> } } },
+            { "sec", { { 0x38, 2, Mode::NONE, Set<CARRY, true> } } },
+            { "clc", { { 0x18, 2, Mode::NONE, Set<CARRY, false> } } },
+            { "sei", { { 0x78, 2, Mode::NONE, Set<IRQ, true> } } },
+            { "cli", { { 0x58, 2, Mode::NONE, Set<IRQ, false> } } },
+            { "sed", { { 0xf8, 2, Mode::NONE, Set<DECIMAL, true> } } },
+            { "cld", { { 0xd8, 2, Mode::NONE, Set<DECIMAL, false> } } },
+            { "clv", { { 0xb8, 2, Mode::NONE, Set<OVER, false> } } },
 
             { "lsr", {
-                { 0x4a, 2, NONE, Lsr<A>},
-                { 0x4a, 2, ACC, Lsr<A>},
-                { 0x46, 5, ZP, Lsr<ZP>},
-                { 0x56, 6, ZPX, Lsr<ZPX>},
-                { 0x4e, 6, ABS, Lsr<ABS>},
-                { 0x5e, 7, ABSX, Lsr<ABSX>},
+                { 0x4a, 2, Mode::NONE, Lsr<Mode::ACC>},
+                { 0x4a, 2, Mode::ACC, Lsr<Mode::ACC>},
+                { 0x46, 5, Mode::ZP, Lsr<Mode::ZP>},
+                { 0x56, 6, Mode::ZPX, Lsr<Mode::ZPX>},
+                { 0x4e, 6, Mode::ABS, Lsr<Mode::ABS>},
+                { 0x5e, 7, Mode::ABSX, Lsr<Mode::ABSX>},
             } },
 
             { "asl", {
-                { 0x0a, 2, NONE, Asl<A>},
-                { 0x0a, 2, ACC, Asl<A>},
-                { 0x06, 5, ZP, Asl<ZP>},
-                { 0x16, 6, ZPX, Asl<ZPX>},
-                { 0x0e, 6, ABS, Asl<ABS>},
-                { 0x1e, 7, ABSX, Asl<ABSX>},
+                { 0x0a, 2, Mode::NONE, Asl<Mode::ACC>},
+                { 0x0a, 2, Mode::ACC, Asl<Mode::ACC>},
+                { 0x06, 5, Mode::ZP, Asl<Mode::ZP>},
+                { 0x16, 6, Mode::ZPX, Asl<Mode::ZPX>},
+                { 0x0e, 6, Mode::ABS, Asl<Mode::ABS>},
+                { 0x1e, 7, Mode::ABSX, Asl<Mode::ABSX>},
             } },
 
             { "ror", {
-                { 0x6a, 2, NONE, Ror<A>},
-                { 0x6a, 2, ACC, Ror<A>},
-                { 0x66, 5, ZP, Ror<ZP>},
-                { 0x76, 6, ZPX, Ror<ZPX>},
-                { 0x6e, 6, ABS, Ror<ABS>},
-                { 0x7e, 7, ABSX, Ror<ABSX>},
+                { 0x6a, 2, Mode::NONE, Ror<Mode::ACC>},
+                { 0x6a, 2, Mode::ACC, Ror<Mode::ACC>},
+                { 0x66, 5, Mode::ZP, Ror<Mode::ZP>},
+                { 0x76, 6, Mode::ZPX, Ror<Mode::ZPX>},
+                { 0x6e, 6, Mode::ABS, Ror<Mode::ABS>},
+                { 0x7e, 7, Mode::ABSX, Ror<Mode::ABSX>},
             } },
 
             { "rol", {
-                { 0x2a, 2, NONE, Rol<A>},
-                { 0x2a, 2, ACC, Rol<A>},
-                { 0x26, 5, ZP, Rol<ZP>},
-                { 0x36, 6, ZPX, Rol<ZPX>},
-                { 0x2e, 6, ABS, Rol<ABS>},
-                { 0x3e, 7, ABSX, Rol<ABSX>},
+                { 0x2a, 2, Mode::NONE, Rol<Mode::ACC>},
+                { 0x2a, 2, Mode::ACC, Rol<Mode::ACC>},
+                { 0x26, 5, Mode::ZP, Rol<Mode::ZP>},
+                { 0x36, 6, Mode::ZPX, Rol<Mode::ZPX>},
+                { 0x2e, 6, Mode::ABS, Rol<Mode::ABS>},
+                { 0x3e, 7, Mode::ABSX, Rol<Mode::ABSX>},
             } },
 
             { "bit", {
-                { 0x24, 3, ZP, Bit<ZP>},
-                { 0x2c, 4, ABS, Bit<ABS>},
+                { 0x24, 3, Mode::ZP, Bit<Mode::ZP>},
+                { 0x2c, 4, Mode::ABS, Bit<Mode::ABS>},
             } },
 
             { "rti", {
-                { 0x40, 6, NONE, [](Machine& m) {
+                { 0x40, 6, Mode::NONE, [](Machine& m) {
                     m.set_SR(m.stack[m.sp+1]);
                     m.pc = (m.stack[m.sp+2] | (m.stack[m.sp+3]<<8));
                     m.sp += 3;
@@ -1000,7 +989,7 @@ private:
             } },
 
             { "brk", {
-                { 0x00, 7, NONE, [](Machine& m) {
+                { 0x00, 7, Mode::NONE, [](Machine& m) {
                     m.ReadPC();
                     m.stack[m.sp] = m.pc >> 8;
                     m.stack[m.sp-1] = m.pc & 0xff;
@@ -1008,7 +997,7 @@ private:
                     m.sp -= 3;
                     m.pc = m.Read16(m.to_adr(0xfe, 0xff));
                 } },
-                { 0x00, 7, IMM, [](Machine& m) {
+                { 0x00, 7, Mode::IMM, [](Machine& m) {
                     auto what = m.ReadPC();
                     if(m.breakFunction != nullptr) {
                         m.breakFunction(what, m.breakData);
@@ -1023,7 +1012,7 @@ private:
             } },
 
             { "rts", {
-                { 0x60, 6, NONE, [](Machine& m) {
+                { 0x60, 6, Mode::NONE, [](Machine& m) {
                     if constexpr (POLICY::ExitOnStackWrap) {
                         if (m.sp == 0xff) {
                             m.realCycles = m.cycles;
@@ -1037,86 +1026,85 @@ private:
             } },
 
             { "jmp", {
-                { 0x4c, 3, ABS, [](Machine& m) {
+                { 0x4c, 3, Mode::ABS, [](Machine& m) {
                     m.pc = m.ReadPC16();
                 } },
-                { 0x6c, 5, IND, [](Machine& m) {
+                { 0x6c, 5, Mode::IND, [](Machine& m) {
                     m.pc = m.Read16(m.ReadPC16());
                 } }
             } },
 
             { "jsr", {
-                { 0x20, 6, ABS, [](Machine& m) {
+                { 0x20, 6, Mode::ABS, [](Machine& m) {
                     m.stack[m.sp] = (m.pc+1) >> 8;
                     m.stack[m.sp-1] = (m.pc+1) & 0xff;
                     m.sp -= 2;
                     m.pc = m.ReadPC16();
                 } }
             } },
-
         };
 
         std::vector<Instruction> instructions65c02 = {
-            {"adc", {{0x72, 5, INDZ, Adc<INDZ, USE_BCD>}}},
-            {"and", {{0x32, 5, INDZ, And<INDZ>}}},
-            {"cmp", {{0xd2, 5, INDZ, Cmp<A, INDZ>}}},
-            {"eor", {{0x52, 5, INDZ, Eor<INDZ>}}},
-            {"lda", {{0xb2, 5, INDZ, Load<A, INDZ>}}},
-            {"ora", {{0x12, 5, INDZ, Ora<INDZ>}}},
-            {"sbc", {{0xf2, 5, INDZ, Sbc<INDZ, USE_BCD>}}},
-            {"sta", {{0x92, 5, INDZ, Store<A, INDZ>}}},
+            {"adc", {{0x72, 5, Mode::INDZ, Adc<Mode::INDZ, USE_BCD>}}},
+            {"and", {{0x32, 5, Mode::INDZ, And<Mode::INDZ>}}},
+            {"cmp", {{0xd2, 5, Mode::INDZ, Cmp<Reg::A, Mode::INDZ>}}},
+            {"eor", {{0x52, 5, Mode::INDZ, Eor<Mode::INDZ>}}},
+            {"lda", {{0xb2, 5, Mode::INDZ, Load<Reg::A, Mode::INDZ>}}},
+            {"ora", {{0x12, 5, Mode::INDZ, Ora<Mode::INDZ>}}},
+            {"sbc", {{0xf2, 5, Mode::INDZ, Sbc<Mode::INDZ, USE_BCD>}}},
+            {"sta", {{0x92, 5, Mode::INDZ, Store<Reg::A, Mode::INDZ>}}},
             {"phx",
-             {{0xda, 3, NONE, [](Machine& m) { m.stack[m.sp--] = m.x; }}}},
+             {{0xda, 3, Mode::NONE, [](Machine& m) { m.stack[m.sp--] = m.x; }}}},
             {"phy",
-             {{0x5a, 3, NONE, [](Machine& m) { m.stack[m.sp--] = m.y; }}}},
+             {{0x5a, 3, Mode::NONE, [](Machine& m) { m.stack[m.sp--] = m.y; }}}},
             {"plx",
-             {{0xfa, 4, NONE, [](Machine& m) { m.x = m.stack[++m.sp]; }}}},
+             {{0xfa, 4, Mode::NONE, [](Machine& m) { m.x = m.stack[++m.sp]; }}}},
             {"ply",
-             {{0x7a, 4, NONE, [](Machine& m) { m.y = m.stack[++m.sp]; }}}},
+             {{0x7a, 4, Mode::NONE, [](Machine& m) { m.y = m.stack[++m.sp]; }}}},
             {"stz",
-             {{0x64, 3, ZP, Store0<ZP>},
-              {0x74, 4, ZPX, Store0<ZPX>},
-              {0x9c, 4, ABS, Store0<ABS>},
-              {0x9e, 5, ABSX, Store0<ABSX>}}},
+             {{0x64, 3, Mode::ZP, Store0<Mode::ZP>},
+              {0x74, 4, Mode::ZPX, Store0<Mode::ZPX>},
+              {0x9c, 4, Mode::ABS, Store0<Mode::ABS>},
+              {0x9e, 5, Mode::ABSX, Store0<Mode::ABSX>}}},
 
-            {"trb", {{0x14, 5, ZP, Trb<ZP>}, {0x1c, 6, ABS, Trb<ABS>}}},
-            {"tsb", {{0x04, 5, ZP, Tsb<ZP>}, {0x0c, 6, ABS, Tsb<ABS>}}},
+            {"trb", {{0x14, 5, Mode::ZP, Trb<Mode::ZP>}, {0x1c, 6, Mode::ABS, Trb<Mode::ABS>}}},
+            {"tsb", {{0x04, 5, Mode::ZP, Tsb<Mode::ZP>}, {0x0c, 6, Mode::ABS, Tsb<Mode::ABS>}}},
 
-            {"bra", {{0x80, 2, REL, Branch}}},
+            {"bra", {{0x80, 2, Mode::REL, Branch}}},
 
-            {"bbr0", {{0x0f, 5, ZP_REL, Bbr<0>}}},
-            {"bbr1", {{0x1f, 5, ZP_REL, Bbr<1>}}},
-            {"bbr2", {{0x2f, 5, ZP_REL, Bbr<2>}}},
-            {"bbr3", {{0x3f, 5, ZP_REL, Bbr<3>}}},
-            {"bbr4", {{0x4f, 5, ZP_REL, Bbr<4>}}},
-            {"bbr5", {{0x5f, 5, ZP_REL, Bbr<5>}}},
-            {"bbr6", {{0x6f, 5, ZP_REL, Bbr<6>}}},
-            {"bbr7", {{0x7f, 5, ZP_REL, Bbr<7>}}},
-            {"bbs0", {{0x8f, 5, ZP_REL, Bbs<0>}}},
-            {"bbs1", {{0x9f, 5, ZP_REL, Bbs<1>}}},
-            {"bbs2", {{0xaf, 5, ZP_REL, Bbs<2>}}},
-            {"bbs3", {{0xbf, 5, ZP_REL, Bbs<3>}}},
-            {"bbs4", {{0xcf, 5, ZP_REL, Bbs<4>}}},
-            {"bbs5", {{0xdf, 5, ZP_REL, Bbs<5>}}},
-            {"bbs6", {{0xef, 5, ZP_REL, Bbs<6>}}},
-            {"bbs7", {{0xff, 5, ZP_REL, Bbs<7>}}},
+            {"bbr0", {{0x0f, 5, Mode::ZP_REL, Bbr<0>}}},
+            {"bbr1", {{0x1f, 5, Mode::ZP_REL, Bbr<1>}}},
+            {"bbr2", {{0x2f, 5, Mode::ZP_REL, Bbr<2>}}},
+            {"bbr3", {{0x3f, 5, Mode::ZP_REL, Bbr<3>}}},
+            {"bbr4", {{0x4f, 5, Mode::ZP_REL, Bbr<4>}}},
+            {"bbr5", {{0x5f, 5, Mode::ZP_REL, Bbr<5>}}},
+            {"bbr6", {{0x6f, 5, Mode::ZP_REL, Bbr<6>}}},
+            {"bbr7", {{0x7f, 5, Mode::ZP_REL, Bbr<7>}}},
+            {"bbs0", {{0x8f, 5, Mode::ZP_REL, Bbs<0>}}},
+            {"bbs1", {{0x9f, 5, Mode::ZP_REL, Bbs<1>}}},
+            {"bbs2", {{0xaf, 5, Mode::ZP_REL, Bbs<2>}}},
+            {"bbs3", {{0xbf, 5, Mode::ZP_REL, Bbs<3>}}},
+            {"bbs4", {{0xcf, 5, Mode::ZP_REL, Bbs<4>}}},
+            {"bbs5", {{0xdf, 5, Mode::ZP_REL, Bbs<5>}}},
+            {"bbs6", {{0xef, 5, Mode::ZP_REL, Bbs<6>}}},
+            {"bbs7", {{0xff, 5, Mode::ZP_REL, Bbs<7>}}},
 
-            {"rmb0", {{0x07, 5, ZP, Rmb<0>}}},
-            {"rmb1", {{0x17, 5, ZP, Rmb<1>}}},
-            {"rmb2", {{0x27, 5, ZP, Rmb<2>}}},
-            {"rmb3", {{0x37, 5, ZP, Rmb<3>}}},
-            {"rmb4", {{0x47, 5, ZP, Rmb<4>}}},
-            {"rmb5", {{0x57, 5, ZP, Rmb<5>}}},
-            {"rmb6", {{0x67, 5, ZP, Rmb<6>}}},
-            {"rmb7", {{0x77, 5, ZP, Rmb<7>}}},
-            {"smb0", {{0x87, 5, ZP, Smb<0>}}},
-            {"smb1", {{0x97, 5, ZP, Smb<1>}}},
-            {"smb2", {{0xa7, 5, ZP, Smb<2>}}},
-            {"smb3", {{0xb7, 5, ZP, Smb<3>}}},
-            {"smb4", {{0xc7, 5, ZP, Smb<4>}}},
-            {"smb5", {{0xd7, 5, ZP, Smb<5>}}},
-            {"smb6", {{0xe7, 5, ZP, Smb<6>}}},
-            {"smb7", {{0xf7, 5, ZP, Smb<7>}}},
+            {"rmb0", {{0x07, 5, Mode::ZP, Rmb<0>}}},
+            {"rmb1", {{0x17, 5, Mode::ZP, Rmb<1>}}},
+            {"rmb2", {{0x27, 5, Mode::ZP, Rmb<2>}}},
+            {"rmb3", {{0x37, 5, Mode::ZP, Rmb<3>}}},
+            {"rmb4", {{0x47, 5, Mode::ZP, Rmb<4>}}},
+            {"rmb5", {{0x57, 5, Mode::ZP, Rmb<5>}}},
+            {"rmb6", {{0x67, 5, Mode::ZP, Rmb<6>}}},
+            {"rmb7", {{0x77, 5, Mode::ZP, Rmb<7>}}},
+            {"smb0", {{0x87, 5, Mode::ZP, Smb<0>}}},
+            {"smb1", {{0x97, 5, Mode::ZP, Smb<1>}}},
+            {"smb2", {{0xa7, 5, Mode::ZP, Smb<2>}}},
+            {"smb3", {{0xb7, 5, Mode::ZP, Smb<3>}}},
+            {"smb4", {{0xc7, 5, Mode::ZP, Smb<4>}}},
+            {"smb5", {{0xd7, 5, Mode::ZP, Smb<5>}}},
+            {"smb6", {{0xe7, 5, Mode::ZP, Smb<6>}}},
+            {"smb7", {{0xf7, 5, Mode::ZP, Smb<7>}}},
 
         };
 

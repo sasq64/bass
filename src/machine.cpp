@@ -522,26 +522,26 @@ std::string Machine::disassemble(uint32_t* pc)
         arg = machine->readMem(*pc++);
     }
 
-    if (opcode.mode == sixfive::AddressingMode::REL) {
+    if (opcode.mode == sixfive::Mode::REL) {
         arg = (static_cast<int8_t>(arg)) + *pc;
     }
 
     std::array<char, 16> argstr; // NOLINT
-    sprintf(argstr.data(), modeTemplate.at(opcode.mode), arg);
+    sprintf(argstr.data(), modeTemplate.at(static_cast<int>(opcode.mode)), arg);
 
     return fmt::format("{} {}", name, argstr.data());
 }
 
 AsmResult Machine::assemble(Instruction const& instr)
 {
-    using sixfive::AddressingMode;
+    using sixfive::Mode;
 
     auto arg = instr;
     auto opcode = instr.opcode;
 
     auto const& instructions = sixfive::Machine<>::getInstructions();
 
-    if (arg.mode == AddressingMode::ZP_REL) {
+    if (arg.mode == Mode::ZP_REL) {
         auto bit = arg.val >> 24;
         arg.val &= 0xffffff;
         opcode = opcode + std::to_string(bit);
@@ -563,11 +563,10 @@ AsmResult Machine::assemble(Instruction const& instr)
         // Adressing mode did not match directly. See if we can
         // 'optimize it' depending on the instruction value
 
-        static std::unordered_map<AddressingMode, AddressingMode> conv{
-            {AddressingMode::INDZ, AddressingMode::IND},
-            {AddressingMode::ZPX, AddressingMode::ABSX},
-            {AddressingMode::ZPY, AddressingMode::ABSY},
-            {AddressingMode::ZP, AddressingMode::ABS}};
+        static std::unordered_map<Mode, Mode> conv{{Mode::INDZ, Mode::IND},
+                                                   {Mode::ZPX, Mode::ABSX},
+                                                   {Mode::ZPY, Mode::ABSY},
+                                                   {Mode::ZP, Mode::ABS}};
 
         if (instruction.val >= 0 && instruction.val <= 0xff) {
             if (conv[opcode.mode] == instruction.mode) {
@@ -575,8 +574,7 @@ AsmResult Machine::assemble(Instruction const& instr)
             }
         }
 
-        if (instruction.mode == AddressingMode::ABS &&
-            opcode.mode == AddressingMode::REL) {
+        if (instruction.mode == Mode::ABS && opcode.mode == Mode::REL) {
             return true;
         }
         return false;
@@ -591,11 +589,11 @@ AsmResult Machine::assemble(Instruction const& instr)
     }
     arg.mode = it1->mode;
 
-    if (arg.mode == AddressingMode::REL) {
+    if (arg.mode == Mode::REL) {
         arg.val = arg.val - currentSection->pc - 2;
     }
 
-    if (arg.mode == AddressingMode::ZP_REL) {
+    if (arg.mode == Mode::ZP_REL) {
         auto adr = arg.val & 0xffff;
         auto val = (arg.val >> 16) & 0xff;
         auto diff = adr - currentSection->pc - 2;
@@ -612,10 +610,10 @@ AsmResult Machine::assemble(Instruction const& instr)
         }
         inData = false;
         fprintf(fp, "%04x : %s ", currentSection->pc, it0->name);
-        if (arg.mode == sixfive::AddressingMode::REL) {
+        if (arg.mode == sixfive::Mode::REL) {
             v = (static_cast<int8_t>(v)) + 2 + currentSection->pc;
         }
-        fprintf(fp, modeTemplate.at(arg.mode), v);
+        fprintf(fp, modeTemplate.at(static_cast<int>(arg.mode)), v);
         fputs("\n", fp);
     }
 
@@ -627,7 +625,7 @@ AsmResult Machine::assemble(Instruction const& instr)
         writeByte(arg.val >> 8);
     }
 
-    if (arg.mode == AddressingMode::REL && (arg.val > 127 || arg.val < -128)) {
+    if (arg.mode == Mode::REL && (arg.val > 127 || arg.val < -128)) {
         return AsmResult::Truncated;
     }
 
@@ -704,4 +702,43 @@ void Machine::setRegs(Tuple6 const& regs)
     std::get<3>(r) = std::get<3>(regs);
     std::get<4>(r) = std::get<4>(regs);
     std::get<5>(r) = std::get<5>(regs);
+}
+
+void Machine::setReg(sixfive::Reg reg, unsigned v)
+{
+    using sixfive::Reg;
+    switch (reg) {
+    case Reg::A:
+        return machine->set<Reg::A>(v);
+    case Reg::X:
+        return machine->set<Reg::X>(v);
+    case Reg::Y:
+        return machine->set<Reg::Y>(v);
+    case Reg::SR:
+        return machine->set<Reg::SR>(v);
+    case Reg::SP:
+        return machine->set<Reg::SP>(v);
+    case Reg::PC:
+        return machine->set<Reg::PC>(v);
+    }
+}
+
+unsigned Machine::getReg(sixfive::Reg reg)
+{
+    using sixfive::Reg;
+    switch (reg) {
+    case Reg::A:
+        return machine->get<Reg::A>();
+    case Reg::X:
+        return machine->get<Reg::X>();
+    case Reg::Y:
+        return machine->get<Reg::Y>();
+    case Reg::SR:
+        return machine->get<Reg::SR>();
+    case Reg::SP:
+        return machine->get<Reg::SP>();
+    case Reg::PC:
+        return machine->get<Reg::PC>();
+    }
+    return 0; // Cant get here
 }

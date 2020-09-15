@@ -32,26 +32,10 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
             mach.setBankRead(hi_adr, len, bank);
         });
 
-    lua["reg_a"] = [&]() {
-        auto const& [a, x, y, sr, sp, pc] = mach.getRegs();
-        return a;
-    };
-    lua["reg_x"] = [&]() {
-        auto const& [a, x, y, sr, sp, pc] = mach.getRegs();
-        return x;
-    };
-    lua["reg_y"] = [&]() {
-        auto const& [a, x, y, sr, sp, pc] = mach.getRegs();
-        return y;
-    };
-    lua["set_x"] = [&](int x) {
-        auto regs = mach.getRegs();
-        std::get<1>(regs) = x;
-        mach.setRegs(regs);
-    };
-    lua["set_y"] = [&](int y) {
-        auto regs = mach.getRegs();
-        std::get<2>(regs) = y;
-        mach.setRegs(regs);
-    };
+    lua["reg_a"] = [&]() { return mach.getReg(sixfive::Reg::A); };
+    lua["reg_x"] = [&]() { return mach.getReg(sixfive::Reg::X); };
+    lua["reg_y"] = [&]() { return mach.getReg(sixfive::Reg::Y); };
+    lua["set_a"] = [&](int y) { mach.setReg(sixfive::Reg::A, y); };
+    lua["set_x"] = [&](int x) { mach.setReg(sixfive::Reg::X, x); };
+    lua["set_y"] = [&](int y) { mach.setReg(sixfive::Reg::Y, y); };
 }
