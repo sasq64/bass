@@ -71,7 +71,7 @@ struct Error
     std::string file;
     ErrLevel level{ErrLevel::Error};
 
-    operator bool() const { return line == 0; }
+    explicit operator bool() const { return line == 0; }
 };
 
 struct ParserWrapper

@@ -60,5 +60,8 @@ start:
 font:
     png = load_png("../data/ff.png")
     tiles = layout_tiles(png.pixels, 128/8, 1, 8)
-    !fill tiles[8*32:8*64]
-    !fill tiles[0:8*32]
+
+    tiles2 = index_tiles(tiles, 8)
+
+    !fill tiles2.tiles[8*32:8*64]
+    !fill tiles2.tiles[0:8*32]

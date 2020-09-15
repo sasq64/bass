@@ -57,42 +57,47 @@ bool checkErrors(std::vector<Error> errs)
     auto it = errs.begin();
     while (it != errs.end()) {
         auto const& e = *it;
-        if(checkFile(e)) {
+        if (checkFile(e)) {
             it = errs.erase(it);
         } else {
             it++;
-       }
+        }
     }
     return errs.empty();
 }
 
 TEST_CASE("png.layout", "[assembler]")
 {
+    auto get = [&](auto const& vec, int n) -> uint16_t {
+        return vec[n * 2] | (vec[n * 2 + 1] << 8);
+    };
 
     auto png = loadPng((projDir() / "data" / "test.png").string());
+
+    auto colors = std::any_cast<std::vector<uint8_t>>(png["colors"]);
+
+    REQUIRE(get(colors, 0) == 0);
+    REQUIRE(get(colors, 1) == 0x000a);
+    REQUIRE(get(colors, 2) == 0x00f0);
+
     auto pixels = std::any_cast<std::vector<uint8_t>>(png["pixels"]);
     auto tiles = layoutTiles(pixels, 32, 8, 8);
 
     LOGI("TILES %d", tiles.size());
-    for(int i=0; i<8*8; i++) {
+    for (int i = 0; i < 8 * 8; i++) {
         fmt::print("{:02x} ", tiles[i]);
     }
     puts("");
-    for(int i=0; i<8*8; i++) {
-        fmt::print("{:02x} ", tiles[i+8*8]);
+    for (int i = 0; i < 8 * 8; i++) {
+        fmt::print("{:02x} ", tiles[i + 8 * 8]);
     }
 
-    auto indexes = index_tiles(tiles, 8*8);
+    auto indexes = index_tiles(tiles, 8 * 8);
 
-    auto get = [&](int n) -> uint16_t {
-        return indexes[n*2] | (indexes[n*2+1] << 8);
-    };
-
-    REQUIRE(get(0) == get(15));
-    REQUIRE(get(8) == get(10));
-    REQUIRE(get(2) == get(13));
-    REQUIRE(tiles.size() == 8*8*8);
-
+    REQUIRE(get(indexes, 0) == get(indexes, 15));
+    REQUIRE(get(indexes, 8) == get(indexes, 10));
+    REQUIRE(get(indexes, 2) == get(indexes, 13));
+    REQUIRE(tiles.size() == 8 * 8 * 8);
 }
 
 TEST_CASE("png", "[assembler]")
@@ -102,12 +107,11 @@ TEST_CASE("png", "[assembler]")
     auto pixels = std::any_cast<std::vector<uint8_t>>(png["pixels"]);
     auto tiles = layoutTiles(pixels, 96, 2, 16);
 
-    uint8_t* tile8 = &tiles[8*2*16];
+    uint8_t* tile8 = &tiles[8 * 2 * 16];
 
-    for(int i=0; i<256; i+=2) {
-        if(i % 32 == 0)
-            puts("--------");
-        fmt::print("{:02x} {:02x}\n", tiles[i], tiles[i+1]);
+    for (int i = 0; i < 256; i += 2) {
+        if (i % 32 == 0) puts("--------");
+        fmt::print("{:02x} {:02x}\n", tiles[i], tiles[i + 1]);
     }
 
     LOGI("%x %x %x", tile8[0], tile8[1], tiles[2]);
@@ -116,7 +120,6 @@ TEST_CASE("png", "[assembler]")
     REQUIRE(tile8[1] == 0b11111010);
 
     auto tiles8 = layoutTiles(tiles, 2, 1, 8);
-
 }
 
 TEST_CASE("all", "[assembler]")
@@ -126,7 +129,8 @@ TEST_CASE("all", "[assembler]")
         fmt::print(fmt::fg(fmt::color::yellow), "{}\n", p.string());
         ass.parse_path(p);
         for (auto const& e : ass.getErrors()) {
-            fmt::print(fmt::fg(fmt::color::coral), "ERROR '{}' in {}:{}\n", e.message, e.file, e.line);
+            fmt::print(fmt::fg(fmt::color::coral), "ERROR '{}' in {}:{}\n",
+                       e.message, e.file, e.line);
         }
         if (!checkErrors(ass.getErrors())) {
             FAIL("Did not find expected errors");

@@ -17,7 +17,7 @@
 
 extern char const* const grammar6502;
 
-using sixfive::AddressingMode;
+using sixfive::Mode;
 
 
 // OpenBSD
@@ -235,7 +235,7 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
     syms.acceptUndefined(false);
     inTest--;
 
-    mach->assemble({"rts", AddressingMode::NONE, 0});
+    mach->assemble({"rts", Mode::NONE, 0});
 
     auto cycles = mach->run(start);
     if (cycles > 16777200) {
@@ -671,7 +671,7 @@ void Assembler::setupRules()
                 if (it != macros.end()) {
                     LOGD("Found macro %s", it->second.name);
                     Call c{i->opcode, {}};
-                    if (i->mode > sixfive::ACC) {
+                    if (i->mode > sixfive::Mode::ACC) {
                         c.args.emplace_back(any_num(i->val));
                     }
                     auto sz = it->second.args.size();
@@ -702,7 +702,7 @@ void Assembler::setupRules()
         trace(sv);
         auto opcode = std::string(any_cast<std::string_view>(sv[0]));
         opcode = utils::toLower(opcode);
-        Instruction instruction{opcode, AddressingMode::NONE, 0};
+        Instruction instruction{opcode, Mode::NONE, 0};
         if (sv.size() > 1) {
             auto arg = any_cast<Instruction>(sv[1]);
             instruction.mode = arg.mode;
@@ -712,17 +712,17 @@ void Assembler::setupRules()
     };
 
     // Set up the 'Instruction' parsing rules
-    static const std::unordered_map<std::string, AddressingMode> modeMap = {
-        {"Abs", AddressingMode::ABS},   {"AbsX", AddressingMode::ABSX},
-        {"AbsY", AddressingMode::ABSY}, {"Ind", AddressingMode::IND},
-        {"IndX", AddressingMode::INDX}, {"IndY", AddressingMode::INDY},
-        {"Acc", AddressingMode::ACC},   {"Imm", AddressingMode::IMM},
+    static const std::unordered_map<std::string, Mode> modeMap = {
+        {"Abs", Mode::ABS},   {"AbsX", Mode::ABSX},
+        {"AbsY", Mode::ABSY}, {"Ind", Mode::IND},
+        {"IndX", Mode::INDX}, {"IndY", Mode::INDY},
+        {"Acc", Mode::ACC},   {"Imm", Mode::IMM},
     };
     auto buildArg = [](SV& sv) -> std::any {
         auto mode = modeMap.at(sv.name());
         return Instruction{
             "", mode,
-            mode == AddressingMode::ACC ? 0 : any_cast<Number>(sv[0])};
+            mode == Mode::ACC ? 0 : any_cast<Number>(sv[0])};
     };
     for (auto const& [name, _] : modeMap) {
         parser[name.c_str()] = buildArg;
@@ -731,7 +731,7 @@ void Assembler::setupRules()
     parser["ZRel"] = [&](SV& sv) -> Instruction {
         int32_t v = (number<int32_t>(sv[1]) << 24) |
                     (number<int32_t>(sv[0]) << 16) | number<int32_t>(sv[2]);
-        return {"", AddressingMode::ZP_REL, static_cast<Number>(v)};
+        return {"", Mode::ZP_REL, static_cast<Number>(v)};
     };
 
     parser["LabelRef"] = [&](SV& sv) {
@@ -1050,12 +1050,12 @@ void Assembler::printSymbols()
 
 void Assembler::addLog(std::string_view text)
 {
-    mach->assemble({"brk", sixfive::AddressingMode::IMM, 254});
+    mach->assemble({"brk", sixfive::Mode::IMM, 254});
     logs[mach->getPC()] = std::string(text);
 }
 
 void Assembler::addCheck(std::string_view text)
 {
-    mach->assemble({"brk", sixfive::AddressingMode::IMM, 255});
+    mach->assemble({"brk", sixfive::Mode::IMM, 255});
     checks[mach->getPC()] = std::string(text);
 }

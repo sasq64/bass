@@ -148,11 +148,11 @@ private:
 
 struct Instruction
 {
-    Instruction(std::string const& op, sixfive::AddressingMode m, double v)
+    Instruction(std::string const& op, sixfive::Mode m, double v)
         : opcode(op), mode(m), val(static_cast<int32_t>(v))
     {}
     std::string opcode;
-    sixfive::AddressingMode mode;
+    sixfive::Mode mode;
     int32_t val;
 };
 

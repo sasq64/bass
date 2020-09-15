@@ -9,16 +9,12 @@
 #include <cstdint>
 #include <string>
 
-using std::byte;
-
-std::vector<uint8_t> convertPalette(size_t colors, const unsigned char* pal)
+std::vector<uint8_t> convertPalette(std::vector<uint32_t> const& colors32)
 {
     std::vector<uint8_t> pal12;
-    for (size_t i = 0; i < colors; i++) {
-        auto r = pal[i * 4];
-        auto g = pal[i * 4 + 1];
-        auto b = pal[i * 4 + 2];
-        uint16_t c = ((r & 0xf0) << 4) | (g & 0xf0) | (b >> 4);
+    for (auto const& col : colors32) {
+        uint16_t c =
+            ((col << 4) & 0xf0) | ((col >> 8) & 0xf0) | ((col >> 20) & 0xf);
         pal12.push_back(c & 0xff);
         pal12.push_back(c >> 8);
     }
@@ -160,10 +156,8 @@ std::vector<uint8_t> index_tiles(std::vector<uint8_t>& pixels, int size)
     int count = 0;
     uint8_t const* ptr = pixels.data();
     auto tileCount = pixels.size() / size;
-    LOGI("COUNT %d", tileCount);
     for (size_t i = 0; i < tileCount; i++) {
-        auto crc = crc32(reinterpret_cast<const uint32_t*>(ptr), size/4);
-        LOGI("CRC %x from %p", crc, (void*)ptr);
+        auto crc = crc32(reinterpret_cast<const uint32_t*>(ptr), size / 4);
         auto it = tiles_crc.find(crc);
         int index = -1;
         if (it == tiles_crc.end()) {
@@ -174,15 +168,13 @@ std::vector<uint8_t> index_tiles(std::vector<uint8_t>& pixels, int size)
             index = it->second;
             memcpy((void*)ptr, (const void*)(ptr + size),
                    (tileCount - i - 1) * size);
-            //tileCount--;
+            // tileCount--;
         }
         index++;
-        LOGI("INDEX %d", index);
         indexes.push_back(index & 0xff);
         indexes.push_back((index >> 8) & 0x3);
     }
     size_t newSize = (ptr - pixels.data());
-    LOGI("NEW SIZE %d", newSize/size);
     pixels.resize(newSize);
     return indexes;
 }
@@ -193,9 +185,7 @@ AnyMap loadPng(std::string_view const& name)
     auto image = load_png(name);
 
     if (image) {
-        auto pal12 = convertPalette(
-            image.colors.size(),
-            reinterpret_cast<const unsigned char*>(image.colors.data()));
+        auto pal12 = convertPalette(image.colors);
 
         auto bpp = image.bpp; // state.info_raw.bitdepth;
         res["width"] = num(image.width);
@@ -203,51 +193,6 @@ AnyMap loadPng(std::string_view const& name)
         res["height"] = num(image.height);
         res["pixels"] = image.pixels;
         res["colors"] = pal12;
-
-        //        image::bitmap8 bm;
-        //        if (bpp == 1) {
-        //            bm = fromMonochrome(w, h, out.get());
-        //        } else {
-        //            bm = image::bitmap8(w, h, out.get());
-        //        }
-        //
-        //        std::unordered_map<uint32_t, int> tiles_crc{};
-        //        std::vector<uint8_t> indexes;
-        //        std::vector<uint8_t> tiles;
-        //        tiles.resize(8 * 8, 0);
-        //
-        //        int splitSize = 16;
-        //
-        //        int count = 0;
-        //        for (auto const& tile : bm.split(splitSize, splitSize)) {
-        //            auto crc = tile.crc();
-        //            auto it = tiles_crc.find(crc);
-        //            int index = -1;
-        //            if (it == tiles_crc.end()) {
-        //                index = count;
-        //                tiles_crc[crc] = count++;
-        //                if (bpp == 1) {
-        //                    auto pixels = toMonochrome(tile);
-        //                    tiles.insert(tiles.end(), pixels.begin(),
-        //                    pixels.end());
-        //                } else {
-        //                    tiles.insert(tiles.end(), tile.data(),
-        //                                 tile.data() + splitSize * splitSize);
-        //                }
-        //            } else {
-        //                index = it->second;
-        //            }
-        //            index++;
-        //            indexes.push_back(index & 0xff);
-        //            indexes.push_back((index >> 8) & 0x3);
-        //        }
-        //
-        //        res["tiles"] = tiles;
-        //        res["indexes"] = indexes;
-        //
-        //        LOGD("%d different tiles (out of %d)", tiles_crc.size(),
-        //             indexes.size() / 2);
     }
-    //    lodepng_state_cleanup(&state);
     return res;
 }
