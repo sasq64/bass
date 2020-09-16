@@ -104,9 +104,11 @@ std::any Scripting::to_any(sol::object const& obj)
                 first = false;
             }
             if (isVec) {
-                auto index = key.as<size_t>() - 1;
-                vec.resize(index + 1);
-                vec[index] = val.as<uint8_t>();
+                auto index = key.as<size_t>();
+                if(index > 0) {
+                    vec.resize(index);
+                    vec[index-1] = val.as<uint8_t>();
+                }
             } else {
                 auto s = key.as<std::string>();
                 syms[s] = to_any(val);

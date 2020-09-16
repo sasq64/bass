@@ -31,10 +31,11 @@ public:
 
     sol::state& getState() { return *luap; }
 
+    sol::object to_object(std::any const& a);
+    std::any to_any(sol::object const& obj);
+
 private:
     std::unique_ptr<sol::state> luap;
     sol::state& lua;
 
-    sol::object to_object(std::any const& a);
-    std::any to_any(sol::object const& obj);
 };

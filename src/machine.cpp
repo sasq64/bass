@@ -264,7 +264,6 @@ uint32_t Machine::getPC() const
 // clang-format off
 constexpr static std::array modeTemplate = {
         "",
-        "",
         "A",
 
         "#$%02x",
@@ -463,6 +462,18 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
 uint32_t Machine::run(uint16_t pc)
 {
+    runSetup();
+    fmt::print("Running code at ${:x}\n", pc);
+    return go(pc);
+}
+uint32_t Machine::go(uint16_t pc)
+{
+    machine->setPC(pc);
+    return machine->run();
+}
+
+void Machine::runSetup()
+{
     for (auto const& section : sections) {
         if (section.start < 0x10000 && !section.data.empty()) {
             LOGI("Writing '%s' to %x", section.name, section.start);
@@ -470,9 +481,7 @@ uint32_t Machine::run(uint16_t pc)
                               section.data.size());
         }
     }
-    fmt::print("Running code at ${:x}\n", pc);
-    machine->setPC(pc);
-    return machine->run();
+
 }
 
 void Machine::setOutput(FILE* f)

@@ -136,6 +136,8 @@ public:
     void writeRam(uint16_t offset, uint8_t val);
 
     uint32_t run(uint16_t pc);
+    uint32_t go(uint16_t pc);
+    void runSetup();
     std::vector<uint8_t> getRam();
 
     unsigned getReg(sixfive::Reg reg);

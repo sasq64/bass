@@ -118,7 +118,7 @@ struct SymbolTable
         }
     }
 
-    // Return a map containg all symbols beginning with
+    // Return a map containing all symbols beginning with
     // name.
     AnyMap collect(std::string const& name) const
     {

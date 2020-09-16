@@ -9,6 +9,20 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
     auto& lua = s.getState();
     auto& mach = a.getMachine();
 
+    lua["sym"] = [&](std::string const& name) {
+        auto aval = a.getSymbols().get(name);
+        return s.to_object(aval);
+    };
+
+    lua["start_run"] = [&] {
+        mach.runSetup();
+
+    };
+
+    lua["call"] = [&](int32_t adr) {
+        mach.go(adr);
+    };
+
     lua["read_mem_6502"] = [&](int adr) { return mach.readRam(adr); };
     lua["mem_read"] = [&](int adr) { return mach.readRam(adr); };
     lua["mem_write"] = [&](int adr, int val) {
@@ -35,7 +49,7 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
     lua["reg_a"] = [&]() { return mach.getReg(sixfive::Reg::A); };
     lua["reg_x"] = [&]() { return mach.getReg(sixfive::Reg::X); };
     lua["reg_y"] = [&]() { return mach.getReg(sixfive::Reg::Y); };
-    lua["set_a"] = [&](int y) { mach.setReg(sixfive::Reg::A, y); };
+    lua["set_a"] = [&](int a) { mach.setReg(sixfive::Reg::A, a); };
     lua["set_x"] = [&](int x) { mach.setReg(sixfive::Reg::X, x); };
     lua["set_y"] = [&](int y) { mach.setReg(sixfive::Reg::Y, y); };
 }

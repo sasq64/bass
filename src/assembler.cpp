@@ -602,6 +602,7 @@ void Assembler::setupRules()
             return (it->second)(call.args);
         }
 
+        LOGI("Calling %s", call.name);
         if (scripting.hasFunction(call.name)) {
             return scripting.call(call.name, call.args);
         }
