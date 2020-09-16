@@ -156,12 +156,6 @@ struct Instruction
     int32_t val;
 };
 
-AnyMap loadPng(std::string_view const& name);
-
-std::vector<uint8_t> layoutTiles(std::vector<uint8_t> const& pixels, int stride,
-                                 int w, int h);
-
-std::vector<uint8_t> index_tiles(std::vector<uint8_t>& pixels, int size);
 
 inline void printArg(std::any const& arg)
 {

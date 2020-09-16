@@ -3,6 +3,7 @@
 #include "catch.hpp"
 
 #include "assembler.h"
+#include "png.h"
 #include "test_utils.h"
 
 #include <coreutils/crc.h>
@@ -72,15 +73,13 @@ TEST_CASE("png.layout", "[assembler]")
         return vec[n * 2] | (vec[n * 2 + 1] << 8);
     };
 
-    auto png = loadPng((projDir() / "data" / "test.png").string());
+    Image image = loadPng((projDir() / "data" / "test.png").string());
 
-    auto colors = std::any_cast<std::vector<uint8_t>>(png["colors"]);
+    REQUIRE(get(image.colors, 0) == 0);
+    REQUIRE(get(image.colors, 1) == 0x000a);
+    REQUIRE(get(image.colors, 2) == 0x00f0);
 
-    REQUIRE(get(colors, 0) == 0);
-    REQUIRE(get(colors, 1) == 0x000a);
-    REQUIRE(get(colors, 2) == 0x00f0);
-
-    auto pixels = std::any_cast<std::vector<uint8_t>>(png["pixels"]);
+    auto pixels = std::any_cast<std::vector<uint8_t>>(image.pixels);
     auto tiles = layoutTiles(pixels, 32, 8, 8);
 
 
@@ -94,7 +93,7 @@ TEST_CASE("png.layout", "[assembler]")
     }
 
     pixels = tiles;
-    auto indexes = index_tiles(tiles, 8 * 8);
+    auto indexes = indexTiles(tiles, 8 * 8);
 
     REQUIRE(get(indexes, 0) == get(indexes, 15));
     REQUIRE(get(indexes, 8) == get(indexes, 10));
@@ -118,9 +117,8 @@ TEST_CASE("png.layout", "[assembler]")
 TEST_CASE("png", "[assembler]")
 {
 
-    auto png = loadPng((projDir() / "data" / "tiles.png").string());
-    auto pixels = std::any_cast<std::vector<uint8_t>>(png["pixels"]);
-    auto tiles = layoutTiles(pixels, 96, 2, 16);
+    Image image = loadPng((projDir() / "data" / "tiles.png").string());
+    auto tiles = layoutTiles(image.pixels, 96, 2, 16);
 
     uint8_t* tile8 = &tiles[8 * 2 * 16];
 

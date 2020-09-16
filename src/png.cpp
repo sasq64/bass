@@ -1,43 +1,26 @@
-#include "defines.h"
+#include "png.h"
 
 #include <coreutils/bitmap.h>
+#include <coreutils/file.h>
+#include <coreutils/log.h>
 
 #include <lodepng.h>
 
-#include <coreutils/file.h>
-#include <coreutils/log.h>
 #include <cstdint>
-#include <string>
 
 std::vector<uint8_t> convertPalette(std::vector<uint32_t> const& colors32)
 {
     std::vector<uint8_t> pal12;
     for (auto const& col : colors32) {
         uint16_t c =
-            ((col << 4) & 0xf0) | ((col >> 8) & 0xf0) | ((col >> 20) & 0xf);
+            ((col << 4) & 0xf00) | ((col >> 8) & 0xf0) | ((col >> 20) & 0xf);
         pal12.push_back(c & 0xff);
         pal12.push_back(c >> 8);
     }
     return pal12;
 }
 
-struct Tiles
-{
-    std::vector<uint8_t> indexes;
-    std::vector<uint8_t> tiles;
-};
-
-struct Image
-{
-    int32_t width{};
-    int32_t height{};
-    std::vector<uint8_t> pixels;
-    std::vector<uint32_t> colors;
-    uint32_t bpp{};
-    explicit operator bool() const { return bpp != 0; }
-};
-
-Image load_png(std::string_view const& name)
+Image loadPng(std::string_view const& name)
 {
     unsigned w{};
     unsigned h{};
@@ -146,7 +129,7 @@ std::vector<uint8_t> layoutTiles(std::vector<uint8_t> const& pixels, int stride,
     return result;
 }
 
-std::vector<uint8_t> index_tiles(std::vector<uint8_t>& pixels, int size)
+std::vector<uint8_t> indexTiles(std::vector<uint8_t>& pixels, int size)
 {
     std::unordered_map<uint32_t, int> tiles_crc{};
     std::vector<uint8_t> indexes;
@@ -175,20 +158,3 @@ std::vector<uint8_t> index_tiles(std::vector<uint8_t>& pixels, int size)
     return indexes;
 }
 
-AnyMap loadPng(std::string_view const& name)
-{
-    AnyMap res;
-    auto image = load_png(name);
-
-    if (image) {
-        auto pal12 = convertPalette(image.colors);
-
-        auto bpp = image.bpp; // state.info_raw.bitdepth;
-        res["width"] = num(image.width);
-        res["bpp"] = bpp;
-        res["height"] = num(image.height);
-        res["pixels"] = image.pixels;
-        res["colors"] = pal12;
-    }
-    return res;
-}

@@ -80,7 +80,7 @@ void Assembler::trace(SVWrap const& sv) const
     }
 }
 
-void Assembler::debug_flags(uint32_t flags)
+void Assembler::setDebugFlags(uint32_t flags)
 {
     doTrace = (flags & DEB_TRACE) != 0;
     passDebug = (flags & DEB_PASS) != 0;

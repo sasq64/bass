@@ -1,4 +1,5 @@
 #include "assembler.h"
+#include "png.h"
 #include <cmath>
 #include <coreutils/file.h>
 
@@ -117,7 +118,7 @@ void initFunctions(Assembler& a)
         "index_tiles", [&](std::vector<uint8_t> const& pixels, double size) {
             AnyMap result;
             auto pixelCopy = pixels;
-            std::vector<uint8_t> v = index_tiles(pixelCopy, size);
+            std::vector<uint8_t> v = indexTiles(pixelCopy, size);
             result["indexes"] = v;
             result["tiles"] = pixelCopy;
             return result;
@@ -134,6 +135,20 @@ void initFunctions(Assembler& a)
         if (p.is_relative()) {
             p = a.getCurrentPath() / p;
         }
-        return loadPng(p.string());
+
+      AnyMap res;
+      auto image = loadPng(p.string());
+
+      if (image) {
+          auto pal12 = convertPalette(image.colors);
+
+          auto bpp = image.bpp; // state.info_raw.bitdepth;
+          res["width"] = num(image.width);
+          res["bpp"] = bpp;
+          res["height"] = num(image.height);
+          res["pixels"] = image.pixels;
+          res["colors"] = pal12;
+      }
+      return res;
     });
 }

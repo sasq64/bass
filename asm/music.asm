@@ -58,14 +58,27 @@ music:
     !script last {
 
     frame = 0
+    sid_data = []
 
     map_bank_write(0xd4, 1, function(adr, val)
         print("SID", adr - 0xd400, val)
+        sid_data.add[offset] = adr - 0xd400
+        sid_data.add[offset+1] = val
+        offset = offset + 2
     end)
 
-    for 1 to 10*50 do
+    offset = 0
+    for i=1,10*50 do
+        sid_data[offset] = 0xff
+        offset = offset + 1
         call(sym("sid.play"))
-        frame++
+    end
+
+    function get_sid_data()
+        return sid_data
     end
 
     }
+
+ sid_data:
+    !fill get_sid_data()

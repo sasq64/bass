@@ -45,6 +45,8 @@ struct DefaultPolicy
 
     static constexpr int MemSize = 65536;
 
+    static constexpr bool Support65C02 = true;
+
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
 };
@@ -225,7 +227,7 @@ private:
     unsigned sr;
     // Result of last operation; Used for S and Z flags.
     // result & 0xff == 0 => Z flag is set
-    // result & 0x280 !- 0 => S flag is set
+    // result & 0x280 != 0 => S flag is set
     unsigned result;
 
     uint8_t sp;
@@ -1044,85 +1046,98 @@ private:
             } },
         };
 
-        std::vector<Instruction> instructions65c02 = {
-            {"adc", {{0x72, 5, Mode::INDZ, Adc<Mode::INDZ, USE_BCD>}}},
-            {"and", {{0x32, 5, Mode::INDZ, And<Mode::INDZ>}}},
-            {"cmp", {{0xd2, 5, Mode::INDZ, Cmp<Reg::A, Mode::INDZ>}}},
-            {"eor", {{0x52, 5, Mode::INDZ, Eor<Mode::INDZ>}}},
-            {"lda", {{0xb2, 5, Mode::INDZ, Load<Reg::A, Mode::INDZ>}}},
-            {"ora", {{0x12, 5, Mode::INDZ, Ora<Mode::INDZ>}}},
-            {"sbc", {{0xf2, 5, Mode::INDZ, Sbc<Mode::INDZ, USE_BCD>}}},
-            {"sta", {{0x92, 5, Mode::INDZ, Store<Reg::A, Mode::INDZ>}}},
-            {"phx",
-             {{0xda, 3, Mode::NONE, [](Machine& m) { m.stack[m.sp--] = m.x; }}}},
-            {"phy",
-             {{0x5a, 3, Mode::NONE, [](Machine& m) { m.stack[m.sp--] = m.y; }}}},
-            {"plx",
-             {{0xfa, 4, Mode::NONE, [](Machine& m) { m.x = m.stack[++m.sp]; }}}},
-            {"ply",
-             {{0x7a, 4, Mode::NONE, [](Machine& m) { m.y = m.stack[++m.sp]; }}}},
-            {"stz",
-             {{0x64, 3, Mode::ZP, Store0<Mode::ZP>},
-              {0x74, 4, Mode::ZPX, Store0<Mode::ZPX>},
-              {0x9c, 4, Mode::ABS, Store0<Mode::ABS>},
-              {0x9e, 5, Mode::ABSX, Store0<Mode::ABSX>}}},
+        if constexpr (POLICY::Support65C02) {
 
-            {"trb", {{0x14, 5, Mode::ZP, Trb<Mode::ZP>}, {0x1c, 6, Mode::ABS, Trb<Mode::ABS>}}},
-            {"tsb", {{0x04, 5, Mode::ZP, Tsb<Mode::ZP>}, {0x0c, 6, Mode::ABS, Tsb<Mode::ABS>}}},
+            std::vector<Instruction> instructions65c02 = {
+                {"adc", {{0x72, 5, Mode::INDZ, Adc<Mode::INDZ, USE_BCD>}}},
+                {"and", {{0x32, 5, Mode::INDZ, And<Mode::INDZ>}}},
+                {"cmp", {{0xd2, 5, Mode::INDZ, Cmp<Reg::A, Mode::INDZ>}}},
+                {"eor", {{0x52, 5, Mode::INDZ, Eor<Mode::INDZ>}}},
+                {"lda", {{0xb2, 5, Mode::INDZ, Load<Reg::A, Mode::INDZ>}}},
+                {"ora", {{0x12, 5, Mode::INDZ, Ora<Mode::INDZ>}}},
+                {"sbc", {{0xf2, 5, Mode::INDZ, Sbc<Mode::INDZ, USE_BCD>}}},
+                {"sta", {{0x92, 5, Mode::INDZ, Store<Reg::A, Mode::INDZ>}}},
+                {"phx",
+                 {{0xda, 3, Mode::NONE,
+                   [](Machine& m) { m.stack[m.sp--] = m.x; }}}},
+                {"phy",
+                 {{0x5a, 3, Mode::NONE,
+                   [](Machine& m) { m.stack[m.sp--] = m.y; }}}},
+                {"plx",
+                 {{0xfa, 4, Mode::NONE,
+                   [](Machine& m) { m.x = m.stack[++m.sp]; }}}},
+                {"ply",
+                 {{0x7a, 4, Mode::NONE,
+                   [](Machine& m) { m.y = m.stack[++m.sp]; }}}},
+                {"stz",
+                 {{0x64, 3, Mode::ZP, Store0<Mode::ZP>},
+                  {0x74, 4, Mode::ZPX, Store0<Mode::ZPX>},
+                  {0x9c, 4, Mode::ABS, Store0<Mode::ABS>},
+                  {0x9e, 5, Mode::ABSX, Store0<Mode::ABSX>}}},
 
-            {"bra", {{0x80, 2, Mode::REL, Branch}}},
+                {"trb",
+                 {{0x14, 5, Mode::ZP, Trb<Mode::ZP>},
+                  {0x1c, 6, Mode::ABS, Trb<Mode::ABS>}}},
+                {"tsb",
+                 {{0x04, 5, Mode::ZP, Tsb<Mode::ZP>},
+                  {0x0c, 6, Mode::ABS, Tsb<Mode::ABS>}}},
 
-            {"bbr0", {{0x0f, 5, Mode::ZP_REL, Bbr<0>}}},
-            {"bbr1", {{0x1f, 5, Mode::ZP_REL, Bbr<1>}}},
-            {"bbr2", {{0x2f, 5, Mode::ZP_REL, Bbr<2>}}},
-            {"bbr3", {{0x3f, 5, Mode::ZP_REL, Bbr<3>}}},
-            {"bbr4", {{0x4f, 5, Mode::ZP_REL, Bbr<4>}}},
-            {"bbr5", {{0x5f, 5, Mode::ZP_REL, Bbr<5>}}},
-            {"bbr6", {{0x6f, 5, Mode::ZP_REL, Bbr<6>}}},
-            {"bbr7", {{0x7f, 5, Mode::ZP_REL, Bbr<7>}}},
-            {"bbs0", {{0x8f, 5, Mode::ZP_REL, Bbs<0>}}},
-            {"bbs1", {{0x9f, 5, Mode::ZP_REL, Bbs<1>}}},
-            {"bbs2", {{0xaf, 5, Mode::ZP_REL, Bbs<2>}}},
-            {"bbs3", {{0xbf, 5, Mode::ZP_REL, Bbs<3>}}},
-            {"bbs4", {{0xcf, 5, Mode::ZP_REL, Bbs<4>}}},
-            {"bbs5", {{0xdf, 5, Mode::ZP_REL, Bbs<5>}}},
-            {"bbs6", {{0xef, 5, Mode::ZP_REL, Bbs<6>}}},
-            {"bbs7", {{0xff, 5, Mode::ZP_REL, Bbs<7>}}},
+                {"bra", {{0x80, 2, Mode::REL, Branch}}},
 
-            {"rmb0", {{0x07, 5, Mode::ZP, Rmb<0>}}},
-            {"rmb1", {{0x17, 5, Mode::ZP, Rmb<1>}}},
-            {"rmb2", {{0x27, 5, Mode::ZP, Rmb<2>}}},
-            {"rmb3", {{0x37, 5, Mode::ZP, Rmb<3>}}},
-            {"rmb4", {{0x47, 5, Mode::ZP, Rmb<4>}}},
-            {"rmb5", {{0x57, 5, Mode::ZP, Rmb<5>}}},
-            {"rmb6", {{0x67, 5, Mode::ZP, Rmb<6>}}},
-            {"rmb7", {{0x77, 5, Mode::ZP, Rmb<7>}}},
-            {"smb0", {{0x87, 5, Mode::ZP, Smb<0>}}},
-            {"smb1", {{0x97, 5, Mode::ZP, Smb<1>}}},
-            {"smb2", {{0xa7, 5, Mode::ZP, Smb<2>}}},
-            {"smb3", {{0xb7, 5, Mode::ZP, Smb<3>}}},
-            {"smb4", {{0xc7, 5, Mode::ZP, Smb<4>}}},
-            {"smb5", {{0xd7, 5, Mode::ZP, Smb<5>}}},
-            {"smb6", {{0xe7, 5, Mode::ZP, Smb<6>}}},
-            {"smb7", {{0xf7, 5, Mode::ZP, Smb<7>}}},
+                {"bbr0", {{0x0f, 5, Mode::ZP_REL, Bbr<0>}}},
+                {"bbr1", {{0x1f, 5, Mode::ZP_REL, Bbr<1>}}},
+                {"bbr2", {{0x2f, 5, Mode::ZP_REL, Bbr<2>}}},
+                {"bbr3", {{0x3f, 5, Mode::ZP_REL, Bbr<3>}}},
+                {"bbr4", {{0x4f, 5, Mode::ZP_REL, Bbr<4>}}},
+                {"bbr5", {{0x5f, 5, Mode::ZP_REL, Bbr<5>}}},
+                {"bbr6", {{0x6f, 5, Mode::ZP_REL, Bbr<6>}}},
+                {"bbr7", {{0x7f, 5, Mode::ZP_REL, Bbr<7>}}},
+                {"bbs0", {{0x8f, 5, Mode::ZP_REL, Bbs<0>}}},
+                {"bbs1", {{0x9f, 5, Mode::ZP_REL, Bbs<1>}}},
+                {"bbs2", {{0xaf, 5, Mode::ZP_REL, Bbs<2>}}},
+                {"bbs3", {{0xbf, 5, Mode::ZP_REL, Bbs<3>}}},
+                {"bbs4", {{0xcf, 5, Mode::ZP_REL, Bbs<4>}}},
+                {"bbs5", {{0xdf, 5, Mode::ZP_REL, Bbs<5>}}},
+                {"bbs6", {{0xef, 5, Mode::ZP_REL, Bbs<6>}}},
+                {"bbs7", {{0xff, 5, Mode::ZP_REL, Bbs<7>}}},
 
-        };
+                {"rmb0", {{0x07, 5, Mode::ZP, Rmb<0>}}},
+                {"rmb1", {{0x17, 5, Mode::ZP, Rmb<1>}}},
+                {"rmb2", {{0x27, 5, Mode::ZP, Rmb<2>}}},
+                {"rmb3", {{0x37, 5, Mode::ZP, Rmb<3>}}},
+                {"rmb4", {{0x47, 5, Mode::ZP, Rmb<4>}}},
+                {"rmb5", {{0x57, 5, Mode::ZP, Rmb<5>}}},
+                {"rmb6", {{0x67, 5, Mode::ZP, Rmb<6>}}},
+                {"rmb7", {{0x77, 5, Mode::ZP, Rmb<7>}}},
+                {"smb0", {{0x87, 5, Mode::ZP, Smb<0>}}},
+                {"smb1", {{0x97, 5, Mode::ZP, Smb<1>}}},
+                {"smb2", {{0xa7, 5, Mode::ZP, Smb<2>}}},
+                {"smb3", {{0xb7, 5, Mode::ZP, Smb<3>}}},
+                {"smb4", {{0xc7, 5, Mode::ZP, Smb<4>}}},
+                {"smb5", {{0xd7, 5, Mode::ZP, Smb<5>}}},
+                {"smb6", {{0xe7, 5, Mode::ZP, Smb<6>}}},
+                {"smb7", {{0xf7, 5, Mode::ZP, Smb<7>}}},
 
-        auto mergeInstructions = [&](std::vector<Instruction> const& vec) {
-            for (auto const& v : vec) {
-                auto it = std::find_if(
-                    instructionTable.begin(), instructionTable.end(),
-                    [&](auto const& i) { return strcmp(i.name, v.name) == 0; });
-                if (it != instructionTable.end()) {
-                    it->opcodes.insert(it->opcodes.begin(), v.opcodes.begin(),
-                                       v.opcodes.end());
-                } else {
-                    instructionTable.push_back(v);
+            };
+
+            auto mergeInstructions = [&](std::vector<Instruction> const& vec) {
+                for (auto const& v : vec) {
+                    auto it = std::find_if(
+                        instructionTable.begin(), instructionTable.end(),
+                        [&](auto const& i) {
+                            return strcmp(i.name, v.name) == 0;
+                        });
+                    if (it != instructionTable.end()) {
+                        it->opcodes.insert(it->opcodes.begin(),
+                                           v.opcodes.begin(), v.opcodes.end());
+                    } else {
+                        instructionTable.push_back(v);
+                    }
                 }
-            }
-        };
+            };
 
-        mergeInstructions(instructions65c02);
+            mergeInstructions(instructions65c02);
+        }
 
         return instructionTable;
     }

@@ -1,4 +1,6 @@
-
+:doctype manpage
+:manmanual bass
+:mansource bass
 # Meta Commands
 
 All meta commands take the same basic form; An exclamation mark followed by an identifier, then an optional set of arguments, followed by zero, one or two
