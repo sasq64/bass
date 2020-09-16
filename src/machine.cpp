@@ -27,13 +27,18 @@ Machine::Machine()
 
 void Machine::breakFunction(int what, void* data)
 {
+    using sixfive::Reg;
     auto* thiz = static_cast<Machine*>(data);
 
     auto it = thiz->break_functions.find(what);
     if (it != thiz->break_functions.end()) {
         it->second(what);
     } else {
-        auto [a, x, y, sr, sp, pc] = thiz->getRegs();
+        auto a = thiz->getReg(Reg::A);
+        auto x = thiz->getReg(Reg::X);
+        auto y = thiz->getReg(Reg::Y);
+        auto pc = thiz->getReg(Reg::PC);
+
         fmt::print("**Error: Unhandled BRK #${:x}\n", what);
         fmt::print("A:{:x} X:{:x} Y:{:x} PC={:04x}\n", a, x, y, pc);
         fmt::print("{:04x}: {}\n", pc, thiz->disassemble(&pc));
@@ -560,7 +565,7 @@ AsmResult Machine::assemble(Instruction const& instr)
             return true;
         }
 
-        // Adressing mode did not match directly. See if we can
+        // Addressing mode did not match directly. See if we can
         // 'optimize it' depending on the instruction value
 
         static std::unordered_map<Mode, Mode> conv{{Mode::INDZ, Mode::IND},
@@ -686,22 +691,6 @@ std::vector<uint8_t> Machine::getRam()
     std::vector<uint8_t> data(0x10000);
     machine->readRam(0, &data[0], data.size());
     return data;
-}
-
-Tuple6 Machine::getRegs() const
-{
-    return machine->regs();
-}
-
-void Machine::setRegs(Tuple6 const& regs)
-{
-    auto r = machine->regs();
-    std::get<0>(r) = std::get<0>(regs);
-    std::get<1>(r) = std::get<1>(regs);
-    std::get<2>(r) = std::get<2>(regs);
-    std::get<3>(r) = std::get<3>(regs);
-    std::get<4>(r) = std::get<4>(regs);
-    std::get<5>(r) = std::get<5>(regs);
 }
 
 void Machine::setReg(sixfive::Reg reg, unsigned v)

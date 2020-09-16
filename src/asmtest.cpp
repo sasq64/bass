@@ -5,7 +5,7 @@
 #include "assembler.h"
 #include "test_utils.h"
 
-#include "test_utils.h"
+#include <coreutils/crc.h>
 
 #include "machine.h"
 #include <cmath>
@@ -83,6 +83,7 @@ TEST_CASE("png.layout", "[assembler]")
     auto pixels = std::any_cast<std::vector<uint8_t>>(png["pixels"]);
     auto tiles = layoutTiles(pixels, 32, 8, 8);
 
+
     LOGI("TILES %d", tiles.size());
     for (int i = 0; i < 8 * 8; i++) {
         fmt::print("{:02x} ", tiles[i]);
@@ -92,12 +93,26 @@ TEST_CASE("png.layout", "[assembler]")
         fmt::print("{:02x} ", tiles[i + 8 * 8]);
     }
 
+    pixels = tiles;
     auto indexes = index_tiles(tiles, 8 * 8);
 
     REQUIRE(get(indexes, 0) == get(indexes, 15));
     REQUIRE(get(indexes, 8) == get(indexes, 10));
     REQUIRE(get(indexes, 2) == get(indexes, 13));
     REQUIRE(tiles.size() == 8 * 8 * 8);
+
+    auto size = 8*8;
+    for(int i =0; i<16; i++) {
+
+        auto* ptr0 = &pixels[i*size];
+        auto index = get(indexes, i);
+
+        auto* ptr1 = &tiles[index*size];
+        auto crc0 = crc32(reinterpret_cast<const uint32_t*>(ptr0), size / 4);
+        auto crc1 = crc32(reinterpret_cast<const uint32_t*>(ptr1), size / 4);
+
+        REQUIRE(crc0 == crc1);
+    }
 }
 
 TEST_CASE("png", "[assembler]")
@@ -281,6 +296,7 @@ TEST_CASE("assembler.functions", "[assembler]")
 
     ass.registerFunction("table", []() {
         std::vector<uint8_t> v;
+        v.reserve(10);
         for (int i = 0; i < 10; i++) {
             v.push_back(i * 33);
         }

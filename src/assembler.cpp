@@ -19,17 +19,15 @@ extern char const* const grammar6502;
 
 using sixfive::Mode;
 
-
 // OpenBSD
 #ifdef _N
-#undef _N
+#    undef _N
 #endif
 
 Number operator"" _N(unsigned long long a)
 {
     return static_cast<Number>(a);
 }
-
 
 std::string to_string(std::any const& val)
 {
@@ -248,12 +246,15 @@ AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 
     mach->removeSection("__test");
 
-    auto [a, x, y, sr, sp, pc] = mach->getRegs();
-
-    AnyMap res = {{"A", num(a)},           {"X", num(x)},
-                  {"Y", num(y)},           {"SR", num(sr)},
-                  {"SP", num(sp)},         {"PC", num(pc)},
-                  {"cycles", num(cycles)}, {"ram", mach->getRam()}};
+    using sixfive::Reg;
+    AnyMap res = {{"A", num(mach->getReg(Reg::A))},
+                  {"X", num(mach->getReg(Reg::X))},
+                  {"Y", num(mach->getReg(Reg::Y))},
+                  {"SR", num(mach->getReg(Reg::SR))},
+                  {"SP", num(mach->getReg(Reg::SP))},
+                  {"PC", num(mach->getReg(Reg::PC))},
+                  {"cycles", num(cycles)},
+                  {"ram", mach->getRam()}};
 
     restore(saved);
 
@@ -363,13 +364,13 @@ void registerLuaFunctions(Assembler& a, Scripting& s);
 
 void Assembler::setRegSymbols()
 {
-    auto [a, x, y, sr, sp, pc] = mach->getRegs();
-    syms.set("A", num(a));
-    syms.set("X", num(x));
-    syms.set("Y", num(y));
-    syms.set("SR", num(sr));
-    syms.set("SP", num(sp));
-    syms.set("PC", num(pc));
+    using sixfive::Reg;
+    syms.set("A", num(mach->getReg(Reg::A)));
+    syms.set("X", num(mach->getReg(Reg::X)));
+    syms.set("Y", num(mach->getReg(Reg::Y)));
+    syms.set("SR", num(mach->getReg(Reg::SR)));
+    syms.set("SP", num(mach->getReg(Reg::SP)));
+    syms.set("PC", num(mach->getReg(Reg::PC)));
     syms.set("RAM", mach->getRam());
 }
 
@@ -379,7 +380,7 @@ Assembler::Assembler() : parser(grammar6502)
     mach = std::make_shared<Machine>();
 
     mach->setBreakFunction(254, [this](int) {
-        auto [a, x, y, sr, sp, pc] = mach->getRegs();
+        auto pc = mach->getReg(sixfive::Reg::PC);
         auto text = logs[pc];
         if (!text.empty()) {
             auto saved = syms;
@@ -394,8 +395,8 @@ Assembler::Assembler() : parser(grammar6502)
     });
 
     mach->setBreakFunction(255, [this](int) {
-        auto [a, x, y, sr, sp, pc] = mach->getRegs();
-        auto check = checks[pc];
+      auto pc = mach->getReg(sixfive::Reg::PC);
+      auto check = checks[pc];
         if (!check.empty()) {
             auto saved = syms;
             setRegSymbols();
@@ -713,16 +714,14 @@ void Assembler::setupRules()
 
     // Set up the 'Instruction' parsing rules
     static const std::unordered_map<std::string, Mode> modeMap = {
-        {"Abs", Mode::ABS},   {"AbsX", Mode::ABSX},
-        {"AbsY", Mode::ABSY}, {"Ind", Mode::IND},
-        {"IndX", Mode::INDX}, {"IndY", Mode::INDY},
-        {"Acc", Mode::ACC},   {"Imm", Mode::IMM},
+        {"Abs", Mode::ABS}, {"AbsX", Mode::ABSX}, {"AbsY", Mode::ABSY},
+        {"Ind", Mode::IND}, {"IndX", Mode::INDX}, {"IndY", Mode::INDY},
+        {"Acc", Mode::ACC}, {"Imm", Mode::IMM},
     };
     auto buildArg = [](SV& sv) -> std::any {
         auto mode = modeMap.at(sv.name());
-        return Instruction{
-            "", mode,
-            mode == Mode::ACC ? 0 : any_cast<Number>(sv[0])};
+        return Instruction{"", mode,
+                           mode == Mode::ACC ? 0 : any_cast<Number>(sv[0])};
     };
     for (auto const& [name, _] : modeMap) {
         parser[name.c_str()] = buildArg;
@@ -741,7 +740,7 @@ void Assembler::setupRules()
         std::string l = std::string(label);
         if (label[0] == '+') {
             if (inMacro != 0) throw parse_error("No special labels in macro");
-            l = "__special_" + std::to_string(labelNum + label.length()-1);
+            l = "__special_" + std::to_string(labelNum + label.length() - 1);
         } else if (label[0] == '-') {
             if (inMacro != 0) throw parse_error("No special labels in macro");
             l = "__special_" + std::to_string(labelNum - label.length());

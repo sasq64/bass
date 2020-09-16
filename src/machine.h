@@ -99,9 +99,6 @@ enum class OutFmt
     EasyFlash,
 };
 
-using Tuple6 =
-    std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>;
-
 class Machine
 {
 public:
@@ -140,9 +137,6 @@ public:
 
     uint32_t run(uint16_t pc);
     std::vector<uint8_t> getRam();
-
-    Tuple6 getRegs() const;
-    void setRegs(Tuple6 const& regs);
 
     unsigned getReg(sixfive::Reg reg);
     void setReg(sixfive::Reg reg, unsigned v);
