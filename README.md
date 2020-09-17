@@ -135,9 +135,9 @@ way of creating an array.
 Currently the parser evaluates everything while parsing. This means
 that it is not possible to _parse_ an expression without _evaluating_ it.
 
-To support delayed (macros) or skipped (if) evaulation, the parser
+To support delayed (macros) or skipped (if) evaluation, the parser
 recognizes blocks ( `'{' anything '}'` ) and saves the contents without
-evalutating it.
+evaluating it.
 
 If we rewrite the parser to create an AST for delayed evaluation, more
 advanced constructs would be possible.

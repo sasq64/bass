@@ -1,6 +1,6 @@
 #pragma once
 
-#include "enums.h"
+#include "6502.h"
 #include "symbol_table.h"
 
 #include <any>

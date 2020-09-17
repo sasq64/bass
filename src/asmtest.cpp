@@ -114,6 +114,18 @@ TEST_CASE("png.layout", "[assembler]")
     }
 }
 
+TEST_CASE("any_callable", "[assembler]")
+{
+    AnyCallable fn;
+    fn = [](std::string s) -> long {
+        return std::stol(s) + 3;
+    };
+
+    auto res = fn({std::any("100"s)});
+    REQUIRE(std::any_cast<double>(res) == 103);
+}
+
+
 TEST_CASE("png", "[assembler]")
 {
 

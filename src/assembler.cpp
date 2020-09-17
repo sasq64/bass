@@ -853,6 +853,7 @@ void Assembler::setupRules()
 
     parser["Script"] = [&](SV& sv) {
         if (passNo == 0) {
+            LOGI("Script %s", std::any_cast<std::string_view>(sv[0]));
             scripting.add(std::any_cast<std::string_view>(sv[0]));
         }
         return sv[0];

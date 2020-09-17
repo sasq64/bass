@@ -85,6 +85,9 @@ struct FunctionCallerImpl<FX, R (FX::*)(ARGS...) const> : public FunctionCaller
     }
 };
 
+// An `AnyCallable` holds a type erased function that can be called
+// with an array of std::any, and that will extract the real types
+// and call the stored function.
 struct AnyCallable
 {
     std::unique_ptr<FunctionCaller> fc;
@@ -98,9 +101,8 @@ struct AnyCallable
     template <typename FX>
     void init(FX const& f)
     {
-        fc =
-            std::make_unique<FunctionCallerImpl<FX, decltype(&FX::operator())>>(
-                f);
+        using FnType = decltype(&FX::operator());
+        fc = std::make_unique<FunctionCallerImpl<FX, FnType>>(f);
     }
 
     template <typename FX>

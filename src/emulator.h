@@ -8,7 +8,7 @@
 
 #include <coreutils/log.h>
 
-#include "enums.h"
+#include "6502.h"
 
 namespace sixfive {
 
@@ -22,10 +22,10 @@ struct Machine;
 
 enum EmulatedMemoryAccess
 {
-    DIRECT,  // Access `ram` array directly; Means no bank switching, ROM areas
+    Direct,  // Access `ram` array directly; Means no bank switching, ROM areas
              // or IO areas
-    BANKED,  // Access memory through `wbank` and `rbank`; Means no IO areas
-    CALLBACK // Access memory via function pointer per bank
+    Banked,  // Access memory through `wbank` and `rbank`; Means no IO areas
+    Callback // Access memory via function pointer per bank
 };
 
 // The Policy defines the compile & runtime time settings for the emulator
@@ -37,11 +37,11 @@ struct DefaultPolicy
     static constexpr bool ExitOnStackWrap = true;
 
     // PC accesses does not normally need to work in IO areas
-    static constexpr int PC_AccessMode = BANKED;
+    static constexpr int PC_AccessMode = Banked;
 
     // Generic reads and writes should normally not be direct
-    static constexpr int Read_AccessMode = CALLBACK;
-    static constexpr int Write_AccessMode = CALLBACK;
+    static constexpr int Read_AccessMode = Callback;
+    static constexpr int Write_AccessMode = Callback;
 
     static constexpr int MemSize = 65536;
 
@@ -395,9 +395,9 @@ private:
     template <int ACCESS_MODE = POLICY::Read_AccessMode>
     unsigned Read(unsigned adr) const
     {
-        if constexpr (ACCESS_MODE == DIRECT)
+        if constexpr (ACCESS_MODE == Direct)
             return ram[adr];
-        else if constexpr (ACCESS_MODE == BANKED)
+        else if constexpr (ACCESS_MODE == Banked)
             return rbank[hi(adr)][lo(adr)];
         else
             return rcallbacks[hi(adr)](adr, rcbdata[hi(adr)]);
@@ -406,9 +406,9 @@ private:
     template <int ACCESS_MODE = POLICY::Write_AccessMode>
     void Write(unsigned adr, unsigned v)
     {
-        if constexpr (ACCESS_MODE == DIRECT)
+        if constexpr (ACCESS_MODE == Direct)
             ram[adr] = v;
-        else if constexpr (ACCESS_MODE == BANKED)
+        else if constexpr (ACCESS_MODE == Banked)
             wbank[hi(adr)][lo(adr)] = v;
         else
             wcallbacks[hi(adr)](adr, v, wcbdata[hi(adr)]);
