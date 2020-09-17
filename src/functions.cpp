@@ -115,7 +115,7 @@ void initFunctions(Assembler& a)
     });
 
     a.registerFunction(
-        "index_tiles", [&](std::vector<uint8_t> const& pixels, double size) {
+        "index_tiles", [&](std::vector<uint8_t> const& pixels, int32_t size) {
             AnyMap result;
             auto pixelCopy = pixels;
             std::vector<uint8_t> v = indexTiles(pixelCopy, size);
@@ -125,7 +125,7 @@ void initFunctions(Assembler& a)
         });
 
     a.registerFunction("layout_tiles", [&](const std::vector<uint8_t>& pixels,
-                                           double stride, double w, double h) {
+                                           int32_t stride, int32_t w, int32_t h) {
         std::vector<uint8_t> v = layoutTiles(pixels, stride, w, h);
         return v;
     });

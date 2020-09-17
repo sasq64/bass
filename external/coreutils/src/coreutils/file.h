@@ -214,10 +214,12 @@ public:
 
     // Writing
 
-    template <typename T> void writeBE(const T& t) const
+    template <typename T = void, typename S> void writeBE(const S& arg) const
     {
-        for(size_t i=1; i<=sizeof(T); i++) {
-            fputc((t >> (sizeof(T)-i)*8) & 0xff, fp);
+        using Target = std::conditional_t<std::is_same<T, void>::value, S, T>;
+        auto t = static_cast<Target>(arg);
+        for(size_t i=1; i<=sizeof(Target); i++) {
+            fputc((t >> (sizeof(Target)-i)*8) & 0xff, fp);
         }
     }
 

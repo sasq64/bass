@@ -59,6 +59,8 @@ start:
 
 font:
     png = load_png("../data/ff.png")
+
+    !assert png.height == 48
     tiles = layout_tiles(png.pixels, 128/8, 1, 8)
 
     tiles2 = index_tiles(tiles, 8)

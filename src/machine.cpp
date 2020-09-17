@@ -476,7 +476,7 @@ void Machine::runSetup()
 {
     for (auto const& section : sections) {
         if (section.start < 0x10000 && !section.data.empty()) {
-            LOGI("Writing '%s' to %x", section.name, section.start);
+            LOGD("Writing '%s' to %x", section.name, section.start);
             machine->writeRam(section.start, section.data.data(),
                               section.data.size());
         }
