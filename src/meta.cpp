@@ -362,7 +362,7 @@ void initMeta(Assembler& assem)
             auto sz = section.data.size();
             assem.evaluateBlock(blocks[0]);
             if (!section.parent.empty()) {
-                mach.getSection(section.parent).pc += section.data.size() - sz;
+                mach.getSection(section.parent).pc += static_cast<int32_t>(section.data.size() - sz);
             }
             mach.popSection();
             return;

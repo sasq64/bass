@@ -82,7 +82,7 @@ Section& Machine::addSection(Section const& s)
 
     if (!in.empty()) {
         auto& parent = getSection(in);
-        LOGI("Parent %s at %x/%x", parent.name, parent.start, parent.pc);
+        LOGD("Parent %s at %x/%x", parent.name, parent.start, parent.pc);
         Check(parent.data.empty(), "Parent section must contain no data");
 
         if (section.parent.empty()) {
@@ -95,7 +95,7 @@ Section& Machine::addSection(Section const& s)
         }
 
         if (section.start == -1) {
-            LOGI("Setting start to %x", parent.pc);
+            LOGD("Setting start to %x", parent.pc);
             section.start = parent.pc;
         }
     }

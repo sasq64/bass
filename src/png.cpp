@@ -1,4 +1,3 @@
-#include "png.h"
 
 #include <coreutils/bitmap.h>
 #include <coreutils/file.h>
@@ -8,6 +7,7 @@
 
 #include <cstdint>
 
+#include "png.h"
 std::vector<uint8_t> convertPalette(std::vector<uint32_t> const& colors32)
 {
     std::vector<uint8_t> pal12;
