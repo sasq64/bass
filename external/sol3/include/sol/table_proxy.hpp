@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,10 +24,10 @@
 #ifndef SOL_TABLE_PROXY_HPP
 #define SOL_TABLE_PROXY_HPP
 
-#include "traits.hpp"
-#include "function.hpp"
-#include "protected_function.hpp"
-#include "proxy_base.hpp"
+#include <sol/traits.hpp>
+#include <sol/function.hpp>
+#include <sol/protected_function.hpp>
+#include <sol/proxy_base.hpp>
 
 namespace sol {
 
@@ -224,8 +224,9 @@ namespace sol {
 		int push(lua_State* L) const noexcept {
 			if constexpr (std::is_same_v<meta::unqualified_t<Table>, global_table> || is_stack_table_v<meta::unqualified_t<Table>>) {
 				auto pp = stack::push_pop<true>(tbl);
+				int tableindex = pp.index_of(tbl);
 				int top_index = lua_gettop(L);
-				stack::get_field<true>(lua_state(), key, -1);
+				stack::get_field<true>(lua_state(), key, tableindex);
 				lua_replace(L, top_index + 1);
 				lua_settop(L, top_index + 1);
 			}

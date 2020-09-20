@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,8 +24,8 @@
 #ifndef SOL_PROPERTY_HPP
 #define SOL_PROPERTY_HPP
 
-#include "types.hpp"
-#include "ebco.hpp"
+#include <sol/types.hpp>
+#include <sol/ebco.hpp>
 #include <type_traits>
 #include <utility>
 

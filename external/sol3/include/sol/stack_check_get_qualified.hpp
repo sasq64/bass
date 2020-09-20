@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,9 +24,9 @@
 #ifndef SOL_STACK_CHECK_QUALIFIED_GET_HPP
 #define SOL_STACK_CHECK_QUALIFIED_GET_HPP
 
-#include "stack_core.hpp"
-#include "stack_check_get_unqualified.hpp"
-#include "optional.hpp"
+#include <sol/stack_core.hpp>
+#include <sol/stack_check_get_unqualified.hpp>
+#include <sol/optional.hpp>
 
 namespace sol { namespace stack {
 	template <typename T, typename C>
@@ -58,24 +58,29 @@ namespace sol { namespace stack {
 	};
 
 	template <typename T>
-	struct qualified_getter<optional<T>> {
-		static decltype(auto) get(lua_State* L, int index, record& tracking) {
-			return check_get<T>(L, index, no_panic, tracking);
-		}
-	};
-
-#if defined(SOL_CXX17_FEATURES) && SOL_CXX17_FEATURES
-	template <typename T>
-	struct qualified_getter<std::optional<T>> {
-		static std::optional<T> get(lua_State* L, int index, record& tracking) {
-			if (!check<T>(L, index, no_panic)) {
-				tracking.use(static_cast<int>(!lua_isnone(L, index)));
-				return std::nullopt;
+	struct qualified_getter<T, std::enable_if_t<meta::is_optional_v<T>>> {
+		static T get(lua_State* L, int index, record& tracking) {
+			using ValueType = typename meta::unqualified_t<T>::value_type;
+			if constexpr (is_lua_reference_v<ValueType>) {
+				// actually check if it's none here, otherwise
+				// we'll have a none object inside an optional!
+				bool success = lua_isnoneornil(L, index) == 0 && stack::check<ValueType>(L, index, no_panic);
+				if (!success) {
+					// expected type, actual type
+					tracking.use(static_cast<int>(success));
+					return {};
+				}
+				return stack_detail::unchecked_get<ValueType>(L, index, tracking);
 			}
-			return stack_detail::unchecked_get<T>(L, index, tracking);
+			else {
+				if (!check<ValueType>(L, index, &no_panic)) {
+					tracking.use(static_cast<int>(!lua_isnone(L, index)));
+					return {};
+				}
+				return stack_detail::unchecked_get<ValueType>(L, index, tracking);
+			}
 		}
 	};
-#endif // C++17 features
 
 }} // namespace sol::stack
 

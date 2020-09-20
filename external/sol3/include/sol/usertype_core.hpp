@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,17 +24,17 @@
 #ifndef SOL_USERTYPE_CORE_HPP
 #define SOL_USERTYPE_CORE_HPP
 
-#include "wrapper.hpp"
-#include "stack.hpp"
-#include "types.hpp"
-#include "stack_reference.hpp"
-#include "usertype_traits.hpp"
-#include "inheritance.hpp"
-#include "raii.hpp"
-#include "deprecate.hpp"
-#include "object.hpp"
-#include "function_types.hpp"
-#include "usertype_container_launch.hpp"
+#include <sol/wrapper.hpp>
+#include <sol/stack.hpp>
+#include <sol/types.hpp>
+#include <sol/stack_reference.hpp>
+#include <sol/usertype_traits.hpp>
+#include <sol/inheritance.hpp>
+#include <sol/raii.hpp>
+#include <sol/deprecate.hpp>
+#include <sol/object.hpp>
+#include <sol/function_types.hpp>
+#include <sol/usertype_container_launch.hpp>
 
 #include <sstream>
 #include <type_traits>
@@ -172,11 +172,11 @@ namespace sol {
 		template <typename X>
 		void set_undefined_methods_on(stack_reference t) {
 			using T = std::remove_pointer_t<X>;
-			
+
 			lua_State* L = t.lua_state();
-			
+
 			t.push();
-			
+
 			detail::lua_reg_table l{};
 			int index = 0;
 			detail::indexed_insert insert_fx(l, index);
@@ -185,7 +185,7 @@ namespace sol {
 				l[index] = luaL_Reg{ to_string(meta_function::garbage_collect).c_str(), detail::make_destructor<T>() };
 			}
 			luaL_setfuncs(L, l, 0);
-			
+
 			// __type table
 			lua_createtable(L, 0, 2);
 			const std::string& name = detail::demangle<T>();

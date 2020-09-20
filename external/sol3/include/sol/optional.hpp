@@ -1,8 +1,8 @@
-// sol3 
+// sol3
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,22 +24,20 @@
 #ifndef SOL_OPTIONAL_HPP
 #define SOL_OPTIONAL_HPP
 
-#include "forward.hpp"
-#include "in_place.hpp"
-#include "traits.hpp"
-#if defined(SOL_USE_BOOST) && SOL_USE_BOOST
+#include <sol/forward.hpp>
+#include <sol/in_place.hpp>
+#include <sol/traits.hpp>
+#if SOL_IS_ON(SOL_USE_BOOST_I_)
 #include <boost/optional.hpp>
 #else
-#include "optional_implementation.hpp"
+#include <sol/optional_implementation.hpp>
 #endif // Boost vs. Better optional
 
-#if defined(SOL_CXX17_FEATURES) && SOL_CXX17_FEATURES
 #include <optional>
-#endif
 
 namespace sol {
 
-#if defined(SOL_USE_BOOST) && SOL_USE_BOOST
+#if SOL_IS_ON(SOL_USE_BOOST_I_)
 	template <typename T>
 	using optional = boost::optional<T>;
 	using nullopt_t = boost::none_t;
@@ -48,16 +46,28 @@ namespace sol {
 
 	namespace meta {
 		template <typename T>
-		using is_optional = any<
-			is_specialization_of<T, optional>
-#if defined(SOL_CXX17_FEATURES) && SOL_CXX17_FEATURES
-		     , is_specialization_of<T, std::optional>
-#endif
-		>;
-		
+		using is_optional = any<is_specialization_of<T, optional>, is_specialization_of<T, std::optional>>;
+
 		template <typename T>
 		constexpr inline bool is_optional_v = is_optional<T>::value;
 	} // namespace meta
+
+	namespace detail {
+		template <typename T>
+		struct associated_nullopt {
+			inline static constexpr std::nullopt_t value = std::nullopt;
+		};
+
+#if SOL_IS_ON(SOL_USE_BOOST_I_)
+		template <typename T>
+		struct associated_nullopt<boost::optional<T>> {
+			inline static constexpr std::nullopt_t value = boost::nullopt;
+		};
+#endif // Boost nullopt
+
+		template <typename T>
+		inline constexpr auto associated_nullopt_v = associated_nullopt<T>::value;
+	} // namespace detail
 } // namespace sol
 
 #endif // SOL_OPTIONAL_HPP

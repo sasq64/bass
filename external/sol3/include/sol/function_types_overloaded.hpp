@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,9 +24,9 @@
 #ifndef SOL_FUNCTION_TYPES_OVERLOAD_HPP
 #define SOL_FUNCTION_TYPES_OVERLOAD_HPP
 
-#include "overload.hpp"
-#include "call.hpp"
-#include "function_types_core.hpp"
+#include <sol/overload.hpp>
+#include <sol/call.hpp>
+#include <sol/function_types_core.hpp>
 
 namespace sol {
 namespace function_detail {

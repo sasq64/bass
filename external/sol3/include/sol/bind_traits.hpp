@@ -1,8 +1,8 @@
-// sol3 
+// sol3
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,12 +24,11 @@
 #ifndef SOL_BIND_TRAITS_HPP
 #define SOL_BIND_TRAITS_HPP
 
-#include "forward.hpp"
-#include "base_traits.hpp"
-#include "tuple.hpp"
+#include <sol/forward.hpp>
+#include <sol/base_traits.hpp>
+#include <sol/tuple.hpp>
 
-namespace sol {
-namespace meta {
+namespace sol { namespace meta {
 	namespace meta_detail {
 
 		template <class F>
@@ -53,7 +52,9 @@ namespace meta {
 		struct void_tuple_element : meta::tuple_element<I, T> {};
 
 		template <std::size_t I>
-		struct void_tuple_element<I, std::tuple<>> { typedef void type; };
+		struct void_tuple_element<I, std::tuple<>> {
+			typedef void type;
+		};
 
 		template <std::size_t I, typename T>
 		using void_tuple_element_t = typename void_tuple_element<I, T>::type;
@@ -64,11 +65,11 @@ namespace meta {
 			using first_type = meta::conditional_t<std::is_void<T>::value, int, T>&;
 
 		public:
-			static const bool is_noexcept = it_is_noexcept;
-			static const bool is_member_function = std::is_void<T>::value;
-			static const bool has_c_var_arg = has_c_variadic;
-			static const std::size_t arity = sizeof...(Args);
-			static const std::size_t free_arity = sizeof...(Args) + static_cast<std::size_t>(!std::is_void<T>::value);
+			inline static constexpr const bool is_noexcept = it_is_noexcept;
+			inline static constexpr bool is_member_function = std::is_void<T>::value;
+			inline static constexpr bool has_c_var_arg = has_c_variadic;
+			inline static constexpr std::size_t arity = sizeof...(Args);
+			inline static constexpr std::size_t free_arity = sizeof...(Args) + static_cast<std::size_t>(!std::is_void<T>::value);
 			typedef types<Args...> args_list;
 			typedef std::tuple<Args...> args_tuple;
 			typedef T object_type;
@@ -201,7 +202,7 @@ namespace meta {
 			typedef R (T::*function_pointer_type)(Args..., ...) const volatile&&;
 		};
 
-#if defined(SOL_NOEXCEPT_FUNCTION_TYPE) && SOL_NOEXCEPT_FUNCTION_TYPE
+#if SOL_IS_ON(SOL_USE_NOEXCEPT_FUNCTION_TYPE_I_)
 
 		template <typename R, typename... Args>
 		struct fx_traits<R(Args...) noexcept, false> : basic_traits<true, false, void, R, Args...> {
@@ -316,7 +317,7 @@ namespace meta {
 
 #endif // noexcept is part of a function's type
 
-#if defined(_MSC_VER) && defined(_M_IX86)
+#if SOL_IS_ON(SOL_COMPILER_VCXX_I_) && SOL_IS_ON(SOL_PLATFORM_X86_I_)
 		template <typename R, typename... Args>
 		struct fx_traits<R __stdcall(Args...), false> : basic_traits<false, false, void, R, Args...> {
 			typedef R(__stdcall* function_pointer_type)(Args...);
@@ -374,7 +375,7 @@ namespace meta {
 			typedef R (__stdcall T::*function_pointer_type)(Args...) const volatile&&;
 		};
 
-#if defined(SOL_NOEXCEPT_FUNCTION_TYPE) && SOL_NOEXCEPT_FUNCTION_TYPE
+#if SOL_IS_ON(SOL_USE_NOEXCEPT_FUNCTION_TYPE_I_)
 
 		template <typename R, typename... Args>
 		struct fx_traits<R __stdcall(Args...) noexcept, false> : basic_traits<true, false, void, R, Args...> {
@@ -382,7 +383,7 @@ namespace meta {
 		};
 
 		template <typename R, typename... Args>
-		struct fx_traits<R (__stdcall *)(Args...) noexcept, false> : basic_traits<true, false, void, R, Args...> {
+		struct fx_traits<R(__stdcall*)(Args...) noexcept, false> : basic_traits<true, false, void, R, Args...> {
 			typedef R(__stdcall* function_pointer_type)(Args...) noexcept;
 		};
 
@@ -500,11 +501,12 @@ namespace meta {
 #endif // __stdcall x86 VC++ bug
 
 		template <typename Signature>
-		struct fx_traits<Signature, true> : fx_traits<typename fx_traits<decltype(&Signature::operator())>::function_type, false> {};
+		struct fx_traits<Signature, true>
+		: public fx_traits<typename fx_traits<decltype(&Signature::operator())>::function_type, false> {};
 
 		template <typename Signature, bool b = std::is_member_object_pointer<Signature>::value>
-		struct callable_traits : fx_traits<std::decay_t<Signature>> {
-		};
+		struct callable_traits
+		: public fx_traits<std::decay_t<Signature>> {};
 
 		template <typename R, typename T>
 		struct callable_traits<R(T::*), true> {
@@ -512,17 +514,17 @@ namespace meta {
 			typedef return_type Arg;
 			typedef T object_type;
 			using signature_type = R(T::*);
-			static const bool is_noexcept = false;
-			static const bool is_member_function = false;
-			static const std::size_t arity = 1;
-			static const std::size_t free_arity = 2;
+			inline static constexpr bool is_noexcept = false;
+			inline static constexpr bool is_member_function = false;
+			inline static constexpr std::size_t arity = 1;
+			inline static constexpr std::size_t free_arity = 2;
 			typedef std::tuple<Arg> args_tuple;
 			typedef types<Arg> args_list;
 			typedef types<T, Arg> free_args_list;
 			typedef meta::tuple_types<return_type> returns_list;
 			typedef return_type(function_type)(T&, return_type);
-			typedef return_type(*function_pointer_type)(T&, Arg);
-			typedef return_type(*free_function_pointer_type)(T&, Arg);
+			typedef return_type (*function_pointer_type)(T&, Arg);
+			typedef return_type (*free_function_pointer_type)(T&, Arg);
 			template <std::size_t i>
 			using arg_at = void_tuple_element_t<i, args_tuple>;
 		};
@@ -540,7 +542,6 @@ namespace meta {
 
 	template <typename Signature>
 	using function_return_t = typename bind_traits<Signature>::return_type;
-}
-} // namespace sol::meta
+}} // namespace sol::meta
 
 #endif // SOL_BIND_TRAITS_HPP

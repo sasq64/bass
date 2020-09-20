@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,9 +24,8 @@
 #ifndef SOL_USERTYPE_STORAGE_HPP
 #define SOL_USERTYPE_STORAGE_HPP
 
-#include "usertype_core.hpp"
-#include "make_reference.hpp"
-#include "map.hpp"
+#include <sol/usertype_core.hpp>
+#include <sol/make_reference.hpp>
 
 #include <bitset>
 
@@ -97,7 +96,13 @@ namespace sol { namespace u_detail {
 
 		template <bool is_index = true, bool is_variable = false>
 		static inline int call(lua_State* L) {
-			return detail::typed_static_trampoline<decltype(&call_<is_index, is_variable>), (&call_<is_index, is_variable>)>(L);
+			int r = detail::typed_static_trampoline<decltype(&call_<is_index, is_variable>), (&call_<is_index, is_variable>)>(L);
+			if constexpr (meta::is_specialization_of_v<uF, yielding_t>) {
+				return lua_yield(L, r);
+			}
+			else {
+				return r;
+			}
 		}
 
 		template <bool is_index = true, bool is_variable = false>
@@ -132,7 +137,13 @@ namespace sol { namespace u_detail {
 
 		template <bool is_index = true, bool is_variable = false>
 		static inline int index_call(lua_State* L) {
-			return detail::typed_static_trampoline<decltype(&index_call_<is_index, is_variable>), (&index_call_<is_index, is_variable>)>(L);
+			int r = detail::typed_static_trampoline<decltype(&index_call_<is_index, is_variable>), (&index_call_<is_index, is_variable>)>(L);
+			if constexpr (meta::is_specialization_of_v<uF, yielding_t>) {
+				return lua_yield(L, r);
+			}
+			else {
+				return r;
+			}
 		}
 	};
 
@@ -175,17 +186,14 @@ namespace sol { namespace u_detail {
 		index_call_storage* p_ics = nullptr;
 		usertype_storage_base* p_usb = nullptr;
 		void* p_derived_usb = nullptr;
-		lua_CFunction idx_call = nullptr, 
-			new_idx_call = nullptr, 
-			meta_idx_call = nullptr, 
-			meta_new_idx_call = nullptr;
+		lua_CFunction idx_call = nullptr, new_idx_call = nullptr, meta_idx_call = nullptr, meta_new_idx_call = nullptr;
 		change_indexing_mem_func change_indexing;
-		
+
 		void operator()(lua_State* L, submetatable_type smt, reference& fast_index_table) {
 			std::string& key = *p_key;
 			usertype_storage_base& usb = *p_usb;
 			index_call_storage& ics = *p_ics;
-			
+
 			if (smt == submetatable_type::named) {
 				// do not override __call or
 				// other specific meta functions on named metatable:
@@ -196,18 +204,11 @@ namespace sol { namespace u_detail {
 			int fast_index_table_push = fast_index_table.push();
 			stack_reference t(L, -fast_index_table_push);
 			if (poison_indexing) {
-				(usb.*change_indexing)(L,
-					smt,
-					p_derived_usb,
-					t,
-					idx_call,
-					new_idx_call,
-					meta_idx_call,
-					meta_new_idx_call);
+				(usb.*change_indexing)(L, smt, p_derived_usb, t, idx_call, new_idx_call, meta_idx_call, meta_new_idx_call);
 			}
 			if (is_destruction
 				&& (smt == submetatable_type::reference || smt == submetatable_type::const_reference || smt == submetatable_type::named
-				        || smt == submetatable_type::unique)) {
+				     || smt == submetatable_type::unique)) {
 				// gc does not apply to us here
 				// for reference types (raw T*, std::ref)
 				// for the named metatable itself,
@@ -264,14 +265,7 @@ namespace sol { namespace u_detail {
 			stack::set_field(L, detail::base_class_check_key(), reinterpret_cast<void*>(base_class_check_func), t.stack_index());
 			stack::set_field(L, detail::base_class_cast_key(), reinterpret_cast<void*>(base_class_cast_func), t.stack_index());
 			// change indexing, forcefully
-			(p_usb->*change_indexing)(L,
-				smt,
-				p_derived_usb,
-				t,
-				idx_call,
-				new_idx_call,
-				meta_idx_call,
-				meta_new_idx_call);
+			(p_usb->*change_indexing)(L, smt, p_derived_usb, t, idx_call, new_idx_call, meta_idx_call, meta_new_idx_call);
 			t.pop();
 		}
 	};
@@ -279,7 +273,8 @@ namespace sol { namespace u_detail {
 	struct binding_data_equals {
 		void* binding_data;
 
-		binding_data_equals(void* b) : binding_data(b) {}
+		binding_data_equals(void* b) : binding_data(b) {
+		}
 
 		bool operator()(const std::unique_ptr<binding_base>& ptr) const {
 			return binding_data == ptr->data();
@@ -290,8 +285,8 @@ namespace sol { namespace u_detail {
 	public:
 		std::vector<std::unique_ptr<binding_base>> storage;
 		std::vector<std::unique_ptr<char[]>> string_keys_storage;
-		detail::unordered_map<string_view, index_call_storage> string_keys;
-		detail::unordered_map<reference, reference, reference_hash, reference_equals> auxiliary_keys;
+		std::unordered_map<string_view, index_call_storage> string_keys;
+		std::unordered_map<reference, reference, reference_hash, reference_equals> auxiliary_keys;
 		reference value_index_table;
 		reference reference_index_table;
 		reference unique_index_table;
@@ -384,7 +379,7 @@ namespace sol { namespace u_detail {
 				return;
 			}
 
-			(void)detail::swallow{ 0, ((weak_derive<Bases>::value = true), 0)... };
+			(void)detail::swallow { 0, ((weak_derive<Bases>::value = true), 0)... };
 
 			void* derived_this = static_cast<void*>(static_cast<usertype_storage<T>*>(this));
 
@@ -446,7 +441,7 @@ namespace sol { namespace u_detail {
 			type_table = lua_nil;
 			gc_names_table = lua_nil;
 			named_metatable = lua_nil;
-			
+
 			storage.clear();
 			string_keys.clear();
 			auxiliary_keys.clear();
@@ -460,13 +455,13 @@ namespace sol { namespace u_detail {
 			}
 			(void)L;
 			(void)self;
-#if defined(SOL_UNSAFE_BASE_LOOKUP) && SOL_UNSAFE_BASE_LOOKUP
+#if SOL_IS_ON(SOL_USE_UNSAFE_BASE_LOOKUP_I_)
 			usertype_storage_base& base_storage = get_usertype_storage<Base>(L);
 			base_result = self_index_call<is_new_index, true>(bases(), L, base_storage);
 #else
 			optional<usertype_storage<Base>&> maybe_base_storage = maybe_get_usertype_storage<Base>(L);
 			if (static_cast<bool>(maybe_base_storage)) {
-				base_result = self_index_call<is_new_index, true>(bases(), L, *maybe_base_storage);				
+				base_result = self_index_call<is_new_index, true>(bases(), L, *maybe_base_storage);
 				keep_going = base_result == base_walking_failed_index;
 			}
 #endif // Fast versus slow, safe base lookup
@@ -504,7 +499,7 @@ namespace sol { namespace u_detail {
 					}
 				}
 				if (target != nullptr) {
-					if constexpr(is_new_index) {
+					if constexpr (is_new_index) {
 						// set value and return
 						*target = reference(L, 3);
 						return 0;
@@ -522,7 +517,7 @@ namespace sol { namespace u_detail {
 			int base_result;
 			(void)keep_going;
 			(void)base_result;
-			(void)detail::swallow{ 1, (base_walk_index<is_new_index, Bases>(L, self, keep_going, base_result), 1)... };
+			(void)detail::swallow { 1, (base_walk_index<is_new_index, Bases>(L, self, keep_going, base_result), 1)... };
 			if constexpr (sizeof...(Bases) > 0) {
 				if (!keep_going) {
 					return base_result;
@@ -633,7 +628,7 @@ namespace sol { namespace u_detail {
 	};
 
 	template <typename T>
-	inline int destruct_usertype_storage (lua_State* L) {
+	inline int destruct_usertype_storage(lua_State* L) {
 		return detail::user_alloc_destruct<usertype_storage<T>>(L);
 	}
 
@@ -644,6 +639,7 @@ namespace sol { namespace u_detail {
 		using Binding = binding<KeyU, ValueU, T>;
 		using is_var_bind = is_variable_binding<ValueU>;
 		if constexpr (std::is_same_v<KeyU, call_construction>) {
+			(void)key;
 			std::unique_ptr<Binding> p_binding = std::make_unique<Binding>(std::forward<Value>(value));
 			Binding& b = *p_binding;
 			this->storage.push_back(std::move(p_binding));
@@ -689,10 +685,11 @@ namespace sol { namespace u_detail {
 			void* derived_this = static_cast<void*>(static_cast<usertype_storage<T>*>(this));
 			index_call_storage ics;
 			ics.binding_data = b.data();
-			ics.index = is_index || is_static_index ? &Binding::template call_with_<true, is_var_bind::value> : &Binding::template index_call_with_<true, is_var_bind::value>;
-			ics.new_index
-				= is_new_index || is_static_new_index ? &Binding::template call_with_<false, is_var_bind::value> : &Binding::template index_call_with_<false, is_var_bind::value>;
-			
+			ics.index = is_index || is_static_index ? &Binding::template call_with_<true, is_var_bind::value>
+				                                   : &Binding::template index_call_with_<true, is_var_bind::value>;
+			ics.new_index = is_new_index || is_static_new_index ? &Binding::template call_with_<false, is_var_bind::value>
+				                                               : &Binding::template index_call_with_<false, is_var_bind::value>;
+
 			string_for_each_metatable_func for_each_fx;
 			for_each_fx.is_destruction = is_destruction;
 			for_each_fx.is_index = is_index;
@@ -704,7 +701,7 @@ namespace sol { namespace u_detail {
 			for_each_fx.p_ics = &ics;
 			if constexpr (is_lua_c_function_v<ValueU>) {
 				for_each_fx.is_unqualified_lua_CFunction = true;
-				for_each_fx.call_func = *static_cast<lua_CFunction*>(ics.binding_data);				
+				for_each_fx.call_func = *static_cast<lua_CFunction*>(ics.binding_data);
 			}
 			else if constexpr (is_lua_reference_or_proxy_v<ValueU>) {
 				for_each_fx.is_unqualified_lua_reference = true;
@@ -751,7 +748,7 @@ namespace sol { namespace u_detail {
 					this->set<T>(L, string_key, std::forward<Value>(value));
 				}
 				else {
-					lua_reference_func ref_additions_fx{ key, value };
+					lua_reference_func ref_additions_fx { key, value };
 
 					this->for_each_table(L, ref_additions_fx);
 					this->auxiliary_keys.insert_or_assign(std::forward<Key>(key), std::forward<Value>(value));
@@ -760,7 +757,7 @@ namespace sol { namespace u_detail {
 			else {
 				reference ref_key = make_reference(L, std::forward<Key>(key));
 				reference ref_value = make_reference(L, std::forward<Value>(value));
-				lua_reference_func ref_additions_fx{ key, value };
+				lua_reference_func ref_additions_fx { key, value };
 
 				this->for_each_table(L, ref_additions_fx);
 				this->auxiliary_keys.insert_or_assign(std::move(ref_key), std::move(ref_value));

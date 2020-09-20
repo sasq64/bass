@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,11 +24,11 @@
 #ifndef SOL_USERTYPE_HPP
 #define SOL_USERTYPE_HPP
 
-#include "usertype_core.hpp"
-#include "usertype_container_launch.hpp"
-#include "usertype_storage.hpp"
-#include "usertype_proxy.hpp"
-#include "metatable.hpp"
+#include <sol/usertype_core.hpp>
+#include <sol/usertype_container_launch.hpp>
+#include <sol/usertype_storage.hpp>
+#include <sol/usertype_proxy.hpp>
+#include <sol/metatable.hpp>
 
 namespace sol {
 

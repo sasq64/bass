@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,7 +24,7 @@
 #ifndef SOL_STACK_CHECK_QUALIFIED_HPP
 #define SOL_STACK_CHECK_QUALIFIED_HPP
 
-#include "stack_check_unqualified.hpp"
+#include <sol/stack_check_unqualified.hpp>
 
 namespace sol {
 namespace stack {
@@ -75,6 +75,10 @@ namespace stack {
 				else {
 					return stack::unqualified_check<nested<X>>(L, index, std::forward<Handler>(handler), tracking);
 				}
+			}
+			else if constexpr (!std::is_reference_v<X> && meta::is_specialization_of_v<X, nested>) {
+				using NestedX = typename meta::unqualified_t<X>::nested_type;
+				return stack::check<NestedX>(L, index, ::std::forward<Handler>(handler), tracking);
 			}
 			else {
 				return stack::unqualified_check<X>(L, index, std::forward<Handler>(handler), tracking);

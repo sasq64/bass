@@ -1,7 +1,7 @@
 # # # # sol3
 # The MIT License (MIT)
 # 
-# Copyright (c) 2013-2019 Rapptz, ThePhD, and contributors
+# Copyright (c) 2013-2020 Rapptz, ThePhD, and contributors
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of
 # this software and associated documentation files (the "Software"), to deal in
@@ -185,7 +185,27 @@ if (MSVC)
 		"C:/Program Files/Microsoft Visual Studio/2017/Professional/VC"
 		"C:/Program Files/Microsoft Visual Studio/2017/Enterprise/VC/Auxiliary/Build"
 		"C:/Program Files/Microsoft Visual Studio/2017/Enterprise/VC/Auxiliary"
-		"C:/Program Files/Microsoft Visual Studio/2017/Enterprise/VC")
+		"C:/Program Files/Microsoft Visual Studio/2017/Enterprise/VC"
+
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Auxiliary/Build"
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Auxiliary"
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC"
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Auxiliary/Build"
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC/Auxiliary"
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/Professional/VC"
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build"
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary"
+		"C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC"
+
+		"C:/Program Files/Microsoft Visual Studio/2019/Community/VC/Auxiliary/Build"
+		"C:/Program Files/Microsoft Visual Studio/2019/Community/VC/Auxiliary"
+		"C:/Program Files/Microsoft Visual Studio/2019/Community/VC"
+		"C:/Program Files/Microsoft Visual Studio/2019/Professional/VC/Auxiliary/Build"
+		"C:/Program Files/Microsoft Visual Studio/2019/Professional/VC/Auxiliary"
+		"C:/Program Files/Microsoft Visual Studio/2019/Professional/VC"
+		"C:/Program Files/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build"
+		"C:/Program Files/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary"
+		"C:/Program Files/Microsoft Visual Studio/2019/Enterprise/VC")
 	if (VCVARS_ALL_BAT MATCHES "VCVARS_ALL_BAT-NOTFOUND")
 		MESSAGE(FATAL_ERROR "Cannot find 'vcvarsall.bat' file or similar needed to build LuaJIT ${LUA_VERSION} on Windows")
 	endif()
@@ -195,6 +215,9 @@ if (MSVC)
 		set(LUA_JIT_MAKE_COMMAND "${VCVARS_ALL_BAT}" x64)
 	endif()
 	set(LUA_JIT_MAKE_COMMAND ${LUA_JIT_MAKE_COMMAND} && cd src && msvcbuild.bat)
+	if (CMAKE_BUILD_TYPE MATCHES "Debug")
+		set(LUA_JIT_MAKE_COMMAND ${LUA_JIT_MAKE_COMMAND} debug)
+	endif()
 	if (NOT BUILD_LUA_AS_DLL)
 		set(LUA_JIT_MAKE_COMMAND ${LUA_JIT_MAKE_COMMAND} static)
 	endif()
@@ -299,16 +322,16 @@ set(LUA_JIT_POSTBUILD_COMMENTS "Executable - Moving \"${LUA_JIT_SOURCE_LUA_INTER
 set(LUA_JIT_POSTBUILD_COMMANDS COMMAND "${CMAKE_COMMAND}" -E copy "${LUA_JIT_SOURCE_LUA_INTERPRETER}" "${LUA_JIT_DESTINATION_LUA_INTERPRETER}")
 if (BUILD_LUA_AS_DLL)
 	if (MSVC)
-		set(LUA_JIT_POSTBUILD_COMMENTS "${LUA_JIT_POSTBUILD_COMMENTS} | Import Library - Moving \"${LUA_JIT_SOURCE_LUA_IMP_LIB}\" to \"${LUA_JIT_DESTINATION_LUA_IMP_LIB}\"...")
+		set(LUA_JIT_POSTBUILD_COMMENTS "${LUA_JIT_POSTBUILD_COMMENTS} Import Library - Moving \"${LUA_JIT_SOURCE_LUA_IMP_LIB}\" to \"${LUA_JIT_DESTINATION_LUA_IMP_LIB}\"...")
 		set(LUA_JIT_POSTBUILD_COMMANDS ${LUA_JIT_POSTBUILD_COMMANDS} COMMAND "${CMAKE_COMMAND}" -E copy "${LUA_JIT_SOURCE_LUA_IMP_LIB}" "${LUA_JIT_DESTINATION_LUA_IMP_LIB}")
 		
-		set(LUA_JIT_POSTBUILD_COMMENTS "${LUA_JIT_POSTBUILD_COMMENTS} | Library - Moving \"${LUA_JIT_SOURCE_LUA_LIB_EXP}\" to \"${LUA_JIT_DESTINATION_LUA_LIB_EXP}\"...")
+		set(LUA_JIT_POSTBUILD_COMMENTS "${LUA_JIT_POSTBUILD_COMMENTS} Library - Moving \"${LUA_JIT_SOURCE_LUA_LIB_EXP}\" to \"${LUA_JIT_DESTINATION_LUA_LIB_EXP}\"...")
 		set(LUA_JIT_POSTBUILD_COMMANDS ${LUA_JIT_POSTBUILD_COMMANDS} && "${CMAKE_COMMAND}" -E copy "${LUA_JIT_SOURCE_LUA_LIB_EXP}" "${LUA_JIT_DESTINATION_LUA_LIB_EXP}")
 	endif()
-	set(LUA_JIT_POSTBUILD_COMMENTS "${LUA_JIT_POSTBUILD_COMMENTS} | Dynamic Library - Moving \"${LUA_JIT_SOURCE_LUA_DLL}\" to \"${LUA_JIT_DESTINATION_LUA_DLL}\"...")
+	set(LUA_JIT_POSTBUILD_COMMENTS "${LUA_JIT_POSTBUILD_COMMENTS} Dynamic Library - Moving \"${LUA_JIT_SOURCE_LUA_DLL}\" to \"${LUA_JIT_DESTINATION_LUA_DLL}\"...")
 	set(LUA_JIT_POSTBUILD_COMMANDS ${LUA_JIT_POSTBUILD_COMMANDS} COMMAND "${CMAKE_COMMAND}" -E copy "${LUA_JIT_SOURCE_LUA_DLL}" "${LUA_JIT_DESTINATION_LUA_DLL}")
 else()
-	set(LUA_JIT_POSTBUILD_COMMENTS "${LUA_JIT_POSTBUILD_COMMENTS} | Library - Moving \"${LUA_JIT_SOURCE_LUA_LIB}\" to \"${LUA_JIT_DESTINATION_LUA_LIB}\"...")
+	set(LUA_JIT_POSTBUILD_COMMENTS "${LUA_JIT_POSTBUILD_COMMENTS} Library - Moving \"${LUA_JIT_SOURCE_LUA_LIB}\" to \"${LUA_JIT_DESTINATION_LUA_LIB}\"...")
 	set(LUA_JIT_POSTBUILD_COMMANDS ${LUA_JIT_POSTBUILD_COMMANDS} COMMAND "${CMAKE_COMMAND}" -E copy "${LUA_JIT_SOURCE_LUA_LIB}" "${LUA_JIT_DESTINATION_LUA_LIB}")
 endif()
 

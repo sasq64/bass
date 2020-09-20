@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,12 +24,12 @@
 #ifndef SOL_UNSAFE_FUNCTION_RESULT_HPP
 #define SOL_UNSAFE_FUNCTION_RESULT_HPP
 
-#include "reference.hpp"
-#include "tuple.hpp"
-#include "stack.hpp"
-#include "proxy_base.hpp"
-#include "stack_iterator.hpp"
-#include "stack_proxy.hpp"
+#include <sol/reference.hpp>
+#include <sol/tuple.hpp>
+#include <sol/stack.hpp>
+#include <sol/proxy_base.hpp>
+#include <sol/stack_iterator.hpp>
+#include <sol/stack_proxy.hpp>
 #include <cstdint>
 
 namespace sol {

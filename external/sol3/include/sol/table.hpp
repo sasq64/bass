@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,9 +24,9 @@
 #ifndef SOL_TABLE_HPP
 #define SOL_TABLE_HPP
 
-#include "table_core.hpp"
-#include "lua_table.hpp"
-#include "usertype.hpp"
+#include <sol/table_core.hpp>
+#include <sol/lua_table.hpp>
+#include <sol/usertype.hpp>
 
 namespace sol {
 	typedef table_core<false> table;

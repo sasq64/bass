@@ -2,7 +2,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2013-2019 Rapptz, ThePhD and contributors
+// Copyright (c) 2013-2020 Rapptz, ThePhD and contributors
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy of
 // this software and associated documentation files (the "Software"), to deal in
@@ -24,9 +24,9 @@
 #ifndef SOL_VARIADIC_ARGS_HPP
 #define SOL_VARIADIC_ARGS_HPP
 
-#include "stack.hpp"
-#include "stack_proxy.hpp"
-#include "stack_iterator.hpp"
+#include <sol/stack.hpp>
+#include <sol/stack_proxy.hpp>
+#include <sol/stack_iterator.hpp>
 #include <limits>
 #include <iterator>
 
