@@ -45,7 +45,7 @@ struct DefaultPolicy
 
     static constexpr int MemSize = 65536;
 
-    static constexpr bool Support65C02 = true;
+    static constexpr bool Support65C02 = false;
 
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
@@ -743,6 +743,22 @@ private:
         m.Write(adr, val | m.a);
     }
 
+    // ILLEGALS
+
+    template <enum Mode MODE>
+    static constexpr void Sax(Machine& m)
+    {
+        auto r = m.Reg<Reg::A>() & m.Reg<Reg::X>();
+        m.StoreEA<MODE>(r);
+    }
+
+    template <enum Mode MODE>
+    static constexpr void Lax(Machine& m)
+    {
+        m.a =m.x =  m.LoadEA<MODE>();
+        m.set<SZ>(m.a);
+    }
+
     /////////////////////////////////////////////////////////////////////////
     ///
     ///   INSTRUCTION TABLE
@@ -766,6 +782,7 @@ private:
                 { 0xa1, 6, Mode::INDX, Load<Reg::A, Mode::INDX>},
                 { 0xb1, 5, Mode::INDY, Load<Reg::A, Mode::INDY>},
             } },
+
             { "ldx", {
                 { 0xa2, 2, Mode::IMM, Load<Reg::X, Mode::IMM>},
                 { 0xa6, 3, Mode::ZP, Load<Reg::X, Mode::ZP>},
@@ -1044,6 +1061,23 @@ private:
                     m.pc = m.ReadPC16();
                 } }
             } },
+
+            { "lax", {
+                 { 0xa7, 3, Mode::ZP, Lax<Mode::ZP>},
+                 { 0xb7, 4, Mode::ZPY, Lax<Mode::ZPY>},
+                 { 0xaf, 4, Mode::ABS, Lax<Mode::ABS>},
+                 { 0xbf, 4, Mode::ABSY, Lax<Mode::ABSY>},
+                 { 0xa3, 6, Mode::INDX, Lax<Mode::INDX>},
+                 { 0xb3, 5, Mode::INDY, Lax<Mode::INDY>},
+             } },
+
+            { "sax", {
+                 { 0x87, 3, Mode::ZP, Sax<Mode::ZP>},
+                 { 0x97, 4, Mode::ZPY, Sax<Mode::ZPY>},
+                 { 0x83, 4, Mode::ABS, Sax<Mode::ABS>},
+                 { 0x8f, 6, Mode::INDX, Sax<Mode::INDX>},
+             } },
+
         };
 
         if constexpr (POLICY::Support65C02) {
