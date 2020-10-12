@@ -37,7 +37,7 @@ public:
 
     std::vector<Error> getErrors() const;
 
-    bool parse(std::string_view const& source, std::string const& fname = "");
+    bool parse(std::string_view source, std::string const& fname = "");
     bool parse_path(utils::path const& p);
 
     utils::path getCurrentPath() const { return currentPath; }
