@@ -395,8 +395,8 @@ Assembler::Assembler() : parser(grammar6502)
     });
 
     mach->setBreakFunction(255, [this](int) {
-      auto pc = mach->getReg(sixfive::Reg::PC);
-      auto check = checks[pc];
+        auto pc = mach->getReg(sixfive::Reg::PC);
+        auto check = checks[pc];
         if (!check.empty()) {
             auto saved = syms;
             setRegSymbols();
@@ -572,7 +572,7 @@ void Assembler::setupRules()
 
         while (i < sv.size()) {
             auto block = any_cast<std::string_view>(sv[i++]);
-            if(block != "else" && block[0] != ' ' && block[0] != '\n') {
+            if (block != "else" && block[0] != ' ' && block[0] != '\n') {
                 // Avoid unexpected result when block seems
                 // to start in column 0
                 auto fixed = " "s + std::string(block);
@@ -650,9 +650,9 @@ void Assembler::setupRules()
         return sv.token_view();
     };
     parser["Block"] = [&](SV& sv) {
-      trace(sv);
-      // Skip EOLs
-      return sv[sv.size()-1];
+        trace(sv);
+        // Skip EOLs
+        return sv[sv.size() - 1];
     };
     parser["Opcode"] = [&](SV& sv) {
         trace(sv);
@@ -813,7 +813,7 @@ void Assembler::setupRules()
         try {
             const char* ptr = sv.c_str();
             if (*ptr == '0') ptr++;
-            return std::stoi(ptr + 1, nullptr, 16);
+            return std::stol(ptr + 1, nullptr, 16);
         } catch (std::out_of_range&) {
             if (finalPass) {
                 throw parse_error("Out of range");
@@ -994,7 +994,8 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
 {
     finalPass = false;
 
-    if((uint8_t)source[0] == 0xef && (uint8_t)source[1] == 0xbb && (uint8_t)source[2] == 0xbf) {
+    if ((uint8_t)source[0] == 0xef && (uint8_t)source[1] == 0xbb &&
+        (uint8_t)source[2] == 0xbf) {
         // BOM
         source.remove_prefix(3);
     }
@@ -1062,6 +1063,17 @@ void Assembler::printSymbols()
     syms.forAll([](std::string const& name, std::any const& val) {
         if (!utils::startsWith(name, "__"))
             fmt::print("{} == {}\n", name, to_string(val));
+    });
+}
+
+void Assembler::writeSymbols(utils::path const& p)
+{
+    utils::File f{p, utils::File::Mode::Write};
+    syms.forAll([&](std::string const& name, std::any const& val) {
+        if (!utils::startsWith(name, "__") &&
+            (name.find('.') == std::string::npos) &&
+            val.type() == typeid(Number))
+            fmt::print(f.filePointer(), "{} = {}\n", name, to_string(val));
     });
 }
 

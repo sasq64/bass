@@ -45,7 +45,7 @@ struct DefaultPolicy
 
     static constexpr int MemSize = 65536;
 
-    static constexpr bool Support65C02 = false;
+    static constexpr bool Support65C02 = true;
 
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }

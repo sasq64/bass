@@ -44,6 +44,7 @@ public:
     SymbolTable& getSymbols();
     Machine& getMachine();
     void printSymbols();
+    void writeSymbols(utils::path const& p);
     std::string_view includeFile(std::string_view fileName);
 
     bool isFinalPass() const { return finalPass; }

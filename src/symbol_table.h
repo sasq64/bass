@@ -207,7 +207,7 @@ struct SymbolTable
     void forAll(FN const& fn) const
     {
         for (auto const& p : syms) {
-            fn(p.first, p.second);
+            fn(p.first, p.second.value);
         }
     }
 

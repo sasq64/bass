@@ -29,6 +29,7 @@ int main(int argc, char** argv)
     bool dumpSyms = false;
     bool showUndef = false;
     bool showTrace = false;
+    std::string symbolFile;
     OutFmt outFmt = OutFmt::Prg;
     std::map<std::string, OutFmt> tr{
         {"raw"s, OutFmt::Raw},
@@ -45,6 +46,7 @@ int main(int argc, char** argv)
     app.add_flag("--show-undefined", showUndef,
                  "Show undefined after each pass");
     app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
+    app.add_option("-s,--table", symbolFile, "Write numeric symbols to file");
     app.add_option("-o,--out", outFile, "Output file");
     app.add_option("-D", definitions, "Add symbol");
     app.add_option("-i", sourceFiles, "Sources to compile");
@@ -60,7 +62,7 @@ int main(int argc, char** argv)
     }
     Assembler assem;
     assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
-                      (showTrace ? Assembler::DEB_TRACE : 0));
+                        (showTrace ? Assembler::DEB_TRACE : 0));
 
     if (outFile.empty()) {
         outFile = outFmt == OutFmt::Prg
@@ -105,8 +107,9 @@ int main(int argc, char** argv)
     }
     try {
         mach.write(outFile, outFmt);
-    } catch (utils::io_exception &e) {
-        fmt::print(stderr, "**Error: Could not write output file {}\n", outFile);
+    } catch (utils::io_exception& e) {
+        fmt::print(stderr, "**Error: Could not write output file {}\n",
+                   outFile);
         return 1;
     }
 
@@ -116,6 +119,9 @@ int main(int argc, char** argv)
     }
 
     if (dumpSyms) assem.printSymbols();
+    if (!symbolFile.empty()) {
+        assem.writeSymbols(utils::path{symbolFile});
+    }
 
     return 0;
 }
