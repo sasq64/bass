@@ -103,7 +103,12 @@ int main(int argc, char** argv)
     if (failed) {
         return 1;
     }
-    mach.write(outFile, outFmt);
+    try {
+        mach.write(outFile, outFmt);
+    } catch (utils::io_exception &e) {
+        fmt::print(stderr, "**Error: Could not write output file {}\n", outFile);
+        return 1;
+    }
 
     for (auto const& section : mach.getSections()) {
         fmt::print("{:04x}-{:04x} {}\n", section.start,
