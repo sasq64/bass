@@ -81,7 +81,7 @@ Number <-  HexNum / Binary / Octal / Multi / Decimal / Char
 LineComment <- ';' (!EOL .)* &EOL
 WholeLineComment <- (';' / '#') (!EOL .)* &EOL
 
-~_ <- [ \t]*
+~_ <- [ \u200b\t]*
 
 Symbol <- [_A-Za-z] [_A-Za-z0-9]*
 DotSymbol <- ([._A-Za-z] [_A-Za-z0-9]*)
