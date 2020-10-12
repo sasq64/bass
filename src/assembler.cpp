@@ -572,7 +572,7 @@ void Assembler::setupRules()
 
         while (i < sv.size()) {
             auto block = any_cast<std::string_view>(sv[i++]);
-            if(block[0] != ' ' && block[0] != '\n') {
+            if(block != "else" && block[0] != ' ' && block[0] != '\n') {
                 // Avoid unexpected result when block seems
                 // to start in column 0
                 auto fixed = " "s + std::string(block);
@@ -987,7 +987,7 @@ bool Assembler::parse_path(utils::path const& p)
     currentPath = utils::absolute(p).parent_path();
     utils::File f{p.string()};
 
-    return parse(f.readAllString(), p.string());
+    return parse(f.readAllString() + "\n", p.string());
 }
 
 bool Assembler::parse(std::string_view source, std::string const& fname)
