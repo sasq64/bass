@@ -1074,8 +1074,8 @@ private:
             { "sax", {
                  { 0x87, 3, Mode::ZP, Sax<Mode::ZP>},
                  { 0x97, 4, Mode::ZPY, Sax<Mode::ZPY>},
-                 { 0x83, 4, Mode::ABS, Sax<Mode::ABS>},
-                 { 0x8f, 6, Mode::INDX, Sax<Mode::INDX>},
+                 { 0x8f, 4, Mode::ABS, Sax<Mode::ABS>},
+                 { 0x83, 6, Mode::INDX, Sax<Mode::INDX>},
              } },
 
         };
