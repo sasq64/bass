@@ -571,7 +571,14 @@ void Assembler::setupRules()
         std::vector<std::string_view> blocks;
 
         while (i < sv.size()) {
-            blocks.push_back(any_cast<std::string_view>(sv[i++]));
+            auto block = any_cast<std::string_view>(sv[i++]);
+            if(block[0] != ' ' && block[0] != '\n') {
+                // Avoid unexpected result when block seems
+                // to start in column 0
+                auto fixed = " "s + std::string(block);
+                block = persist(fixed);
+            }
+            blocks.push_back(block);
         }
 
         auto it = metaFunctions.find(std::string(meta));
