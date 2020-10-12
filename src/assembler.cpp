@@ -642,6 +642,11 @@ void Assembler::setupRules()
         trace(sv);
         return sv.token_view();
     };
+    parser["Block"] = [&](SV& sv) {
+      trace(sv);
+      // Skip EOLs
+      return sv[sv.size()-1];
+    };
     parser["Opcode"] = [&](SV& sv) {
         trace(sv);
         return sv.token_view();
