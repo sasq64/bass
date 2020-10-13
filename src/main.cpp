@@ -75,7 +75,7 @@ int main(int argc, char** argv)
     auto& mach = assem.getMachine();
     auto& syms = assem.getSymbols();
 
-    mach.setCpu(use65c02 ? Machine::CPU::CPU_6502 : Machine::CPU_65C02);
+    mach.setCpu(use65c02 ? Machine::CPU::CPU_65C02 : Machine::CPU_6502);
 
     utils::File defFile{"out.def", utils::File::Write};
     mach.setOutput(defFile.filePointer());
