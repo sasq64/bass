@@ -21,9 +21,12 @@ struct SVWrap
 
     explicit SVWrap(peg::SemanticValues const& s);
 
+    mutable std::string tok;
+    mutable bool tokSet{false};
+
     const char* c_str() const;
     std::any operator[](size_t i) const;
-    std::string token() const;
+    std::string const& token() const;
     std::string_view token_view() const;
     size_t size() const;
     const std::string& name() const;

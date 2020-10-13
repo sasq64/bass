@@ -14,20 +14,29 @@ SVWrap::SVWrap(peg::SemanticValues const& s) : sv(s) {}
 
 const char* SVWrap::c_str() const
 {
-    return sv.c_str();
+    if(!tokSet) {
+        tok = std::string(sv.token());
+        tokSet = true;
+    }
+    return tok.c_str();
 }
+
 std::any SVWrap::operator[](size_t i) const
 {
     return sv[i];
 }
-std::string SVWrap::token() const
+std::string const& SVWrap::token() const
 {
-    return sv.token();
+    if(!tokSet) {
+        tok = std::string(sv.token());
+        tokSet = true;
+    }
+    return tok;
 }
 
 std::string_view SVWrap::token_view() const
 {
-    return std::string_view(sv.c_str(), sv.length());
+    return sv.token();
 }
 
 const std::string& SVWrap::name() const

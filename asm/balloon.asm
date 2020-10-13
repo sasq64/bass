@@ -1,9 +1,9 @@
 
-    !section "sprites", $0340
+    !section "sprites",$0340
 MIB_MEM_SP2
 
-    !section "main", 0x801
-    !byte $0b, $08,$01,$00,$9e,str(start),$00,$00,$00
+    !section "main",0x801
+    !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
 start
     ; Black screen
     lda #0

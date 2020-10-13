@@ -376,7 +376,7 @@ void Assembler::setRegSymbols()
 
 Assembler::Assembler() : parser(grammar6502)
 {
-    parser.packrat();
+    //parser.packrat();
     mach = std::make_shared<Machine>();
 
     mach->setBreakFunction(254, [this](int) {
@@ -713,8 +713,8 @@ void Assembler::setupRules()
 
     parser["Instruction"] = [&](SV& sv) {
         trace(sv);
-        auto opcode = std::string(any_cast<std::string_view>(sv[0]));
-        opcode = utils::toLower(opcode);
+        auto opcode = any_cast<std::string_view>(sv[0]);
+        //opcode = utils::toLower(opcode);
         Instruction instruction{opcode, Mode::NONE, 0};
         if (sv.size() > 1) {
             auto arg = any_cast<Instruction>(sv[1]);

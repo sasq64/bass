@@ -45,7 +45,7 @@ struct DefaultPolicy
 
     static constexpr int MemSize = 65536;
 
-    static constexpr bool Support65C02 = true;
+    static constexpr bool Support65C02 = false;
 
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
@@ -1076,6 +1076,12 @@ private:
                  { 0x97, 4, Mode::ZPY, Sax<Mode::ZPY>},
                  { 0x8f, 4, Mode::ABS, Sax<Mode::ABS>},
                  { 0x83, 6, Mode::INDX, Sax<Mode::INDX>},
+             } },
+            { "lxa", {
+                 { 0xab, 2, Mode::IMM, [](Machine& m) {
+                    m.a &= m.LoadEA<Mode::IMM>();
+                    m.x = m.a;
+                 } }
              } },
 
         };

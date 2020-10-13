@@ -558,7 +558,7 @@ AsmResult Machine::assemble(Instruction const& instr)
     if (arg.mode == Mode::ZP_REL) {
         auto bit = arg.val >> 24;
         arg.val &= 0xffffff;
-        opcode = opcode + std::to_string(bit);
+        opcode = persist(std::string(opcode) + std::to_string(bit));
     }
 
     // Find a matching opcode
