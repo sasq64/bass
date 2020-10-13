@@ -10,6 +10,7 @@ if(WIN32)
     set(WARN_EXT /W2)
 else()
     set(THREAD_LIB pthread)
+    set(THREAD_OPTIONS -pthread)
 endif()
 
 # Warning level setup #######################################################
@@ -74,8 +75,9 @@ else()
     target_link_libraries(bass PRIVATE badlib CLI11::CLI11)
 
     add_executable(gtest src/gtest.cpp src/grammar.cpp)
+    target_link_options(gtest PRIVATE ${THREAD_OPTIONS})
     target_include_directories(gtest PRIVATE external/peglib)
-    target_link_libraries(gtest PRIVATE pthread coreutils CLI11::CLI11)
+    target_link_libraries(gtest PRIVATE coreutils CLI11::CLI11 ${THREAD_LIB})
 
 
     add_executable(sectiontest EXCLUDE_FROM_ALL src/testmain.cpp src/sectiontest.cpp src/machine.cpp)
