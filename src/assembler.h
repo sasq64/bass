@@ -47,7 +47,7 @@ public:
     void writeSymbols(utils::path const& p);
     std::string_view includeFile(std::string_view fileName);
 
-    bool isFinalPass() const { return finalPass; }
+    bool isFinalPass() { needsFinalPass = true; return finalPass; }
     bool isFirstPass() const { return passNo == 0; }
     template <typename FN>
     void registerFunction(std::string const& name, FN const& fn)
@@ -175,6 +175,7 @@ private:
     SymbolTable syms;
     std::string_view lastLabel;
     bool finalPass{false};
+    bool needsFinalPass{false};
     int passNo{0};
 
     std::string fileName;

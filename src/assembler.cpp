@@ -198,7 +198,7 @@ int Assembler::checkUndefined()
 
 AnyMap Assembler::runTest(std::string_view name, std::string_view contents)
 {
-    if (!finalPass) {
+    if (!isFinalPass()) {
         return {
             {"A", 0_N},  {"X", 0_N},  {"Y", 0_N},      {"SR", 0_N},
             {"SP", 0_N}, {"PC", 0_N}, {"cycles", 0_N}, {"ram", mach->getRam()}};
@@ -376,7 +376,7 @@ void Assembler::setRegSymbols()
 
 Assembler::Assembler() : parser(grammar6502)
 {
-    //parser.packrat();
+    parser.packrat();
     mach = std::make_shared<Machine>();
 
     mach->setBreakFunction(254, [this](int) {
@@ -679,7 +679,6 @@ void Assembler::setupRules()
         if (sv.size() > 0 && sv[0].has_value()) {
             auto arg = sv[0];
             if (auto* i = any_cast<Instruction>(&arg)) {
-
                 auto it = macros.find(i->opcode);
                 if (it != macros.end()) {
                     LOGD("Found macro %s", it->second.name);
@@ -696,7 +695,7 @@ void Assembler::setupRules()
                 }
 
                 auto res = mach->assemble(*i);
-                if (res == AsmResult::Truncated && !finalPass) {
+                if (res == AsmResult::Truncated && !isFinalPass()) {
                     // Accept long branches unless final pass
                     res = AsmResult::Ok;
                 }
@@ -714,7 +713,7 @@ void Assembler::setupRules()
     parser["Instruction"] = [&](SV& sv) {
         trace(sv);
         auto opcode = any_cast<std::string_view>(sv[0]);
-        //opcode = utils::toLower(opcode);
+        // opcode = utils::toLower(opcode);
         Instruction instruction{opcode, Mode::NONE, 0};
         if (sv.size() > 1) {
             auto arg = any_cast<Instruction>(sv[1]);
@@ -764,7 +763,7 @@ void Assembler::setupRules()
         try {
             return std::stod(sv.c_str(), nullptr);
         } catch (std::out_of_range&) {
-            if (finalPass) {
+            if (isFinalPass()) {
                 throw parse_error("Out of range");
             }
             return 0;
@@ -775,7 +774,7 @@ void Assembler::setupRules()
         try {
             return std::stoi(sv.c_str() + 2, nullptr, 8);
         } catch (std::out_of_range&) {
-            if (finalPass) {
+            if (isFinalPass()) {
                 throw parse_error("Out of range");
             }
             return 0;
@@ -786,7 +785,7 @@ void Assembler::setupRules()
         try {
             return std::stoi(sv.c_str() + 2, nullptr, 4);
         } catch (std::out_of_range&) {
-            if (finalPass) {
+            if (isFinalPass()) {
                 throw parse_error("Out of range");
             }
             return 0;
@@ -797,7 +796,7 @@ void Assembler::setupRules()
         try {
             return std::stoi(sv.c_str() + 2, nullptr, 2);
         } catch (std::out_of_range&) {
-            if (finalPass) {
+            if (isFinalPass()) {
                 throw parse_error("Out of range");
             }
             return 0;
@@ -815,7 +814,7 @@ void Assembler::setupRules()
             if (*ptr == '0') ptr++;
             return std::stol(ptr + 1, nullptr, 16);
         } catch (std::out_of_range&) {
-            if (finalPass) {
+            if (isFinalPass()) {
                 throw parse_error("Out of range");
             }
             return 0;
@@ -850,12 +849,12 @@ void Assembler::setupRules()
             auto result = static_cast<Number>(operation(ope, a, b));
             return std::any(result);
         } catch (std::out_of_range&) {
-            if (finalPass) {
+            if (isFinalPass()) {
                 throw parse_error("Out of range");
             }
             return any_num(0);
         } catch (dbz_error&) {
-            if (finalPass) {
+            if (isFinalPass()) {
                 throw parse_error("Division by zero");
             }
             return any_num(0);
@@ -894,7 +893,7 @@ void Assembler::setupRules()
                 }
 
                 if (a >= b || b > v->size()) {
-                    if (finalPass) {
+                    if (isFinalPass()) {
                         throw parse_error("Slice outside array");
                     }
                     return any_num(0);
@@ -906,7 +905,7 @@ void Assembler::setupRules()
             }
 
             if (index >= v->size()) {
-                if (finalPass) {
+                if (isFinalPass()) {
                     throw parse_error("Index outside array");
                 }
                 return any_num(0);
@@ -974,6 +973,7 @@ bool Assembler::pass(std::string_view const& source)
     mach->clear();
     syms.clear();
     errors.clear();
+    needsFinalPass = false;
     auto err = parser.parse(source, fileName);
     if (!err) {
         errors.push_back(err);
@@ -1029,9 +1029,15 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
         }
 
         passNo++;
-        if (checkUndefined() == PASS) {
+        auto rc = checkUndefined();
+
+        if (rc == PASS) {
             continue;
         }
+        if(rc == ERROR) {
+            needsFinalPass = true;
+        }
+
         if (!layoutOk) {
             continue;
         }
@@ -1043,10 +1049,13 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
         errors.push_back(err);
         return false;
     }
-    finalPass = true;
-    fmt::print("* FINAL PASS\n");
-    syms.acceptUndefined(false);
-    return pass(source);
+    if (needsFinalPass) {
+        finalPass = true;
+        fmt::print("* FINAL PASS\n");
+        syms.acceptUndefined(false);
+        return pass(source);
+    }
+    return true;
 }
 
 SymbolTable& Assembler::getSymbols()
