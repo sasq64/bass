@@ -766,7 +766,7 @@ private:
     /////////////////////////////////////////////////////////////////////////
 
     template <bool USE_BCD = false>
-    static std::vector<Instruction> makeInstructionTable()
+    static std::vector<Instruction> makeInstructionTable(bool cpu65c02 = false)
     {
         std::vector<Instruction> instructionTable = {
 
@@ -1062,31 +1062,26 @@ private:
                 } }
             } },
 
-            { "lax", {
-                 { 0xa7, 3, Mode::ZP, Lax<Mode::ZP>},
-                 { 0xb7, 4, Mode::ZPY, Lax<Mode::ZPY>},
-                 { 0xaf, 4, Mode::ABS, Lax<Mode::ABS>},
-                 { 0xbf, 4, Mode::ABSY, Lax<Mode::ABSY>},
-                 { 0xa3, 6, Mode::INDX, Lax<Mode::INDX>},
-                 { 0xb3, 5, Mode::INDY, Lax<Mode::INDY>},
-             } },
-
-            { "sax", {
-                 { 0x87, 3, Mode::ZP, Sax<Mode::ZP>},
-                 { 0x97, 4, Mode::ZPY, Sax<Mode::ZPY>},
-                 { 0x8f, 4, Mode::ABS, Sax<Mode::ABS>},
-                 { 0x83, 6, Mode::INDX, Sax<Mode::INDX>},
-             } },
-            { "lxa", {
-                 { 0xab, 2, Mode::IMM, [](Machine& m) {
-                    m.a &= m.LoadEA<Mode::IMM>();
-                    m.x = m.a;
-                 } }
-             } },
 
         };
 
-        if constexpr (POLICY::Support65C02) {
+        auto mergeInstructions = [&](std::vector<Instruction> const& vec) {
+          for (auto const& v : vec) {
+              auto it = std::find_if(
+                  instructionTable.begin(), instructionTable.end(),
+                  [&](auto const& i) {
+                    return strcmp(i.name, v.name) == 0;
+                  });
+              if (it != instructionTable.end()) {
+                  it->opcodes.insert(it->opcodes.begin(),
+                                     v.opcodes.begin(), v.opcodes.end());
+              } else {
+                  instructionTable.push_back(v);
+              }
+          }
+        };
+
+        if  (cpu65c02) {
 
             std::vector<Instruction> instructions65c02 = {
                 {"adc", {{0x72, 5, Mode::INDZ, Adc<Mode::INDZ, USE_BCD>}}},
@@ -1160,23 +1155,33 @@ private:
 
             };
 
-            auto mergeInstructions = [&](std::vector<Instruction> const& vec) {
-                for (auto const& v : vec) {
-                    auto it = std::find_if(
-                        instructionTable.begin(), instructionTable.end(),
-                        [&](auto const& i) {
-                            return strcmp(i.name, v.name) == 0;
-                        });
-                    if (it != instructionTable.end()) {
-                        it->opcodes.insert(it->opcodes.begin(),
-                                           v.opcodes.begin(), v.opcodes.end());
-                    } else {
-                        instructionTable.push_back(v);
-                    }
-                }
-            };
-
             mergeInstructions(instructions65c02);
+        } else {
+
+            std::vector<Instruction> instructionsIllegal = {
+                { "lax", {
+                    { 0xa7, 3, Mode::ZP, Lax<Mode::ZP>},
+                    { 0xb7, 4, Mode::ZPY, Lax<Mode::ZPY>},
+                    { 0xaf, 4, Mode::ABS, Lax<Mode::ABS>},
+                    { 0xbf, 4, Mode::ABSY, Lax<Mode::ABSY>},
+                    { 0xa3, 6, Mode::INDX, Lax<Mode::INDX>},
+                    { 0xb3, 5, Mode::INDY, Lax<Mode::INDY>},
+                } },
+
+                { "sax", {
+                    { 0x87, 3, Mode::ZP, Sax<Mode::ZP>},
+                    { 0x97, 4, Mode::ZPY, Sax<Mode::ZPY>},
+                    { 0x8f, 4, Mode::ABS, Sax<Mode::ABS>},
+                    { 0x83, 6, Mode::INDX, Sax<Mode::INDX>},
+                } },
+                { "lxa", {
+                    { 0xab, 2, Mode::IMM, [](Machine& m) {
+                      m.a &= m.LoadEA<Mode::IMM>();
+                      m.x = m.a;
+                    } }
+                } },
+            };
+            mergeInstructions(instructionsIllegal);
         }
 
         return instructionTable;
@@ -1189,6 +1194,16 @@ public:
         static const std::vector<Instruction> instructionTable =
             makeInstructionTable<USE_BCD>();
         return instructionTable;
+    }
+
+    template <bool USE_BCD = false>
+    static const auto& getInstructions(bool cpu65c02)
+    {
+        static const std::vector<Instruction> instructionTable =
+            makeInstructionTable<USE_BCD>(true);
+        static const std::vector<Instruction> instructionTable2 =
+            makeInstructionTable<USE_BCD>(false);
+        return cpu65c02 ? instructionTable : instructionTable2;
     }
 }; // namespace sixfive
 } // namespace sixfive

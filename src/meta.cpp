@@ -301,6 +301,17 @@ void initMeta(Assembler& assem)
         mach.getCurrentSection().setPC(org);
     });
 
+    assem.registerMeta("cpu", [&](auto const& text, auto const&) {
+        LOGI("CPU %s", text);
+        if(text == "6502") {
+            mach.setCpu(Machine::CPU_6502);
+        } else if(text == "65C02") {
+            mach.setCpu(Machine::CPU_65C02);
+        } else {
+            throw parse_error("Unknown CPU");
+        }
+    });
+
     assem.registerMeta("align", [&](auto const& text, auto const&) {
         auto bytes = number<int32_t>(assem.evaluateExpression(text));
         int bits = 0;

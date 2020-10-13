@@ -25,6 +25,7 @@ int main(int argc, char** argv)
     std::vector<std::string> sourceFiles;
     std::vector<std::string> scriptFiles;
     std::vector<std::string> definitions;
+    bool use65c02 = false;
     std::string outFile;
     bool dumpSyms = false;
     bool showUndef = false;
@@ -46,6 +47,7 @@ int main(int argc, char** argv)
     app.add_flag("--show-undefined", showUndef,
                  "Show undefined after each pass");
     app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
+    app.add_flag("--65c02", use65c02, "Target 65c02");
     app.add_option("-s,--table", symbolFile, "Write numeric symbols to file");
     app.add_option("-o,--out", outFile, "Output file");
     app.add_option("-D", definitions, "Add symbol");
@@ -72,6 +74,8 @@ int main(int argc, char** argv)
 
     auto& mach = assem.getMachine();
     auto& syms = assem.getSymbols();
+
+    mach.setCpu(use65c02 ? Machine::CPU::CPU_6502 : Machine::CPU_65C02);
 
     utils::File defFile{"out.def", utils::File::Write};
     mach.setOutput(defFile.filePointer());

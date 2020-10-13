@@ -1,4 +1,5 @@
 
+    !cpu 65C02
 
     !section "main",$1000
 start:
@@ -68,8 +69,8 @@ table:
     !byte 0,0,0,0
     !byte $55,$aa
 
-
-!test "test" {
-    !log "Testing"
-    jsr start
-}
+;;; TODO: Emulator runtime switch
+;!test "test" {
+;    !log "Testing"
+;    jsr start
+;}

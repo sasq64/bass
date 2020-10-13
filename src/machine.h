@@ -154,7 +154,20 @@ public:
                      std::function<uint8_t(uint16_t)> const& fn);
     void setBankRead(int hi_adr, int len, int bank);
 
+    enum CPU
+    {
+        CPU_6502,
+        CPU_65C02
+    };
+
+    void setCpu(CPU cpu) {
+        cpu65C02 = cpu == CPU_65C02;
+    }
+
+
 private:
+
+    bool cpu65C02 = true;
 
     std::deque<Section*> savedSections;
     bool inData = false;

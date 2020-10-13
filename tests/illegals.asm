@@ -1,4 +1,5 @@
 
+    !cpu 6502
 
 !section "main", $c000
 test_lax:

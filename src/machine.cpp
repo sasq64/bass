@@ -6,6 +6,7 @@
 #include <coreutils/algorithm.h>
 #include <coreutils/file.h>
 #include <coreutils/log.h>
+#include <coreutils/text.h>
 
 #include <algorithm>
 #include <array>
@@ -280,6 +281,7 @@ constexpr static std::array modeTemplate = {
         "$%04x",
         "$%04x,x",
         "$%04x,y",
+        "$%x"
 };
 // clang-format on
 
@@ -551,9 +553,10 @@ AsmResult Machine::assemble(Instruction const& instr)
     using sixfive::Mode;
 
     auto arg = instr;
-    auto opcode = instr.opcode;
+    std::string opcode = utils::toLower(std::string(instr.opcode));
 
-    auto const& instructions = sixfive::Machine<>::getInstructions();
+
+    auto const& instructions = sixfive::Machine<>::getInstructions(cpu65C02);
 
     if (arg.mode == Mode::ZP_REL) {
         auto bit = arg.val >> 24;

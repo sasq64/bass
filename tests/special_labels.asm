@@ -46,18 +46,19 @@ $   nop
 
 
 many:
+    clc
 
     ldx #0
-    bra +++
+    bcc +++
     nop
 $
-    bra .out
+    bcc .out
 $
     inx
-    bra .out
+    bcc .out
 $
     ldx #3
-    bra --
+    bcc --
     rts
 .out
     rts
