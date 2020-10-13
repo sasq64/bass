@@ -73,6 +73,11 @@ else()
     add_executable(bass src/main.cpp)
     target_link_libraries(bass PRIVATE badlib CLI11::CLI11)
 
+    add_executable(gtest src/gtest.cpp src/grammar.cpp)
+    target_include_directories(gtest PRIVATE external/peglib)
+    target_link_libraries(gtest PRIVATE pthread coreutils CLI11::CLI11)
+
+
     add_executable(sectiontest EXCLUDE_FROM_ALL src/testmain.cpp src/sectiontest.cpp src/machine.cpp)
     target_include_directories(sectiontest PRIVATE src)
     target_link_libraries(sectiontest PRIVATE catch coreutils fmt)
