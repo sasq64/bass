@@ -3,7 +3,7 @@ extern char const* const grammar6502;
 
 #include <coreutils/file.h>
 
-#include "peglib.h"
+#include <peglib.h>
 #include <iostream>
 
 int main(int argc, char** argv)
@@ -18,7 +18,8 @@ int main(int argc, char** argv)
     p.log = [](size_t line, size_t col, const std::string& msg) {
         std::cerr << line << ":" << col << ": " << msg << "\n";
     };
-    p.parse(data.c_str());
+    auto rc = p.parse(data.c_str());
+    printf("Result %d\n", (int)rc);
 
     return 0;
 }

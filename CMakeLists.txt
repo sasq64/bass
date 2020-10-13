@@ -72,6 +72,7 @@ if(FUZZ)
     target_link_libraries(bazz PRIVATE badlib)
 else()
     add_executable(bass src/main.cpp)
+    target_link_options(bass PRIVATE ${THREAD_OPTIONS})
     target_link_libraries(bass PRIVATE badlib CLI11::CLI11)
 
     add_executable(gtest src/gtest.cpp src/grammar.cpp)

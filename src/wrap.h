@@ -86,7 +86,7 @@ struct ParserWrapper
 
     ~ParserWrapper();
 
-    explicit ParserWrapper(std::string const& source);
+    explicit ParserWrapper(const char* grammar);
 
     void packrat() const;
     void action(const char* name,

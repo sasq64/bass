@@ -81,8 +81,8 @@ std::vector<std::any> SVWrap::transform() const
     return sv.transform<std::any>();
 }
 
-ParserWrapper::ParserWrapper(std::string const& s)
-    : p(std::make_unique<peg::parser>(s.c_str()))
+ParserWrapper::ParserWrapper(const char *s)
+    : p(std::make_unique<peg::parser>(s))
 {
     p->log = [&](size_t line, size_t col, std::string const& msg) {
         currentError.message = msg;
