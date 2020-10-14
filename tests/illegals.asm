@@ -10,6 +10,14 @@ test_lax:
     sax data2
     ldy data2
     !check Y == $70
+
+    rts
+
+test_nop:
+
+    nop #3
+    nop $01
+    nop $1234
     rts
 
 data:
@@ -20,4 +28,5 @@ data2:
 
 !test "illegals" {
     jsr test_lax
+    jsr test_nop
 }

@@ -917,6 +917,7 @@ void Assembler::setupRules()
     };
 
     parser["UnOp"] = [&](SV& sv) { return sv.token()[0]; };
+    parser["UnOp2"] = [&](SV& sv) { return sv.token()[0]; };
 
     parser["Unary"] = [&](SV& sv) -> Number {
         trace(sv);
@@ -930,6 +931,16 @@ void Assembler::setupRules()
             return -num;
         case '!':
             return static_cast<Number>(inum == 0);
+        default:
+            throw parse_error("Unknown unary operator");
+        }
+    };
+    parser["Unary2"] = [&](SV& sv) -> Number {
+        trace(sv);
+        auto ope = any_cast<char>(sv[0]);
+        auto num = number(sv[1]);
+        auto inum = number<int64_t>(num);
+        switch (ope) {
         case '<':
             return static_cast<Number>(inum & 0xff);
         case '>':

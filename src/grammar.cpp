@@ -110,7 +110,7 @@ Expression  <- Atom (Operator Atom)* {
                        }
 
 
-Atom <- _? (Star / Unary / Number /
+Atom <- _? (Star / Unary / Unary2 / Number /
         Index / FnCall / Variable / '(' Expression ')') _?
 
 Star <- '*'
@@ -122,7 +122,9 @@ Indexable <- FnCall / Variable
 IndexSep <- ':'
 
 Unary <- UnOp Atom
-UnOp <- ('!' / '~' / '-' / '<' / '>' )
+Unary2 <- UnOp2 Expression
+UnOp <- ('!' / '~' / '-')
+UnOp2 <- ('<' / '>')
 FnCall <- Call
 Call <- CallName '(' CallArgs ')'
 CallName <- Symbol

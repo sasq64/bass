@@ -6,6 +6,7 @@
 #include <peglib.h>
 
 #include <coreutils/log.h>
+#include <cstdio>
 #include <string>
 
 using namespace std::string_literals;
@@ -84,6 +85,10 @@ std::vector<std::any> SVWrap::transform() const
 ParserWrapper::ParserWrapper(const char *s)
     : p(std::make_unique<peg::parser>(s))
 {
+    if(!(*p)) {
+        fprintf(stderr, "Error:: Illegal grammar\n");
+        exit(0);
+    }
     p->log = [&](size_t line, size_t col, std::string const& msg) {
         currentError.message = msg;
         if (currentError.line <= 0) {

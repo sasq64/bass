@@ -755,7 +755,7 @@ private:
     template <enum Mode MODE>
     static constexpr void Lax(Machine& m)
     {
-        m.a =m.x =  m.LoadEA<MODE>();
+        m.a = m.x = m.LoadEA<MODE>();
         m.set<SZ>(m.a);
     }
 
@@ -1166,6 +1166,8 @@ private:
                     { 0xbf, 4, Mode::ABSY, Lax<Mode::ABSY>},
                     { 0xa3, 6, Mode::INDX, Lax<Mode::INDX>},
                     { 0xb3, 5, Mode::INDY, Lax<Mode::INDY>},
+                    // NOTE: Emulate as unstable ?
+                    { 0xab, 2, Mode::IMM, Lax<Mode::IMM>},
                 } },
 
                 { "sax", {
@@ -1179,6 +1181,17 @@ private:
                       m.a &= m.LoadEA<Mode::IMM>();
                       m.x = m.a;
                     } }
+                } },
+                { "nop", {
+                    { 0xe2, 2, Mode::IMM, [](Machine& m) {
+                        m.LoadEA<Mode::IMM>();
+                    } },
+                    { 0x04, 3, Mode::ZP, [](Machine& m) {
+                        m.LoadEA<Mode::ZP>();
+                    } },
+                    { 0x0c, 4, Mode::ABS, [](Machine& m) {
+                        m.LoadEA<Mode::ABS>();
+                    } },
                 } },
             };
             mergeInstructions(instructionsIllegal);
