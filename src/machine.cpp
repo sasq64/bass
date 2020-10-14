@@ -587,7 +587,8 @@ AsmResult Machine::assemble(Instruction const& instr)
                                                    {Mode::ZP, Mode::ABS}};
 
         if (instruction.val >= 0 && instruction.val <= 0xff) {
-            if (conv[opcode.mode] == instruction.mode) {
+            auto it = conv.find(opcode.mode);
+            if (it != conv.end() && it->second == instruction.mode) {
                 return true;
             }
         }

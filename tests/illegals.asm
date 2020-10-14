@@ -17,6 +17,7 @@ test_nop:
 
     nop #3
     nop $01
+    nop
     nop $1234
     rts
 
