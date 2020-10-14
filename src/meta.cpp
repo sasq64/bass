@@ -302,7 +302,6 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("cpu", [&](auto const& text, auto const&) {
-        LOGI("CPU %s", text);
         if(text == "6502") {
             mach.setCpu(Machine::CPU_6502);
         } else if(text == "65C02") {

@@ -30,6 +30,7 @@ int main(int argc, char** argv)
     bool dumpSyms = false;
     bool showUndef = false;
     bool showTrace = false;
+    bool quiet = false;
     std::string symbolFile;
     OutFmt outFmt = OutFmt::Prg;
     std::map<std::string, OutFmt> tr{
@@ -38,14 +39,15 @@ int main(int argc, char** argv)
         {"crt"s, OutFmt::Crt},
     };
 
-    puts(banner + 1);
-
     CLI::App app{"badass"};
+    app.set_help_flag();
+    auto help = app.add_flag("-h,--help", "Request help");
     app.add_option("-f,--format", outFmt, "Output format")
         ->transform(CLI::CheckedTransformer(tr, CLI::ignore_case));
     app.add_flag("--trace", showTrace, "Trace rule invocations");
     app.add_flag("--show-undefined", showUndef,
                  "Show undefined after each pass");
+    app.add_flag("-q,--quiet", quiet, "Less noise");
     app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
     app.add_flag("--65c02", use65c02, "Target 65c02");
     app.add_option("-s,--table", symbolFile, "Write numeric symbols to file");
@@ -59,9 +61,15 @@ int main(int argc, char** argv)
 
     try {
         app.parse(argc, argv);
+        if (*help) {
+            puts(banner + 1);
+            throw CLI::CallForHelp();
+        }
     } catch (const CLI::ParseError& e) {
         app.exit(e);
     }
+    if (*help) return 0;
+    if (!quiet) puts(banner + 1);
     Assembler assem;
     assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
                         (showTrace ? Assembler::DEB_TRACE : 0));
@@ -117,9 +125,13 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    for (auto const& section : mach.getSections()) {
-        fmt::print("{:04x}-{:04x} {}\n", section.start,
-                   section.start + section.data.size(), section.name);
+    if (!quiet) {
+        for (auto const& section : mach.getSections()) {
+            if (section.data.size() > 0) {
+                fmt::print("{:04x}-{:04x} {}\n", section.start,
+                           section.start + section.data.size(), section.name);
+            }
+        }
     }
 
     if (dumpSyms) assem.printSymbols();
