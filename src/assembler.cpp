@@ -1077,7 +1077,7 @@ void Assembler::printSymbols()
 
 void Assembler::writeSymbols(utils::path const& p)
 {
-    utils::File f{p, utils::File::Mode::Write};
+    auto f = createFile(p);
     syms.forAll([&](std::string const& name, std::any const& val) {
         if (!utils::startsWith(name, "__") &&
             (name.find('.') == std::string::npos) &&

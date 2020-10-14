@@ -387,7 +387,8 @@ void Machine::write(std::string const& name, OutFmt fmt)
               [](auto const& a, auto const& b) { return a.start < b.start; });
 
     int32_t last_end = -1;
-    utils::File outFile{name, utils::File::Mode::Write};
+
+    utils::File outFile = createFile(name);
 
     auto start = non_empty.front().start;
     auto end = non_empty.back().start +
@@ -422,7 +423,7 @@ void Machine::write(std::string const& name, OutFmt fmt)
         }
 
         if ((section.flags & WriteToDisk) != 0) {
-            utils::File of{section.name, utils::File::Mode::Write};
+            auto of = createFile(section.name);
             of.write<uint8_t>(section.start & 0xff);
             of.write<uint8_t>(section.start >> 8);
             of.write(section.data);

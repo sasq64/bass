@@ -3,6 +3,8 @@
 #include "6502.h"
 #include "symbol_table.h"
 
+#include <coreutils/file.h>
+#include <coreutils/path.h>
 #include <any>
 #include <memory>
 #include <string>
@@ -28,6 +30,16 @@ inline std::string_view persist(std::string const& s)
     persist(sv);
     return sv;
 }
+
+inline utils::File createFile(utils::path const& p)
+{
+    auto pp = p.parent_path();
+    if(!pp.empty()) {
+        utils::create_directories(pp);
+    }
+    return utils::File{p.string(), utils::File::Mode::Write};
+}
+
 
 class dbz_error : public std::exception
 {
