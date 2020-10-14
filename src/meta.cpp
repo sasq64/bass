@@ -357,6 +357,10 @@ void initMeta(Assembler& assem)
         syms.set("RO", num(0x400000000));
         auto args = assem.evaluateList(text);
 
+        syms.erase("NO_STORE");
+        syms.erase("TO_PRG");
+        syms.erase("RO");
+
         if (args.empty()) {
             throw parse_error("Too few arguments");
         }
