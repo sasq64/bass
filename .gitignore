@@ -5,3 +5,6 @@ fuzz/
 .vscode/
 cmake-*/
 compile_commands.json
+.vs/
+CMakeSettings.json
+
