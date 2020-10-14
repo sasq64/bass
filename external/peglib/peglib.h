@@ -26,10 +26,6 @@
 #include <unordered_map>
 #include <vector>
 
-#if !defined(__cplusplus) || __cplusplus < 201703L
-#error "Requires complete C++17 support"
-#endif
-
 namespace peg {
 
 /*-----------------------------------------------------------------------------
