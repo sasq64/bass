@@ -112,7 +112,7 @@ int main(int argc, char** argv)
         if (!assem.parse_path(sp)) {
             for (auto const& e : assem.getErrors()) {
                 if (e.level == ErrLevel::Error) failed = true;
-                fmt::print("{}:{}: {}: {}\n", sourceFile, e.line,
+                fmt::print("{}:{}: {}: {}\n", e.file, e.line,
                            e.level == ErrLevel::Warning ? "warning" : "error",
                            e.message.c_str());
             }

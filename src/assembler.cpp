@@ -594,7 +594,6 @@ void Assembler::setupRules()
             try {
                 (it->second)(text, blocks);
             } catch (parse_error& e) {
-                LOGI("ERR %d %d", sv.line(), parser.currentError.line);
                 if(parser.currentError.line == 0) {
                     parser.currentError.line = sv.line();
                 }

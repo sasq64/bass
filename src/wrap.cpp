@@ -90,7 +90,6 @@ ParserWrapper::ParserWrapper(const char *s)
         exit(0);
     }
     p->log = [&](size_t line, size_t col, std::string const& msg) {
-        LOGI("%d:%s", line, msg);
         currentError.message = msg;
         // Dont update line if already set
         if (currentError.line <= 0) {
@@ -169,10 +168,10 @@ void ParserWrapper::action(const char* name,
         try {
             return fn(s);
         } catch (dbz_error&) {
-            LOGW("DBZ");
+            LOGW("Division by zero");
             return std::any();
         } catch (parse_error& e) {
-            LOGI("Caught %s", e.what());
+            LOGD("Caught %s", e.what());
             throw peg::parse_error(e.what());
         } catch (script_error& e) {
             std::string w = e.what();
