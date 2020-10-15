@@ -28,11 +28,7 @@ FnName <- Symbol
 FnArgs <- (FnArg (',' FnArg)*)?
 FnArg <- _? Symbol _?
 
-Block <- NormalBlock / EOLBlock
-
-NormalBlock <-  _ '{' BlockContents '}'
-EOLBlock <- EOL _ '{' BlockContents '}'
-
+Block <- EOL? _ '{' BlockContents '}'
 BlockContents <- SkipProgram
 
 SkipProgram <- (SkipLine EOL)* SkipLine?

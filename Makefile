@@ -1,5 +1,5 @@
 CMAKE_FLAGS = -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
-all : debug
+all : bass
 
 builds/debug/cmake_install.cmake :
 	rm -rf builds/debug
@@ -10,8 +10,14 @@ compile_commands.json : builds/debug/compile_commands.json
 	ln -s builds/debug/compile_commands.json .
 
 debug : builds/debug/cmake_install.cmake compile_commands.json
-	cmake --build builds/debug -- -j8
 
-test : all
+
+bass : debug
+	cmake --build builds/debug -- -j8 bass
+
+
+
+test : debug
+	cmake --build builds/debug -- -j8 tester
 	builds/debug/tester all
 

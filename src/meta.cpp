@@ -30,19 +30,19 @@ static void resetTranslate()
 }
 
 static void evalIf(Assembler& a, bool cond,
-                   std::vector<std::string_view> const& blocks, size_t line)
+                   std::vector<Assembler::Block> const& blocks)
 {
     if (blocks.empty()) {
         throw parse_error("Expected block");
     }
     if (cond) {
-        a.evaluateBlock(blocks[0], line);
+        a.evaluateBlock(blocks[0].contents, blocks[0].line);
     } else {
         if (blocks.size() == 3) {
-            if (std::any_cast<std::string_view>(blocks[1]) != "else") {
+            if (std::any_cast<std::string_view>(blocks[1].contents) != "else") {
                 throw parse_error("Expected 'else'");
             }
-            a.evaluateBlock(blocks[2], line);
+            a.evaluateBlock(blocks[2].contents, blocks[2].line);
         }
     }
 }
@@ -112,25 +112,24 @@ void initMeta(Assembler& assem)
         }
 
         Check(blocks.size() == 1, "Expected block");
-        auto contents = blocks[0];
+        auto contents = blocks[0].contents;
         auto res = assem.runTest(testName, contents);
         assem.getSymbols().set("tests."s + testName, res);
         // LOGI("Set %s %x", testName, number<int32_t>(res["A"]));
     });
 
-    assem.registerMeta(
-        "macro", [&](auto const& text, auto const& blocks, size_t line) {
-            Check(blocks.size() == 1, "Expected block");
-            auto def = assem.evaluateDefinition(text, line);
-            assem.defineMacro(def.name, def.args, line, blocks[0]);
-        });
+    assem.registerMeta("macro", [&](auto const& text, auto const& blocks) {
+        Check(blocks.size() == 1, "Expected block");
+        auto def = assem.evaluateDefinition(text, blocks[0].line);
+        assem.defineMacro(def.name, def.args, blocks[0].line,
+                          blocks[0].contents);
+    });
 
-    assem.registerMeta("define",
-                       [&](auto const& text, auto const& blocks, size_t line) {
-                           Check(blocks.size() == 1, "Expected block");
-                           auto def = assem.evaluateDefinition(text);
-                           assem.addDefine(def.name, def.args, line, blocks[0]);
-                       });
+    assem.registerMeta("define", [&](auto const& text, auto const& blocks) {
+        Check(blocks.size() == 1, "Expected block");
+        auto def = assem.evaluateDefinition(text);
+        assem.addDefine(def.name, def.args, blocks[0].line, blocks[0].contents);
+    });
 
     assem.registerMeta("ascii", [&](auto const& args, auto const&) {
         resetTranslate();
@@ -224,53 +223,52 @@ void initMeta(Assembler& assem)
         }
     });
 
-    assem.registerMeta(
-        "fill", [&](auto const& text, auto const& blocks, size_t line) {
-            std::any data = assem.evaluateExpression(text);
+    assem.registerMeta("fill", [&](auto const& text, auto const& blocks) {
+        std::any data = assem.evaluateExpression(text);
 
-            auto& syms = assem.getSymbols();
+        auto& syms = assem.getSymbols();
 
-            if (auto* vec = any_cast<std::vector<uint8_t>>(&data)) {
-                for (size_t i = 0; i < vec->size(); i++) {
-                    uint8_t d = (*vec)[i];
-                    syms.erase("i");
-                    syms.set("i", any_num(i));
-                    for (auto const& b : blocks) {
-                        assem.getSymbols().at<Number>("v") = d;
-                        auto res = assem.evaluateExpression(b, line);
-                        d = number<uint8_t>(res);
-                    }
-                    mach.writeByte(d);
+        if (auto* vec = any_cast<std::vector<uint8_t>>(&data)) {
+            for (size_t i = 0; i < vec->size(); i++) {
+                uint8_t d = (*vec)[i];
+                syms.erase("i");
+                syms.set("i", any_num(i));
+                for (auto const& b : blocks) {
+                    assem.getSymbols().at<Number>("v") = d;
+                    auto res = assem.evaluateExpression(b.contents, b.line);
+                    d = number<uint8_t>(res);
                 }
-            } else if (auto* sv = any_cast<std::string_view>(&data)) {
-                auto utext = utils::utf8_decode(*sv);
-                for (size_t i = 0; i < utext.size(); i++) {
-                    auto d = utext[i];
-                    syms.erase("i");
-                    syms.set("i", any_num(i));
-                    for (auto const& b : blocks) {
-                        assem.getSymbols().at<Number>("v") = d;
-                        auto res = assem.evaluateExpression(b, line);
-                        d = number<wchar_t>(res);
-                    }
-                    mach.writeByte(char_translate.at(d));
-                }
-            } else {
-                auto size = number<size_t>(data);
-                LOGD("Fill %d bytes", size);
-                for (size_t i = 0; i < size; i++) {
-                    syms.erase("i");
-                    syms.set("i", any_num(i));
-                    uint8_t d = 0;
-                    for (auto const& b : blocks) {
-                        assem.getSymbols().at<Number>("v") = d;
-                        auto res = assem.evaluateExpression(b, line);
-                        d = number<uint8_t>(res);
-                    }
-                    mach.writeByte(d);
-                }
+                mach.writeByte(d);
             }
-        });
+        } else if (auto* sv = any_cast<std::string_view>(&data)) {
+            auto utext = utils::utf8_decode(*sv);
+            for (size_t i = 0; i < utext.size(); i++) {
+                auto d = utext[i];
+                syms.erase("i");
+                syms.set("i", any_num(i));
+                for (auto const& b : blocks) {
+                    assem.getSymbols().at<Number>("v") = d;
+                    auto res = assem.evaluateExpression(b.contents, b.line);
+                    d = number<wchar_t>(res);
+                }
+                mach.writeByte(char_translate.at(d));
+            }
+        } else {
+            auto size = number<size_t>(data);
+            LOGD("Fill %d bytes", size);
+            for (size_t i = 0; i < size; i++) {
+                syms.erase("i");
+                syms.set("i", any_num(i));
+                uint8_t d = 0;
+                for (auto const& b : blocks) {
+                    assem.getSymbols().at<Number>("v") = d;
+                    auto res = assem.evaluateExpression(b.contents, b.line);
+                    d = number<uint8_t>(res);
+                }
+                mach.writeByte(d);
+            }
+        }
+    });
 
     assem.registerMeta("map", [&](auto const& text, auto const& blocks) {
         std::vector<uint8_t> result;
@@ -289,7 +287,7 @@ void initMeta(Assembler& assem)
             for (auto const& b : blocks) {
                 assem.getSymbols().at<Number>("i") = static_cast<Number>(i);
                 assem.getSymbols().at<Number>("v") = d;
-                auto res = assem.evaluateExpression(b);
+                auto res = assem.evaluateExpression(b.contents);
                 d = number<uint8_t>(res);
                 result.push_back(d);
             }
@@ -375,7 +373,7 @@ void initMeta(Assembler& assem)
         if (!blocks.empty()) {
             mach.pushSection(section.name);
             auto sz = section.data.size();
-            assem.evaluateBlock(blocks[0]);
+            assem.evaluateBlock(blocks[0].contents);
             if (!section.parent.empty()) {
                 mach.getSection(section.parent).pc +=
                     static_cast<int32_t>(section.data.size() - sz);
@@ -422,56 +420,50 @@ void initMeta(Assembler& assem)
         }
     });
 
-    assem.registerMeta(
-        "rept", [&](auto const& text, auto const& blocks, size_t line) {
-            Check(blocks.size() == 1, "Expected block");
-            std::any data;
-            std::string indexVar = "i";
-            auto parts = utils::split(std::string(text), ',');
-            if (parts.size() == 2) {
-                indexVar = utils::lrstrip(parts[0]);
-                data = assem.evaluateExpression(parts[1]);
-            } else {
-                data = assem.evaluateExpression(text);
-            }
-            auto* vec = any_cast<std::vector<uint8_t>>(&data);
-            size_t count = vec ? vec->size() : number<size_t>(data);
+    assem.registerMeta("rept", [&](auto const& text, auto const& blocks) {
+        Check(blocks.size() == 1, "Expected block");
+        std::any data;
+        std::string indexVar = "i";
+        auto parts = utils::split(std::string(text), ',');
+        if (parts.size() == 2) {
+            indexVar = utils::lrstrip(parts[0]);
+            data = assem.evaluateExpression(parts[1]);
+        } else {
+            data = assem.evaluateExpression(text);
+        }
+        auto* vec = any_cast<std::vector<uint8_t>>(&data);
+        size_t count = vec ? vec->size() : number<size_t>(data);
 
-            for (size_t i = 0; i < count; i++) {
-                assem.getSymbols().erase(indexVar);
-                assem.getSymbols().set(indexVar, any_num(i));
-                if (vec) {
-                    assem.getSymbols().erase("v");
-                    assem.getSymbols().set("v", any_num((*vec)[i]));
-                }
-                // localLabel = prefix + std::to_string(i);
-                assem.evaluateBlock(blocks[0], line);
+        for (size_t i = 0; i < count; i++) {
+            assem.getSymbols().erase(indexVar);
+            assem.getSymbols().set(indexVar, any_num(i));
+            if (vec) {
+                assem.getSymbols().erase("v");
+                assem.getSymbols().set("v", any_num((*vec)[i]));
             }
-        });
+            // localLabel = prefix + std::to_string(i);
+            assem.evaluateBlock(blocks[0].contents, blocks[0].line);
+        }
+    });
 
-    assem.registerMeta("if", [&](auto const& text,
-                                 std::vector<std::string_view> const& blocks,
-                                 size_t line) {
+    assem.registerMeta("if", [&](auto const& text, auto const& blocks) {
         evalIf(assem, any_cast<Number>(assem.evaluateExpression(text)) != 0,
-               blocks, line);
+               blocks);
     });
 
-    assem.registerMeta("ifdef", [&](auto const& text,
-                                    std::vector<std::string_view> const& blocks,
-                                    size_t line) {
+    assem.registerMeta("ifdef", [&](auto const& text, auto const& blocks) {
         auto rc = assem.getSymbols().is_defined(text);
-        evalIf(assem, rc, blocks, line);
+        evalIf(assem, rc, blocks);
     });
 
-    assem.registerMeta("ifndef",
-                       [&](auto const& text, auto const& blocks, size_t line) {
-                           auto rc = assem.getSymbols().is_defined(text);
-                           evalIf(assem, !rc, blocks, line);
-                       });
+    assem.registerMeta("ifndef", [&](auto const& text, auto const& blocks) {
+        auto rc = assem.getSymbols().is_defined(text);
+        evalIf(assem, !rc, blocks);
+    });
 
-    assem.registerMeta("enum", [&](auto const& text, auto const& blocks, size_t line) {
+    assem.registerMeta("enum", [&](auto const& text, auto const& blocks) {
         Check(!blocks.empty(), "Expected block");
-        auto s = assem.evaluateEnum(blocks[0], line);
+        auto s = assem.evaluateEnum(blocks[0].contents, blocks[0].line);
         if (text.empty()) {
             for (auto const& [name, v] : s) {
                 assem.getSymbols().set(name, v);

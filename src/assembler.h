@@ -31,9 +31,16 @@ inline void Check(bool v, std::string const& txt)
 
 class Assembler
 {
+
 public:
     Assembler();
     ~Assembler();
+
+    struct Block
+    {
+        std::string_view contents;
+        size_t line;
+    };
 
     std::vector<Error> getErrors() const;
 
@@ -58,21 +65,11 @@ public:
     void addScript(utils::path const& p) { scripting.load(p); }
 
     using MetaFn = std::function<void(
-        std::string_view, std::vector<std::string_view> const&, size_t)>;
-
-    using MetaFnNoLine = std::function<void(
-        std::string_view, std::vector<std::string_view> const&)>;
+        std::string_view, std::vector<Block> const&)>;
 
     inline void registerMeta(std::string const& name, MetaFn const& fn)
     {
         metaFunctions[name] = fn;
-    }
-
-    inline void registerMeta(std::string const& name, MetaFnNoLine const& fn)
-    {
-        metaFunctions[name] = [fn](std::string_view text,
-                                   std::vector<std::string_view> const& blocks,
-                                   size_t) { fn(text, blocks); };
     }
 
     struct Def
@@ -135,6 +132,7 @@ private:
         std::string_view contents;
         size_t line;
     };
+
 
     std::unordered_map<std::string, AnyCallable> functions;
     std::unordered_map<std::string, MetaFn> metaFunctions;

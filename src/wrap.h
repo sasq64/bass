@@ -70,6 +70,7 @@ struct Error
     {}
     size_t line = 0;
     size_t column = 0;
+    bool failed{false};
     std::string message;
     std::string file;
     ErrLevel level{ErrLevel::Error};

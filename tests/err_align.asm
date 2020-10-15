@@ -1,0 +1,6 @@
+
+;
+;
+; !error syntax
+    !align :$:
+    rts

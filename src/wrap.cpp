@@ -90,6 +90,7 @@ ParserWrapper::ParserWrapper(const char *s)
         exit(0);
     }
     p->log = [&](size_t line, size_t col, std::string const& msg) {
+        LOGI("%d:%s", line, msg);
         currentError.message = msg;
         if (currentError.line <= 0) {
             currentError.line = line;
@@ -110,12 +111,18 @@ Error ParserWrapper::parse(std::string_view source, const char* file,
 {
     try {
         currentError.line = 0;
+        currentError.failed = false;
         if (file != nullptr) {
             currentError.file = file;
         }
         auto rc = p->parse_n(source.data(), source.length(), file);
+        if(!rc) {
+            currentError.failed = true;
+        }
         if (currentError.line > 0 && line > 0) {
             currentError.line += (line - 1);
+        } else {
+            currentError.line = 0;
         }
     } catch (peg::parse_error& e) {
         fmt::print("Parse error: {}\n", e.what());
@@ -160,7 +167,7 @@ void ParserWrapper::action(const char* name,
             LOGW("DBZ");
             return std::any();
         } catch (parse_error& e) {
-            LOGD("Caught %s", e.what());
+            LOGI("Caught %s", e.what());
             throw peg::parse_error(e.what());
         } catch (script_error& e) {
             std::string w = e.what();

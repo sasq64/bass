@@ -59,17 +59,21 @@ int main(int argc, char** argv)
     app.add_option("source", sourceFiles, "Sources to compile")
         ->check(CLI::ExistingFile);
 
+    bool showHelp = false;
+
     try {
         app.parse(argc, argv);
-        if (*help) {
-            puts(banner + 1);
+        showHelp = (*help || (sourceFiles.empty() && scriptFiles.empty()));
+        if (showHelp) {
+            if(!quiet) puts(banner + 1);
+
             throw CLI::CallForHelp();
         }
     } catch (const CLI::ParseError& e) {
         app.exit(e);
     }
-    if (*help) return 0;
-    if (!quiet) puts(banner + 1);
+    if (showHelp) return 0;
+    
     Assembler assem;
     assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
                         (showTrace ? Assembler::DEB_TRACE : 0));

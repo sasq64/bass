@@ -154,7 +154,7 @@ struct SymbolTable
         auto it = syms.find(s);
         if (it == syms.end()) {
             if (!undef_ok) {
-                throw sym_error("Undefined:" + std::string(name));
+                throw sym_error("Undefined symbol '" + std::string(name) + "'");
             }
             LOGD("%s is undefined", name);
             if (trace) {

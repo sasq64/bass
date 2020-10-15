@@ -121,7 +121,7 @@ std::any Assembler::evaluateExpression(std::string_view expr, size_t line)
     auto s = ":x:"s + std::string(expr);
 
     auto err = parser.parse(s, line);
-    if (!err) {
+    if (err.line > 0 || err.failed) {
         throw parse_error(err.message);
     }
     return parseResult;
@@ -147,8 +147,9 @@ std::vector<std::any> Assembler::evaluateList(std::string_view expr,
     auto s = ":a:"s + std::string(expr);
     auto sv = std::string_view(s);
     persist(sv);
-    if (!parser.parse(sv, line)) {
-        throw parse_error("Not a list");
+    auto err = parser.parse(sv, line);
+    if (err.line > 0 || err.failed) {
+        throw parse_error(err.message);
     }
 
     return std::any_cast<std::vector<std::any>>(parseResult);
@@ -161,7 +162,7 @@ AnyMap Assembler::evaluateEnum(std::string_view expr, size_t line)
     auto sv = std::string_view(s);
     persist(sv);
     auto err = parser.parse(sv, line);
-    if(!err) {
+    if (!err) {
         throw parse_error(err.message);
     }
 
@@ -560,9 +561,7 @@ void Assembler::setupRules()
         parseResult = sv[0];
         return sv[0];
     };
-    parser["MetaName"] = [&](SV& sv) {
-        return sv[0];
-    };
+    parser["MetaName"] = [&](SV& sv) { return sv[0]; };
 
     parser["Meta"] = [&](SV& sv) {
         trace(sv);
@@ -572,22 +571,35 @@ void Assembler::setupRules()
         // Strip trailing spaces
         text = rstrip(text);
 
-        std::vector<std::string_view> blocks;
+        std::vector<Block> blocks;
 
         while (i < sv.size()) {
-            auto block = any_cast<std::string_view>(sv[i++]);
-            if (block != "else" && block[0] != ' ' && block[0] != '\n') {
-                // Avoid unexpected result when block seems
-                // to start in column 0
-                auto fixed = " "s + std::string(block);
-                block = persist(fixed);
+            if (sv[i].type() == typeid(Block)) {
+                auto block = any_cast<Block>(sv[i]);
+                if (block.contents[0] != ' ' && block.contents[0] != '\n') {
+                    // Avoid unexpected result when block seems
+                    // to start in column 0
+                    auto fixed = " "s + std::string(block.contents);
+                    block.contents = persist(fixed);
+                }
+                blocks.push_back(block);
+            } else {
+                blocks.push_back({any_cast<std::string_view>(sv[i]), 0});
             }
-            blocks.push_back(block);
+            i++;
         }
 
         auto it = metaFunctions.find(std::string(meta));
         if (it != metaFunctions.end()) {
-            (it->second)(text, blocks, sv.line_info().first);
+            try {
+                (it->second)(text, blocks);
+            } catch (parse_error& e) {
+                LOGI("ERR %d %d", sv.line(), parser.currentError.line);
+                if(parser.currentError.line == 0) {
+                    parser.currentError.line = sv.line();
+                }
+                throw parse_error(e.what());
+            }
             return sv[0];
         }
         throw parse_error(fmt::format("Unknown meta command '{}'", meta));
@@ -651,19 +663,14 @@ void Assembler::setupRules()
     parser["FnArgs"] = [&](SV& sv) { return sv.transform<std::string_view>(); };
     parser["BlockContents"] = [&](SV& sv) {
         trace(sv);
-        return sv.token_view();
+        return Block{sv.token_view(), (size_t)sv.line()};
     };
-    parser["EOLBlock"] = [&](SV& sv) {
-        LOGI("EOLBLOCK!");
+
+    parser["Block"] = [&](SV& sv) -> std::any {
+        trace(sv);
         return sv[sv.size() - 1];
     };
 
-    parser["NormalBlock"] = [&](SV& sv) {
-        trace(sv);
-        LOGI("BLOCK");
-        // Skip EOLs
-        return sv[sv.size() - 1];
-    };
     parser["Opcode"] = [&](SV& sv) {
         trace(sv);
         return sv.token_view();
@@ -1055,7 +1062,7 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
         if (rc == PASS) {
             continue;
         }
-        if(rc == ERROR) {
+        if (rc == ERROR) {
             needsFinalPass = true;
         }
 
