@@ -224,52 +224,53 @@ void initMeta(Assembler& assem)
         }
     });
 
-    assem.registerMeta("fill", [&](auto const& text, auto const& blocks) {
-        std::any data = assem.evaluateExpression(text);
+    assem.registerMeta(
+        "fill", [&](auto const& text, auto const& blocks, size_t line) {
+            std::any data = assem.evaluateExpression(text);
 
-        auto& syms = assem.getSymbols();
+            auto& syms = assem.getSymbols();
 
-        if (auto* vec = any_cast<std::vector<uint8_t>>(&data)) {
-            for (size_t i = 0; i < vec->size(); i++) {
-                uint8_t d = (*vec)[i];
-                syms.erase("i");
-                syms.set("i", any_num(i));
-                for (auto const& b : blocks) {
-                    assem.getSymbols().at<Number>("v") = d;
-                    auto res = assem.evaluateExpression(b);
-                    d = number<uint8_t>(res);
+            if (auto* vec = any_cast<std::vector<uint8_t>>(&data)) {
+                for (size_t i = 0; i < vec->size(); i++) {
+                    uint8_t d = (*vec)[i];
+                    syms.erase("i");
+                    syms.set("i", any_num(i));
+                    for (auto const& b : blocks) {
+                        assem.getSymbols().at<Number>("v") = d;
+                        auto res = assem.evaluateExpression(b, line);
+                        d = number<uint8_t>(res);
+                    }
+                    mach.writeByte(d);
                 }
-                mach.writeByte(d);
-            }
-        } else if (auto* sv = any_cast<std::string_view>(&data)) {
-            auto utext = utils::utf8_decode(*sv);
-            for (size_t i = 0; i < utext.size(); i++) {
-                auto d = utext[i];
-                syms.erase("i");
-                syms.set("i", any_num(i));
-                for (auto const& b : blocks) {
-                    assem.getSymbols().at<Number>("v") = d;
-                    auto res = assem.evaluateExpression(b);
-                    d = number<wchar_t>(res);
+            } else if (auto* sv = any_cast<std::string_view>(&data)) {
+                auto utext = utils::utf8_decode(*sv);
+                for (size_t i = 0; i < utext.size(); i++) {
+                    auto d = utext[i];
+                    syms.erase("i");
+                    syms.set("i", any_num(i));
+                    for (auto const& b : blocks) {
+                        assem.getSymbols().at<Number>("v") = d;
+                        auto res = assem.evaluateExpression(b, line);
+                        d = number<wchar_t>(res);
+                    }
+                    mach.writeByte(char_translate.at(d));
                 }
-                mach.writeByte(char_translate.at(d));
-            }
-        } else {
-            auto size = number<size_t>(data);
-            LOGD("Fill %d bytes", size);
-            for (size_t i = 0; i < size; i++) {
-                syms.erase("i");
-                syms.set("i", any_num(i));
-                uint8_t d = 0;
-                for (auto const& b : blocks) {
-                    assem.getSymbols().at<Number>("v") = d;
-                    auto res = assem.evaluateExpression(b);
-                    d = number<uint8_t>(res);
+            } else {
+                auto size = number<size_t>(data);
+                LOGD("Fill %d bytes", size);
+                for (size_t i = 0; i < size; i++) {
+                    syms.erase("i");
+                    syms.set("i", any_num(i));
+                    uint8_t d = 0;
+                    for (auto const& b : blocks) {
+                        assem.getSymbols().at<Number>("v") = d;
+                        auto res = assem.evaluateExpression(b, line);
+                        d = number<uint8_t>(res);
+                    }
+                    mach.writeByte(d);
                 }
-                mach.writeByte(d);
             }
-        }
-    });
+        });
 
     assem.registerMeta("map", [&](auto const& text, auto const& blocks) {
         std::vector<uint8_t> result;
@@ -302,9 +303,9 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("cpu", [&](auto const& text, auto const&) {
-        if(text == "6502") {
+        if (text == "6502") {
             mach.setCpu(Machine::CPU_6502);
-        } else if(text == "65C02") {
+        } else if (text == "65C02") {
             mach.setCpu(Machine::CPU_65C02);
         } else {
             throw parse_error("Unknown CPU");
@@ -376,7 +377,8 @@ void initMeta(Assembler& assem)
             auto sz = section.data.size();
             assem.evaluateBlock(blocks[0]);
             if (!section.parent.empty()) {
-                mach.getSection(section.parent).pc += static_cast<int32_t>(section.data.size() - sz);
+                mach.getSection(section.parent).pc +=
+                    static_cast<int32_t>(section.data.size() - sz);
             }
             mach.popSection();
             return;
@@ -467,9 +469,9 @@ void initMeta(Assembler& assem)
                            evalIf(assem, !rc, blocks, line);
                        });
 
-    assem.registerMeta("enum", [&](auto const& text, auto const& blocks) {
+    assem.registerMeta("enum", [&](auto const& text, auto const& blocks, size_t line) {
         Check(!blocks.empty(), "Expected block");
-        auto s = assem.evaluateEnum(blocks[0]);
+        auto s = assem.evaluateEnum(blocks[0], line);
         if (text.empty()) {
             for (auto const& [name, v] : s) {
                 assem.getSymbols().set(name, v);

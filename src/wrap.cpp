@@ -114,7 +114,7 @@ Error ParserWrapper::parse(std::string_view source, const char* file,
             currentError.file = file;
         }
         auto rc = p->parse_n(source.data(), source.length(), file);
-        if (currentError.line > 0) {
+        if (currentError.line > 0 && line > 0) {
             currentError.line += (line - 1);
         }
     } catch (peg::parse_error& e) {

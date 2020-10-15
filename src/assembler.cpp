@@ -122,7 +122,7 @@ std::any Assembler::evaluateExpression(std::string_view expr, size_t line)
 
     auto err = parser.parse(s, line);
     if (!err) {
-        throw parse_error("Not an expression");
+        throw parse_error(err.message);
     }
     return parseResult;
 }
@@ -160,8 +160,9 @@ AnyMap Assembler::evaluateEnum(std::string_view expr, size_t line)
     auto s = ":e:"s + std::string(expr);
     auto sv = std::string_view(s);
     persist(sv);
-    if (!parser.parse(sv, line)) {
-        throw parse_error("Not an enum");
+    auto err = parser.parse(sv, line);
+    if(!err) {
+        throw parse_error(err.message);
     }
 
     return std::any_cast<AnyMap>(parseResult);
@@ -559,6 +560,9 @@ void Assembler::setupRules()
         parseResult = sv[0];
         return sv[0];
     };
+    parser["MetaName"] = [&](SV& sv) {
+        return sv[0];
+    };
 
     parser["Meta"] = [&](SV& sv) {
         trace(sv);
@@ -649,8 +653,14 @@ void Assembler::setupRules()
         trace(sv);
         return sv.token_view();
     };
-    parser["Block"] = [&](SV& sv) {
+    parser["EOLBlock"] = [&](SV& sv) {
+        LOGI("EOLBLOCK!");
+        return sv[sv.size() - 1];
+    };
+
+    parser["NormalBlock"] = [&](SV& sv) {
         trace(sv);
+        LOGI("BLOCK");
         // Skip EOLs
         return sv[sv.size() - 1];
     };
