@@ -121,7 +121,7 @@ std::any Assembler::evaluateExpression(std::string_view expr, size_t line)
     auto s = ":x:"s + std::string(expr);
 
     auto err = parser.parse(s, line);
-    if (err.line > 0 || err.failed) {
+    if (!err) {
         throw parse_error(err.message);
     }
     return parseResult;
@@ -148,7 +148,7 @@ std::vector<std::any> Assembler::evaluateList(std::string_view expr,
     auto sv = std::string_view(s);
     persist(sv);
     auto err = parser.parse(sv, line);
-    if (err.line > 0 || err.failed) {
+    if (!err) {
         throw parse_error(err.message);
     }
 

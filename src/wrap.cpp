@@ -92,6 +92,7 @@ ParserWrapper::ParserWrapper(const char *s)
     p->log = [&](size_t line, size_t col, std::string const& msg) {
         LOGI("%d:%s", line, msg);
         currentError.message = msg;
+        // Dont update line if already set
         if (currentError.line <= 0) {
             currentError.line = line;
             currentError.column = col;
@@ -119,9 +120,13 @@ Error ParserWrapper::parse(std::string_view source, const char* file,
         if(!rc) {
             currentError.failed = true;
         }
+        // If we had a line coming in AND we have a new line now,
+        // they need to be added (recursive parsing)
         if (currentError.line > 0 && line > 0) {
             currentError.line += (line - 1);
         } else {
+            // If we had no line coming in, the line reported in
+            // this error has no meaning, so set it to zero
             currentError.line = 0;
         }
     } catch (peg::parse_error& e) {
