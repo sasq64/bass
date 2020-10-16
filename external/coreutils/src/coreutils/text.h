@@ -95,7 +95,7 @@ inline bool endsWith(const std::string& name, const std::string& ext)
     return (pos != std::string::npos && pos == name.length() - ext.length());
 }
 
-inline bool startsWith(const std::string& name, const std::string& pref)
+inline bool startsWith(const std::string_view& name, const std::string_view& pref)
 {
     if (pref.empty())
         return true;

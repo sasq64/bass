@@ -662,7 +662,7 @@ void Assembler::setupRules()
     parser["FnArgs"] = [&](SV& sv) { return sv.transform<std::string_view>(); };
     parser["BlockContents"] = [&](SV& sv) {
         trace(sv);
-        return Block{sv.token_view(), (size_t)sv.line()};
+        return Block{sv.token_view(), sv.line()};
     };
 
     parser["Block"] = [&](SV& sv) -> std::any {
@@ -1020,9 +1020,9 @@ bool Assembler::parse_path(utils::path const& p)
 bool Assembler::parse(std::string_view source, std::string const& fname)
 {
     finalPass = false;
+    const char* bom = "\xef\xbb\xbf";
 
-    if ((uint8_t)source[0] == 0xef && (uint8_t)source[1] == 0xbb &&
-        (uint8_t)source[2] == 0xbf) {
+    if (utils::startsWith(source, bom)) {
         // BOM
         source.remove_prefix(3);
     }

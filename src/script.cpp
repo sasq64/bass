@@ -6,7 +6,7 @@
 #include <sol/sol.hpp>
 #include <string>
 
-static const char* to_string = R"(
+static char const* const to_string = R"(
 function table_print (tt, indent, done)
   print("here")
   done = done or {}

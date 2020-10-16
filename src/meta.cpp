@@ -56,7 +56,7 @@ static Section parseArgs(std::vector<std::any> const& args)
         throw parse_error("Too few arguments");
     }
     for (auto const& arg : args) {
-        if (auto* p =
+        if (auto const* p =
                 std::any_cast<std::pair<std::string_view, std::any>>(&arg)) {
             if (p->first == "name") {
                 result.name = std::any_cast<std::string_view>(p->second);
@@ -131,7 +131,7 @@ void initMeta(Assembler& assem)
         assem.addDefine(def.name, def.args, blocks[0].line, blocks[0].contents);
     });
 
-    assem.registerMeta("ascii", [&](auto const& args, auto const&) {
+    assem.registerMeta("ascii", [&](auto const&, auto const&) {
         resetTranslate();
         for (int i = 0; i < 256; i++) {
             char_translate[i] = i;
@@ -418,6 +418,20 @@ void initMeta(Assembler& assem)
         for (auto const& b : f.readAll()) {
             mach.writeByte(b);
         }
+    });
+
+    assem.registerMeta("assem", [&](auto const& text, auto const& blocks) {
+        Check(blocks.size() == 1, "Expected block");
+        auto args = assem.evaluateList(text);
+        auto sym = std::any_cast<std::string_view>(args[0]);
+        auto start = number<uint32_t>(args[1]);
+        Section s{"__gen" + std::to_string(mach.getPC()), start};
+        auto& section = mach.addSection(s);
+        mach.pushSection(section.name);
+        assem.evaluateBlock(blocks[0].contents, blocks[0].line);
+        assem.getSymbols().set(sym, section.data);
+        mach.popSection();
+        mach.removeSection(section.name);
     });
 
     assem.registerMeta("rept", [&](auto const& text, auto const& blocks) {

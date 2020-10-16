@@ -38,7 +38,7 @@ struct SVWrap
     template <typename T>
     std::vector<T> transform() const;
 
-    int line() const { return static_cast<int>(line_info().first); }
+    size_t line() const { return line_info().first; }
 
     template <typename T>
     T to(size_t i) const
@@ -64,8 +64,9 @@ enum class ErrLevel
 
 struct Error
 {
-    Error(size_t line_ = 0, size_t column_ = 0,
-          std::string const& message_ = "", ErrLevel level_ = ErrLevel::Error)
+    Error() = default;
+    Error(size_t line_, size_t column_, std::string const& message_,
+          ErrLevel level_ = ErrLevel::Error)
         : line(line_), column(column_), message(message_), level(level_)
     {}
     size_t line = 0;

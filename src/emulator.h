@@ -45,8 +45,6 @@ struct DefaultPolicy
 
     static constexpr int MemSize = 65536;
 
-    static constexpr bool Support65C02 = false;
-
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
 };
@@ -385,8 +383,12 @@ private:
     ///
     /////////////////////////////////////////////////////////////////////////
 
+    // Get low byte from an address
     static constexpr unsigned lo(unsigned a) { return a & 0xff; }
+    // Get high byte from an address
     static constexpr unsigned hi(unsigned a) { return a >> 8; }
+
+    // Form an address from lo and hi byte
     static constexpr unsigned to_adr(unsigned lo, unsigned hi)
     {
         return (hi << 8) | lo;
@@ -774,7 +776,7 @@ private:
 
             { "lda", {
                 { 0xa9, 2, Mode::IMM, Load<Reg::A, Mode::IMM>},
-                { 0xa5, 2, Mode::ZP, Load<Reg::A, Mode::ZP>},
+                { 0xa5, 3, Mode::ZP, Load<Reg::A, Mode::ZP>},
                 { 0xb5, 4, Mode::ZPX, Load<Reg::A, Mode::ZPX>},
                 { 0xad, 4, Mode::ABS, Load<Reg::A, Mode::ABS>},
                 { 0xbd, 4, Mode::ABSX, Load<Reg::A, Mode::ABSX>},
