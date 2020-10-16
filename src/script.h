@@ -34,6 +34,8 @@ public:
     sol::object to_object(std::any const& a);
     std::any to_any(sol::object const& obj);
 
+    static constexpr int StartIndex = 1;
+
 private:
     std::unique_ptr<sol::state> luap;
     sol::state& lua;

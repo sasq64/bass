@@ -105,9 +105,11 @@ std::any Scripting::to_any(sol::object const& obj)
             }
             if (isVec) {
                 auto index = key.as<size_t>();
-                if(index > 0) {
-                    vec.resize(index);
-                    vec[index-1] = val.as<uint8_t>();
+                if (index >= StartIndex) {
+                    if (vec.size() < index + 1 - StartIndex) {
+                        vec.resize(index + 1 - StartIndex);
+                    }
+                    vec[index-StartIndex] = val.as<uint8_t>();
                 }
             } else {
                 auto s = key.as<std::string>();
@@ -132,7 +134,7 @@ sol::object Scripting::to_object(std::any const& a)
         // TODO: Can we sol make this 'value' conversion?
         // return sol::make_object(lua, *av);
         sol::table t = lua.create_table();
-        size_t i = 1;
+        size_t i = StartIndex;
         for (auto v : *av) {
             t[i++] = v;
         }

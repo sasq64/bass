@@ -95,6 +95,21 @@ void initMeta(Assembler& assem)
 
     resetTranslate();
 
+    static auto is_space = [](char const c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+    };
+
+    static auto strip_space = [](std::string_view sv) -> std::string_view {
+      while (is_space(sv.front())) {
+          sv.remove_prefix(1);
+      }
+      while (is_space(sv.back())) {
+          sv.remove_suffix(1);
+      }
+      return sv;
+    };
+
+
     assem.registerMeta("test", [&](auto const& text, auto const& blocks) {
         auto args = assem.evaluateList(text);
         std::string testName;
@@ -128,7 +143,8 @@ void initMeta(Assembler& assem)
     assem.registerMeta("define", [&](auto const& text, auto const& blocks) {
         Check(blocks.size() == 1, "Expected block");
         auto def = assem.evaluateDefinition(text);
-        assem.addDefine(def.name, def.args, blocks[0].line, blocks[0].contents);
+        auto contents = strip_space(blocks[0].contents);
+        assem.addDefine(def.name, def.args, blocks[0].line, contents);
     });
 
     assem.registerMeta("ascii", [&](auto const&, auto const&) {
@@ -233,9 +249,10 @@ void initMeta(Assembler& assem)
                 uint8_t d = (*vec)[i];
                 syms.erase("i");
                 syms.set("i", any_num(i));
-                for (auto const& b : blocks) {
+                for (Assembler::Block const& b : blocks) {
+                    auto contents = strip_space(b.contents);
                     assem.getSymbols().at<Number>("v") = d;
-                    auto res = assem.evaluateExpression(b.contents, b.line);
+                    auto res = assem.evaluateExpression(contents, b.line);
                     d = number<uint8_t>(res);
                 }
                 mach.writeByte(d);
@@ -247,8 +264,9 @@ void initMeta(Assembler& assem)
                 syms.erase("i");
                 syms.set("i", any_num(i));
                 for (auto const& b : blocks) {
+                    auto contents = strip_space(b.contents);
                     assem.getSymbols().at<Number>("v") = d;
-                    auto res = assem.evaluateExpression(b.contents, b.line);
+                    auto res = assem.evaluateExpression(contents, b.line);
                     d = number<wchar_t>(res);
                 }
                 mach.writeByte(char_translate.at(d));
@@ -261,8 +279,9 @@ void initMeta(Assembler& assem)
                 syms.set("i", any_num(i));
                 uint8_t d = 0;
                 for (auto const& b : blocks) {
+                    auto contents = strip_space(b.contents);
                     assem.getSymbols().at<Number>("v") = d;
-                    auto res = assem.evaluateExpression(b.contents, b.line);
+                    auto res = assem.evaluateExpression(contents, b.line);
                     d = number<uint8_t>(res);
                 }
                 mach.writeByte(d);

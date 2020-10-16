@@ -40,6 +40,7 @@ void initFunctions(Assembler& a)
     a.registerFunction("len",
                        [](std::vector<uint8_t> const& v) { return v.size(); });
     a.registerFunction("round", [](double a) { return std::round(a); });
+    a.registerFunction("trunc", [](double a) { return std::trunc(a); });
 
     a.registerFunction("compare",
                        [](std::vector<uint8_t> const& v0,

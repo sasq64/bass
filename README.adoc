@@ -15,13 +15,13 @@ See this http://apone.org/bass/part1.html[TUTORIAL] for a tutorial / introductio
 
 === Example
 
-[source,asm]
+[source,ca65]
 ----
     VRAM_LO = $9f00
     VRAM_HI = $9f01
     !macro SetVRAM(a) {
-        .lo = a&0xff;
-        .hi = a>>8;
+        .lo = <a;
+        .hi = >a;
         lda #.lo
         sta VRAM_LO
         !if .lo != .hi { lda #.hi }
@@ -48,6 +48,30 @@ $   lda start,x
 text:
     !byte "Text to copy", 0
 end:
+    
+    ; --- Generate sine table with and without LUA
+
+    !define mysin(x, amp, size) {
+        (sin(x * Math.Pi * 2 / size) * 0.5 + 0.5) * amp
+    }
+sin:
+    !fill 100 { mysin(i, 255, 100) } 
+
+%{ -- LUA code
+function make_sin(amp, size)
+    res = {}
+    for i=0,size-1,1 do
+        res[i+1] = (math.sin(i * math.pi * 2/ size) * 0.5 + 0.5) * amp
+    end
+    return res
+end
+}%
+
+sin2:
+    !fill make_sin(255, 100)
+
+    !assert make_sin(5, 5)[1] == round(mysin(1, 5,5))
+    !assert make_sin(5, 5)[3] == round(mysin(3, 5,5))
 ----
 
 See http://apone.org/bass/example.asm.html[example.asm] for a full example.
