@@ -1,13 +1,49 @@
 #include "assembler.h"
 #include "png.h"
+#include "wrap.h"
+
 #include <cmath>
+#include <coreutils/algorithm.h>
 #include <coreutils/file.h>
+#include <lodepng.h>
 
 static uint8_t to_pet(uint8_t c)
 {
     if (c >= 'a' && c <= 'z') return c - 'a' + 1;
     if (c >= 'A' && c <= 'Z') return c - 'A' + 0x41;
     return c;
+}
+
+template <typename Out, typename In>
+std::vector<Out> convert_vector(std::vector<In> const& in)
+{
+    std::vector<Out> out;
+    std::copy(std::cbegin(in), std::cend(in),
+              std::back_inserter(out));
+    return out;
+}
+
+Image to_image(AnyMap const& img)
+{
+    Image image;
+    image.bpp = number<int32_t>(img.at("bpp"));
+    image.width = number<int32_t>(img.at("width"));
+    image.height = number<int32_t>(img.at("height"));
+    image.pixels = std::any_cast<std::vector<uint8_t>>(img.at("pixels"));
+    auto colors = std::any_cast<std::vector<Number>>(img.at("colors"));
+    image.colors = convert_vector<uint32_t>(colors);
+    return image;
+}
+
+AnyMap from_image(Image const& image)
+{
+    AnyMap res;
+    res["width"] = num(image.width);
+    res["bpp"] = num(image.bpp);
+    res["height"] = num(image.height);
+    res["pixels"] = image.pixels;
+    res["colors"] = convert_vector<Number>(image.colors);
+    return res;
 }
 
 void initFunctions(Assembler& a)
@@ -22,6 +58,8 @@ void initFunctions(Assembler& a)
     // * `AnyMap` for returning struct like things
     // * `std::vector<std::any> const&` as single argument.
 
+    a.registerFunction("log", [](double f) { return std::log(f); });
+    a.registerFunction("exp", [](double f) { return std::exp(f); });
     a.registerFunction("sqrt", [](double f) { return std::sqrt(f); });
 
     a.registerFunction("sin", [](double f) { return std::sin(f); });
@@ -41,6 +79,10 @@ void initFunctions(Assembler& a)
                        [](std::vector<uint8_t> const& v) { return v.size(); });
     a.registerFunction("round", [](double a) { return std::round(a); });
     a.registerFunction("trunc", [](double a) { return std::trunc(a); });
+    a.registerFunction("abs", [](double a) { return std::abs(a); });
+
+    a.registerFunction("random",
+                       []() { return static_cast<double>(std::rand()) / RAND_MAX; });
 
     a.registerFunction("compare",
                        [](std::vector<uint8_t> const& v0,
@@ -115,21 +157,63 @@ void initFunctions(Assembler& a)
         return sv;
     });
 
-    a.registerFunction(
-        "index_tiles", [&](std::vector<uint8_t> const& pixels, int32_t size) {
-            AnyMap result;
-            auto pixelCopy = pixels;
-            std::vector<uint8_t> v = indexTiles(pixelCopy, size);
-            result["indexes"] = v;
-            result["tiles"] = pixelCopy;
-            return result;
-        });
+    a.registerFunction("index_tiles",
+                       [&](std::vector<uint8_t> const& pixels, int32_t size) {
+                           AnyMap result;
+                           auto pixelCopy = pixels;
+                           std::vector<uint8_t> v = indexTiles(pixelCopy, size);
+                           result["indexes"] = v;
+                           result["tiles"] = pixelCopy;
+                           return result;
+                       });
 
     a.registerFunction("layout_tiles", [&](const std::vector<uint8_t>& pixels,
-                                           int32_t stride, int32_t w, int32_t h) {
-        std::vector<uint8_t> v = layoutTiles(pixels, stride, w, h);
+                                           int32_t stride, int32_t w, int32_t h,
+                                           int32_t gap) {
+        std::vector<uint8_t> v = layoutTiles(pixels, stride, w, h, gap);
         return v;
     });
+
+    a.registerFunction(
+        "layout_image", [&](AnyMap const& img, int32_t w, int32_t h) {
+            auto image = to_image(img);
+
+            auto stride = image.width * image.bpp / 8;
+            auto tw = w * image.bpp / 8;
+            auto th = h;
+
+            image.pixels = layoutTiles(image.pixels, stride, tw, th, 0);
+            image.width = w;
+            image.height = image.pixels.size() / tw;
+            return from_image(image);
+        });
+
+    a.registerFunction(
+        "save_png", [&](std::string_view name, AnyMap const& img) {
+            auto error = savePng(std::string(name), to_image(img));
+            if (error != 0) {
+                throw parse_error(fmt::format("Could not save '{}'", name));
+            }
+            return img;
+        });
+
+    a.registerFunction("convert_palette",
+                       [&](std::vector<Number> const& colors, int) {
+                           return convertPalette(colors);
+                       });
+
+    a.registerFunction("change_bpp", [&](AnyMap const& img, int32_t bpp) {
+        auto image = to_image(img);
+        changeImageBpp(image, bpp);
+        return from_image(image);
+    });
+
+    a.registerFunction("remap_image",
+                       [&](AnyMap const& img, std::vector<Number> const& pal) {
+                           auto image = to_image(img);
+                           remap_image(image, convert_vector<uint32_t>(pal));
+                           return from_image(image);
+                       });
 
     a.registerFunction("load_png", [&](std::string_view name) {
         auto p = utils::path(name);
@@ -137,19 +221,30 @@ void initFunctions(Assembler& a)
             p = a.getCurrentPath() / p;
         }
 
-      AnyMap res;
-      auto image = loadPng(p.string());
+        auto image = loadPng(p.string());
 
-      if (image) {
-          auto pal12 = convertPalette(image.colors);
-
-          auto bpp = image.bpp; // state.info_raw.bitdepth;
-          res["width"] = num(image.width);
-          res["bpp"] = bpp;
-          res["height"] = num(image.height);
-          res["pixels"] = image.pixels;
-          res["colors"] = pal12;
-      }
-      return res;
+        if (image) {
+            return from_image(image);
+        }
+        throw parse_error("Could not load png");
     });
+
+    // TODO: Remove
+    a.registerFunction("to_monochrome",
+                       [&](std::vector<uint8_t> const& pixels) {
+                           std::vector<uint8_t> result(pixels.size() / 8);
+                           uint8_t* out = result.data();
+                           int32_t v = 0;
+                           int32_t s = 7;
+                           for (auto const& c : pixels) {
+                               v |= ((c & 1) << s);
+                               s--;
+                               if (s == -1) {
+                                   s = 7;
+                                   *out++ = v;
+                                   v = 0;
+                               }
+                           }
+                           return result;
+                       });
 }

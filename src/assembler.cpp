@@ -70,6 +70,35 @@ std::string_view rstrip(std::string_view text)
     return text;
 }
 
+template <typename T>
+std::any Assembler::slice(std::vector<T> const& v, int64_t a, int64_t b)
+{
+    if (b < 0) {
+        b = v.size() + b + 1;
+    }
+    if (a >= b || b > static_cast<int64_t>(v.size())) {
+        if (isFinalPass()) {
+            throw parse_error("Slice outside array");
+        }
+        return any_num(0);
+    }
+
+    // LOGI("Slice %d:%d", a, b);
+    std::vector<uint8_t> nv(v.begin() + a, v.begin() + b);
+    return std::any(nv);
+}
+
+template <typename T>
+std::any Assembler::index(std::vector<T> const& v, int64_t index)
+{
+    if (index >= static_cast<int64_t>(v.size())) {
+        if (isFinalPass()) {
+            throw parse_error("Index outside array");
+        }
+        return any_num(0);
+    }
+    return any_num(v[index]);
+}
 void Assembler::trace(SVWrap const& sv) const
 {
     if (!doTrace) return;
@@ -301,6 +330,14 @@ void Assembler::applyMacro(Call const& call)
 {
     auto it = macros.find(call.name);
     if (it == macros.end()) {
+        // Look for a function if no macro is found
+        auto fit = functions.find(std::string(call.name));
+        if (fit != functions.end()) {
+            auto res = (fit->second)(call.args);
+            syms.erase_all("$");
+            syms.set("$", res);
+            return;
+        }
         throw parse_error(fmt::format("Undefined macro {}", call.name));
     }
 
@@ -310,17 +347,18 @@ void Assembler::applyMacro(Call const& call)
         throw parse_error("Wrong number of arguments");
     }
 
-    std::unordered_map<std::string_view, std::any> shadowed;
+    std::unordered_map<std::string_view, Symbol> shadowed;
 
     for (unsigned i = 0; i < call.args.size(); i++) {
 
-        if (syms.is_defined(m.args[i])) {
+        auto *sym = syms.get_sym(m.args[i]);
+        if (sym != nullptr) {
             errors.emplace_back(
                 0, 0,
                 fmt::format("Macro '{}' shadows global symbol {}", call.name,
                             m.args[i]),
                 ErrLevel::Warning);
-            shadowed[m.args[i]] = syms.get(m.args[i]);
+            shadowed[m.args[i]] = *sym;
             syms.erase(m.args[i]);
         }
         syms.set(m.args[i], call.args[i]);
@@ -343,7 +381,7 @@ void Assembler::applyMacro(Call const& call)
         syms.erase(m.args[i]);
     }
     for (auto const& shadow : shadowed) {
-        syms.set(shadow.first, shadow.second);
+        syms.set_sym(shadow.first, shadow.second);
     }
     lastLabel = ll;
 }
@@ -594,7 +632,7 @@ void Assembler::setupRules()
             try {
                 (it->second)(text, blocks);
             } catch (parse_error& e) {
-                if(parser.currentError.line == 0) {
+                if (parser.currentError.line == 0) {
                     parser.currentError.line = sv.line();
                 }
                 throw parse_error(e.what());
@@ -659,6 +697,7 @@ void Assembler::setupRules()
     parser["ScriptContents"] = [&](SV& sv) { return sv.token_view(); };
 
     parser["Symbol"] = [&](SV& sv) { return sv.token_view(); };
+    parser["Dollar"] = [&](SV& sv) { return sv.token_view(); };
     parser["FnArgs"] = [&](SV& sv) { return sv.transform<std::string_view>(); };
     parser["BlockContents"] = [&](SV& sv) {
         trace(sv);
@@ -810,7 +849,9 @@ void Assembler::setupRules()
 
     parser["Binary"] = [&](SV& sv) -> Number {
         try {
-            return std::stoi(sv.c_str() + 2, nullptr, 2);
+            const char* ptr = sv.c_str();
+            if (*ptr == '0') ptr++;
+            return std::stoi(ptr + 1, nullptr, 2);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
@@ -837,6 +878,15 @@ void Assembler::setupRules()
         }
     };
 
+    parser["ArrayLiteral"] = [&](SV& sv) -> std::vector<Number> {
+        std::vector<Number> v;
+        for (size_t i = 0; i < sv.size(); i++) {
+            std::any const& a = sv[i];
+            v.push_back(number(a));
+        }
+        return v;
+    };
+
     parser["Star"] = [&](SV& sv) -> Number {
         trace(sv);
         return mach->getPC();
@@ -849,16 +899,33 @@ void Assembler::setupRules()
         }
 
         auto ope = any_cast<std::string_view>(sv[1]);
+
+
+        // Todo: generalize operations on non-numeric types
         if (ope == "+") {
+            // String addition
             if (sv[0].type() == typeid(std::string_view)) {
                 auto a = any_cast<std::string_view>(sv[0]);
-                if (sv[1].type() == typeid(std::string_view)) {
+                if (sv[2].type() == typeid(std::string_view)) {
                     auto b = any_cast<std::string_view>(sv[2]);
                     auto result = a + b;
                     return std::any(result);
                 }
             }
         }
+        if(ope == "==") {
+            // uint8-vector comparison
+            if (sv[0].type() == typeid(std::vector<uint8_t>)) {
+                auto a = any_cast<std::vector<uint8_t>>(sv[0]);
+                if (sv[2].type() == typeid(std::vector<uint8_t>)) {
+                    auto b = any_cast<std::vector<uint8_t>>(sv[2]);
+                    return std::any((Number)(a == b));
+                }
+            }
+        }
+
+
+
         auto a = Num(any_cast<Number>(sv[0]));
         auto b = Num(any_cast<Number>(sv[2]));
         try {
@@ -889,47 +956,40 @@ void Assembler::setupRules()
         if (sv.size() == 1) {
             return sv[0];
         }
-        auto index = number<size_t>(sv[1]);
         std::any vec = sv[0];
         if (any_cast<Number>(&vec) != nullptr) {
+            // Slicing undefined symbol, return 0
             return any_num(0);
         }
-        if (auto const* v = any_cast<std::vector<uint8_t>>(&vec)) {
 
-            if (sv.size() >= 3) { // Slice
-                size_t a = 0;
-                size_t b = v->size();
-                if (sv[1].has_value()) {
-                    a = number<size_t>(sv[1]);
-                } else if (sv[2].has_value()) {
-                    b = number<size_t>(sv[2]);
-                }
-                if (sv.size() > 3 && sv[3].has_value()) {
-                    b = number<size_t>(sv[3]);
-                }
-
-                if (a >= b || b > v->size()) {
-                    if (isFinalPass()) {
-                        throw parse_error("Slice outside array");
-                    }
-                    return any_num(0);
-                }
-
-                // LOGI("Slice %d:%d", a, b);
-                std::vector<uint8_t> nv(v->begin() + a, v->begin() + b);
-                return std::any(nv);
+        if (sv.size() >= 3) { // Slice
+            int64_t a = 0;
+            int64_t b = -1;
+            if (sv[1].has_value()) {
+                a = number<int64_t>(sv[1]);
+            } else if (sv[2].has_value()) {
+                b = number<int64_t>(sv[2]);
             }
-
-            if (index >= v->size()) {
-                if (isFinalPass()) {
-                    throw parse_error("Index outside array");
-                }
-                return any_num(0);
+            if (sv.size() > 3 && sv[3].has_value()) {
+                b = number<int64_t>(sv[3]);
             }
-            return any_num((*v)[index]);
+            if (auto const* v8 = any_cast<std::vector<uint8_t>>(&vec)) {
+                return slice(*v8, a, b);
+            }
+            if (auto const* vn = any_cast<std::vector<Number>>(&vec)) {
+                return slice(*vn, a, b);
+            }
+            throw parse_error("Can not slice non-array");
         }
-        auto const& v = any_cast<std::vector<Number>>(vec);
-        return any_num(v[index]);
+
+        auto i = number<size_t>(sv[1]);
+        if (auto const* v8 = any_cast<std::vector<uint8_t>>(&vec)) {
+            return index(*v8, i);
+        }
+        if (auto const* vn = any_cast<std::vector<Number>>(&vec)) {
+            return index(*vn, i);
+        }
+        throw parse_error("Can not index non-array");
     };
 
     parser["UnOp"] = [&](SV& sv) { return sv.token()[0]; };
@@ -1030,7 +1090,8 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
     fileName = fname;
     syms.acceptUndefined(true);
     while (true) {
-        if (passNo >= 10) {
+        if (passNo >= maxPasses) {
+            errors.emplace_back(0, 0, "Max number of passes");
             return false;
         }
         fmt::print("* PASS {}\n", passNo + 1);

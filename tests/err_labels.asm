@@ -1,5 +1,5 @@
 
 same_label
-;!error Redefined
+;!error already
 same_label
     rts

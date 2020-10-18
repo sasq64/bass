@@ -67,6 +67,45 @@ Turns a number into a string
 
 Turns a string into a number.
 
+## Image Functions
+
+### `img = load_png(filename)`
+
+Load the png image into memory. Returns:
+
+`{ pixels, colors, width, height, bpp }`
+
+ex
+```lua
+   img = load_png("test.png")
+   !assert img.width <= 256 && img.height <= 256
+data:
+    !fill img.pixels 
+```
+
+### `img2 = image_remap(img, colors)`
+
+### `img2 = image_layout(img, tile_width, tile_height, gap)`
+
+### `data = pixels_layout(pixels, stride, byte_width, byte_height, gap)`
+
+"Raw" layout function. Takes a byte array and rearranges it into tiles according to sizes in bytes.
+
+### `img2 = image_change_depth(img, new_bpp)`
+
+Change depth. Legal values are 1,2,4 and 8.
+
+```asm
+    load_png("c64_logo.png")
+    image_remap(_, [$000000,$ffffff,$cccccc,$666666])
+    img = image_change_depth(_, 2)
+mc_logo:
+    !fill img.pixels
+```
+
+### `pixels = pixels_change_depth(pixels, old_bpp, new_bpp)`
+
+
 ## LUA Functions
 
 These functions can only be called from LUA.

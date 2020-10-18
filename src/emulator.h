@@ -109,6 +109,18 @@ struct Machine
         jumpTable = &jumpTable_normal[0];
     }
 
+    void setCPU(bool cpu6502) {
+
+        for (const auto& i : getInstructions<false>(cpu6502)) {
+            for (const auto& o : i.opcodes)
+                jumpTable_normal[o.code] = o;
+        }
+        for (const auto& i : getInstructions<true>(cpu6502)) {
+            for (const auto& o : i.opcodes)
+                jumpTable_bcd[o.code] = o;
+        }
+    }
+
     POLICY& policy()
     {
         static POLICY policy(*this);

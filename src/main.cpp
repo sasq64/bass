@@ -31,6 +31,7 @@ int main(int argc, char** argv)
     bool showUndef = false;
     bool showTrace = false;
     bool quiet = false;
+    int maxPasses = 10;
     std::string symbolFile;
     OutFmt outFmt = OutFmt::Prg;
     std::map<std::string, OutFmt> tr{
@@ -45,6 +46,7 @@ int main(int argc, char** argv)
     app.add_option("-f,--format", outFmt, "Output format")
         ->transform(CLI::CheckedTransformer(tr, CLI::ignore_case));
     app.add_flag("--trace", showTrace, "Trace rule invocations");
+    app.add_option("--max-passes", maxPasses, "Max assembler passes");
     app.add_flag("--show-undefined", showUndef,
                  "Show undefined after each pass");
     app.add_flag("-q,--quiet", quiet, "Less noise");
@@ -75,6 +77,7 @@ int main(int argc, char** argv)
     if (showHelp) return 0;
     
     Assembler assem;
+    assem.setMaxPasses(maxPasses);
     assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
                         (showTrace ? Assembler::DEB_TRACE : 0));
 

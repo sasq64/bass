@@ -72,7 +72,7 @@ Opcode <- Symbol
 
 HexNum <- ('$' / '0x') [0-9a-fA-F]+
 Octal <- '0o' [0-7]+
-Binary <- '0b' [01]+
+Binary <- ('0b' / '%')  [01]+
 Char <- '\'' . '\''
 Decimal <- ([0-9]+ '.')? [0-9]+
 Multi <- '0m' [0-3]+
@@ -111,9 +111,11 @@ Expression  <- Atom (Operator Atom)* {
 
 
 Atom <- _? (Star / Unary / Unary2 / Number /
-        Index / FnCall / Variable / '(' Expression ')') _?
+        Index / ArrayLiteral / FnCall / Variable / '(' Expression ')') _?
 
 Star <- '*'
+
+ArrayLiteral <- '[' Expression (',' Expression)* ']'
 
 Index <- Indexable '[' Expression? (IndexSep Expression?)? ']'
 
@@ -128,7 +130,7 @@ UnOp2 <- ('<' / '>')
 FnCall <- Call
 Call <- CallName '(' CallArgs ')'
 CallName <- Symbol
-CallArgs <- (CallArg (',' CallArg)*)?
+CallArgs <- (CallArg (',' _? CallArg)*)?
 CallArg <- (Symbol _? '=' !'=')? (String / Expression)
 Operator <-  
         '&&' / '||' / '<<' / '>>' / '==' / '!=' /
@@ -136,6 +138,7 @@ Operator <-
         '+' / '-' / '*' / '/' / '%' / '\\' /
         '|' / '^' / '&' / '<' / '>'
 
-Variable <- '.'? (Symbol '.')* Symbol
+Variable <- '.'? (Dollar / Symbol) ('.' Symbol)*
+Dollar <- '$'
 
 )";

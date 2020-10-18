@@ -68,7 +68,11 @@ void Scripting::load(utils::path const& p)
 void Scripting::add(std::string_view const& code)
 {
     try {
-        lua.script(code);
+        auto res = lua.script(code);
+        if(res.status() != sol::call_status::ok) {
+            sol::error e = res;
+            throw script_error(e.what());
+        }
     } catch (sol::error& e) {
         throw script_error(e.what());
     }
@@ -136,6 +140,16 @@ sol::object Scripting::to_object(std::any const& a)
         sol::table t = lua.create_table();
         size_t i = StartIndex;
         for (auto v : *av) {
+            t[i++] = v;
+        }
+        return t;
+    }
+    if (auto const* avn = std::any_cast<std::vector<Number>>(&a)) {
+        // TODO: Can we sol make this 'value' conversion?
+        // return sol::make_object(lua, *av);
+        sol::table t = lua.create_table();
+        size_t i = StartIndex;
+        for (auto v : *avn) {
             t[i++] = v;
         }
         return t;

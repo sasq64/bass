@@ -76,8 +76,8 @@ static Section parseArgs(std::vector<std::any> const& args)
                 result.start = number<uint32_t>(arg);
             } else if (i == 2) {
                 auto res = number<uint64_t>(arg);
-                if (res >= 0x100000000) {
-                    result.flags = res >> 32;
+                if (res >= 0x1'0000'0000) {
+                    result.flags |= (res >> 32);
                 } else {
                     result.pc = static_cast<uint32_t>(res);
                 }
@@ -100,15 +100,16 @@ void initMeta(Assembler& assem)
     };
 
     static auto strip_space = [](std::string_view sv) -> std::string_view {
-      while (is_space(sv.front())) {
-          sv.remove_prefix(1);
-      }
-      while (is_space(sv.back())) {
-          sv.remove_suffix(1);
-      }
-      return sv;
+        if (sv.empty()) return sv;
+        while (is_space(sv.front())) {
+            sv.remove_prefix(1);
+        }
+        if (sv.empty()) return sv;
+        while (is_space(sv.back())) {
+            sv.remove_suffix(1);
+        }
+        return sv;
     };
-
 
     assem.registerMeta("test", [&](auto const& text, auto const& blocks) {
         auto args = assem.evaluateList(text);
@@ -178,7 +179,7 @@ void initMeta(Assembler& assem)
         }
     });
 
-    assem.registerMeta("text", [&](auto const& text, auto const&) {
+    assem.registerMeta("text", [&](auto const& text, auto const& blocks) {
         auto list = assem.evaluateList(text);
         for (auto const& v : list) {
             if (auto* s = any_cast<std::string_view>(&v)) {
@@ -189,6 +190,24 @@ void initMeta(Assembler& assem)
                 }
             } else {
                 throw parse_error("Need text");
+            }
+        }
+        for (auto const& block : blocks) {
+            auto contents = std::string(block.contents);
+            auto parts = utils::split(contents, "\n");
+            bool first = true;
+            for (auto part : parts) {
+                std::string_view sv = part;
+                sv = strip_space(sv);
+                auto ws = utils::utf8_decode(sv);
+                if(first) {
+                    mach.writeChar(' ');
+                    first = false;
+                }
+                for (auto c : ws) {
+                    auto b = char_translate.at(c);
+                    mach.writeChar(b);
+                }
             }
         }
     });
@@ -251,7 +270,8 @@ void initMeta(Assembler& assem)
                 syms.set("i", any_num(i));
                 for (Assembler::Block const& b : blocks) {
                     auto contents = strip_space(b.contents);
-                    assem.getSymbols().at<Number>("v") = d;
+                    syms.erase("v");
+                    syms.at<Number>("v") = d;
                     auto res = assem.evaluateExpression(contents, b.line);
                     d = number<uint8_t>(res);
                 }
@@ -265,7 +285,8 @@ void initMeta(Assembler& assem)
                 syms.set("i", any_num(i));
                 for (auto const& b : blocks) {
                     auto contents = strip_space(b.contents);
-                    assem.getSymbols().at<Number>("v") = d;
+                    syms.erase("v");
+                    syms.at<Number>("v") = d;
                     auto res = assem.evaluateExpression(contents, b.line);
                     d = number<wchar_t>(res);
                 }
@@ -280,7 +301,8 @@ void initMeta(Assembler& assem)
                 uint8_t d = 0;
                 for (auto const& b : blocks) {
                     auto contents = strip_space(b.contents);
-                    assem.getSymbols().at<Number>("v") = d;
+                    syms.erase("v");
+                    syms.at<Number>("v") = d;
                     auto res = assem.evaluateExpression(contents, b.line);
                     d = number<uint8_t>(res);
                 }
@@ -369,7 +391,7 @@ void initMeta(Assembler& assem)
 
     assem.registerMeta("section", [&](auto const& text, auto const& blocks) {
         auto& syms = assem.getSymbols();
-        syms.set("NO_STORE", num(0x100000000));
+        syms.set("NO_STORE", num((uint64_t)SectionFlags::NoStorage << 32));
         syms.set("TO_PRG", num(0x200000000));
         syms.set("RO", num(0x400000000));
         auto args = assem.evaluateList(text);
@@ -383,20 +405,21 @@ void initMeta(Assembler& assem)
         }
         auto sectionArgs = parseArgs(args);
 
-        if (sectionArgs.name.empty()) {
-            sectionArgs.name = "__anon" + std::to_string(mach.getPC());
-        }
+        // if (sectionArgs.name.empty()) {
+        //    sectionArgs.name = "__anon" + std::to_string(mach.getPC());
+        //}
 
         auto& section = mach.addSection(sectionArgs);
 
         if (!blocks.empty()) {
             mach.pushSection(section.name);
             auto sz = section.data.size();
-            assem.evaluateBlock(blocks[0].contents);
+            assem.evaluateBlock(blocks[0].contents, blocks[0].line);
             if (!section.parent.empty()) {
                 mach.getSection(section.parent).pc +=
                     static_cast<int32_t>(section.data.size() - sz);
             }
+            syms.set("sections."s + std::string(section.name), section.data);
             mach.popSection();
             return;
         }
@@ -467,6 +490,7 @@ void initMeta(Assembler& assem)
         auto* vec = any_cast<std::vector<uint8_t>>(&data);
         size_t count = vec ? vec->size() : number<size_t>(data);
 
+        auto ll = assem.getLastLabel();
         for (size_t i = 0; i < count; i++) {
             assem.getSymbols().erase(indexVar);
             assem.getSymbols().set(indexVar, any_num(i));
@@ -475,8 +499,10 @@ void initMeta(Assembler& assem)
                 assem.getSymbols().set("v", any_num((*vec)[i]));
             }
             // localLabel = prefix + std::to_string(i);
+            assem.setLastLabel("__rept" + std::to_string(mach.getPC()));
             assem.evaluateBlock(blocks[0].contents, blocks[0].line);
         }
+        assem.setLastLabel(ll);
     });
 
     assem.registerMeta("if", [&](auto const& text, auto const& blocks) {

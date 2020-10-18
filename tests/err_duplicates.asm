@@ -1,7 +1,0 @@
-
-
-
-hello:
-    nop
-hello:
-    rts

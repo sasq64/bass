@@ -13,7 +13,7 @@
 
 tileMem = $1e000
 
-USE_BITMAP = 0
+USE_BITMAP = 1
 
 
     !section "main_code",in="code"
@@ -215,7 +215,7 @@ save: !byte 0,0
     ;!section "indexes", *
 indexes:
 !if !USE_BITMAP {
-    !fill png_indexes
+    !fill png_indexes.indexes
 }
 indexes_end:
 
@@ -229,21 +229,22 @@ indexes_end:
 ; Check first 2 line of screen tiles
 vram = get_vram()
 !rept 10 {
-    !assert compare(vram[tileMem+i*128:tileMem+i*128+80], png.indexes[i*80:(i+1)*80])
+    !assert compare(vram[tileMem+i*128:tileMem+i*128+80], png_indexes.indexes[i*80:(i+1)*80])
 }
 
 ;----------------------------------------------------------
 
     ;!section "colors", *
 colors:
-    !fill png.colors
+    !fill convert_palette(png.colors, 12)
+
 
     !section "IMAGE", 0xa000, NO_STORE|TO_PRG
 pixels:
     !if USE_BITMAP {
         !fill png.pixels
     } else {
-        !fill png_tiles
+        !fill png_indexes.tiles
     }
 
 

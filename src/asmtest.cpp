@@ -67,6 +67,25 @@ bool checkErrors(std::vector<Error> errs)
     return errs.empty();
 }
 
+TEST_CASE("png.remap", "[assembler]")
+{
+    Image image = loadPng((projDir() / "data" / "tiles.png").string());
+
+    int i = 0;
+    for_all_pixels(image.pixels, image.bpp, [&](uint8_t& c) {
+        //c = ~c;
+    });
+
+    savePng("test.png", image);
+
+
+    image = loadPng((projDir() / "data" / "mountain.png").string());
+
+    remap_image(image, { 0x0, 0x444444, 0x888888, 0xccccc, 0xffffff });
+
+    savePng("remapped.png", image);
+}
+
 TEST_CASE("png.layout", "[assembler]")
 {
     auto get = [&](auto const& vec, int n) -> uint16_t {
@@ -80,7 +99,7 @@ TEST_CASE("png.layout", "[assembler]")
     REQUIRE(get(image.colors, 2) == 0x00f0);
 
     auto pixels = std::any_cast<std::vector<uint8_t>>(image.pixels);
-    auto tiles = layoutTiles(pixels, 32, 8, 8);
+    auto tiles = layoutTiles(pixels, 32, 8, 8, 0);
 
 
     LOGI("TILES %d", tiles.size());
@@ -130,7 +149,7 @@ TEST_CASE("png", "[assembler]")
 {
 
     Image image = loadPng((projDir() / "data" / "tiles.png").string());
-    auto tiles = layoutTiles(image.pixels, 96, 2, 16);
+    auto tiles = layoutTiles(image.pixels, 96, 2, 16, 0);
 
     uint8_t* tile8 = &tiles[8 * 2 * 16];
 
@@ -144,7 +163,7 @@ TEST_CASE("png", "[assembler]")
     REQUIRE(tile8[0] == 0b01011111);
     REQUIRE(tile8[1] == 0b11111010);
 
-    auto tiles8 = layoutTiles(tiles, 2, 1, 8);
+    auto tiles8 = layoutTiles(tiles, 2, 1, 8, 0);
 }
 
 TEST_CASE("all", "[assembler]")

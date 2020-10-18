@@ -69,8 +69,7 @@ table:
     !byte 0,0,0,0
     !byte $55,$aa
 
-;;; TODO: Emulator runtime switch
-;!test "test" {
-;    !log "Testing"
-;    jsr start
-;}
+!test "test" {
+    !log "Testing"
+    jsr start
+}

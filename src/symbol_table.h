@@ -1,9 +1,11 @@
 #pragma once
 
 #include <coreutils/log.h>
+#include <coreutils/text.h>
+
+#include <fmt/format.h>
 
 #include <any>
-#include <fmt/format.h>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -31,7 +33,8 @@ private:
 struct Symbol
 {
     std::any value;
-    bool accessed;
+    bool accessed{false};
+    bool defined{false};
 };
 
 struct SymbolTable
@@ -49,6 +52,12 @@ struct SymbolTable
         return syms.find(std::string(name)) != syms.end();
     }
 
+    bool is_defined_now(std::string_view name) const
+    {
+        auto it = syms.find(std::string(name));
+        return it != syms.end() && it->second.defined;
+    }
+
     void set_sym(std::string_view name, AnyMap const& symbols)
     {
         auto s = std::string(name);
@@ -62,10 +71,22 @@ struct SymbolTable
         }
     }
 
+    void set_sym(std::string_view name, Symbol const& sym)
+    {
+        syms[std::string(name)] = sym;
+    }
+
+    Symbol* get_sym(std::string_view name)
+    {
+
+        auto it = syms.find(std::string(name));
+        return it != syms.end() ? &(it->second) : nullptr;
+    }
+
     void set(std::string_view name, std::any const& val)
     {
         auto s = std::string(name);
-        if (val.type() == typeid(AnyMap{})) {
+        if (val.type() == typeid(AnyMap)) {
             set(name, std::any_cast<AnyMap>(val));
         } else if (val.type() == typeid(double)) {
             set(name, std::any_cast<double>(val));
@@ -90,6 +111,12 @@ struct SymbolTable
             set_sym(s, static_cast<AnyMap>(val));
             return;
         } else {
+            auto it = syms.find(std::string(name));
+            if (it != syms.end()) {
+                if (it->second.defined) {
+                    throw sym_error(fmt::format("'{}' already defined", name));
+                }
+            }
             if (accessed.count(s) > 0) {
                 LOGD("%s has been accessed", s);
                 auto it = syms.find(s);
@@ -115,12 +142,13 @@ struct SymbolTable
                 }
             }
             syms[s].value = std::any(val);
+            syms[s].defined = true;
         }
     }
 
     // Return a map containing all symbols beginning with
     // name.
-    AnyMap collect(std::string const& name) const
+    AnyMap collect(std::string_view const& name) const
     {
         AnyMap s;
         for (auto const& p : syms) {
@@ -141,6 +169,7 @@ struct SymbolTable
     template <typename T = std::any>
     T& get(std::string_view name)
     {
+        static std::any temp;
         static T empty;
         static std::any zero(0.0);
         static AnyMap cres;
@@ -153,6 +182,16 @@ struct SymbolTable
         auto s = std::string(name);
         auto it = syms.find(s);
         if (it == syms.end()) {
+
+            if constexpr (std::is_same_v<T, std::any>) {
+                auto m = collect(name);
+                if (!m.empty()) {
+                    // TODO: Can cause problems if reference is kept
+                    temp = m;
+                    return temp;
+                }
+            }
+
             if (!undef_ok) {
                 throw sym_error("Undefined symbol '" + std::string(name) + "'");
             }
@@ -166,6 +205,9 @@ struct SymbolTable
             }
             LOGD("Returning default (%s)", typeid(T{}).name());
             return empty;
+        }
+        if (it->second.value.type() == typeid(AnyMap)) {
+            LOGE("MAP %s in table!!", name);
         }
         if constexpr (std::is_same_v<T, std::any>) {
             return it->second.value;
@@ -232,6 +274,30 @@ struct SymbolTable
         accessed.erase(std::string(name));
     }
 
+    void erase_all(std::string_view name)
+    {
+        {
+            auto it = syms.begin();
+            while (it != syms.end()) {
+                if (utils::startsWith(it->first, name)) {
+                    it = syms.erase(it);
+                } else {
+                    it++;
+                }
+            }
+        }
+        {
+            auto it = accessed.begin();
+            while (it != accessed.end()) {
+                if (utils::startsWith(*it, name)) {
+                    it = accessed.erase(it);
+                } else {
+                    it++;
+                }
+            }
+        }
+    }
+
     bool done() const { return undefined.empty(); }
 
     std::unordered_set<std::string> const& get_undefined() const
@@ -243,6 +309,7 @@ struct SymbolTable
     {
         for (auto& s : syms) {
             s.second.accessed = false;
+            s.second.defined = false;
         }
         accessed.clear();
         undefined.clear();

@@ -2,6 +2,6 @@
 
 
 !rept 4 {
-    hello:
+    .hello:
         nop
 }

@@ -121,7 +121,7 @@ raster_hi=$1100
 RSIZE=150
 
 red:
-    !rept RSIZE { !byte (sin(i*Math.Pi/RSIZE))*15 }
+    !fill RSIZE { (sin(i*Math.Pi/RSIZE)) * 15 }
 red_end:
 
 green:

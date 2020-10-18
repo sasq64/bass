@@ -173,7 +173,7 @@ inline void printArg(std::any const& arg)
 {
     if (auto const* l = std::any_cast<Number>(&arg)) {
         if (*l == trunc(*l)) {
-            fmt::print("{}", static_cast<int32_t>(*l));
+            fmt::print("${:x}", static_cast<int32_t>(*l));
         } else {
             fmt::print("{}", *l);
         }

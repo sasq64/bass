@@ -54,16 +54,24 @@ start:
     lda #$18
     sta $d018
 
+    ldx #0
+$
+    lda text,x
+    beq +
+    sta $400,x
+    inx
+    bne -
+$
+    jmp -
     cli
     rts
 
+text:
+    !text "hello people what's up ?"
+    !byte 0
+
 font:
-    png = load_png("../data/ff.png")
-
-    !assert png.height == 48
-    tiles = layout_tiles(png.pixels, 128/8, 1, 8)
-
-    tiles2 = index_tiles(tiles, 8)
-
-    !fill tiles[8*32:8*64]
-    !fill tiles[0:8*32]
+    load_png("../data/ff.png")
+    layout_image($, 8, 8)
+    !fill $.pixels[8*32:8*64]
+    !fill $.pixels[0:8*32]

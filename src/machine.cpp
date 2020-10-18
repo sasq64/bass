@@ -48,6 +48,11 @@ void Machine::breakFunction(int what, void* data)
     }
 }
 
+void Machine::setCpu(CPU cpu) {
+    cpu65C02 = cpu == CPU_65C02;
+    machine->setCPU(cpu65C02);
+}
+
 Machine::~Machine() = default;
 
 void Machine::setBreakFunction(uint8_t what,
@@ -60,6 +65,10 @@ Section& Machine::addSection(Section const& s)
 {
     auto [name, in, children, start, pc, size, flags, data, valid] = s;
 
+    if (name.empty()) {
+        name = "__anon_" + std::to_string(anonSection++);
+    }
+
     auto it =
         std::find_if(sections.begin(), sections.end(),
                      [name = name](auto const& as) { return as.name == name; });
@@ -67,7 +76,8 @@ Section& Machine::addSection(Section const& s)
     Section& section =
         it == sections.end() ? sections.emplace_back(name, -1) : *it;
 
-    Check(section.data.empty(), "Section already populated");
+    Check(section.data.empty(),
+          fmt::format("Section {} already populated", section.name));
 
     section.flags = flags;
     section.pc = pc;
@@ -181,9 +191,9 @@ bool Machine::layoutSections()
 Error Machine::checkOverlap()
 {
     for (auto& a : sections) {
-        if (!a.data.empty()) {
+        if (!a.data.empty() && (!(a.flags & NoStorage))) {
             for (auto const& b : sections) {
-                if (&a != &b && !b.data.empty()) {
+                if (&a != &b && !b.data.empty() && (!(b.flags & NoStorage))) {
                     auto as = a.start;
                     auto ae = as + static_cast<int32_t>(a.data.size());
                     auto bs = b.start;
@@ -243,6 +253,7 @@ void Machine::setSection(std::string const& name)
 
 void Machine::clear()
 {
+    anonSection = 0;
     if (fp != nullptr) {
         rewind(fp);
     }
@@ -373,8 +384,9 @@ void Machine::writeCrt(utils::File const& outFile)
 
 void Machine::write(std::string const& name, OutFmt fmt)
 {
-    auto non_empty = utils::filter_to(
-        sections, [](auto const& s) { return !s.data.empty(); });
+    auto non_empty = utils::filter_to(sections, [](auto const& s) {
+        return !s.data.empty() && ((s.flags & NoStorage) == 0);
+    });
 
     if (non_empty.empty()) {
         puts("**Warning: No sections");
@@ -413,11 +425,6 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
     for (auto const& section : non_empty) {
 
-        if (section.start < last_end) {
-            throw machine_error(
-                fmt::format("Section {} overlaps previous", section.name));
-        }
-
         if (section.data.empty()) {
             continue;
         }
@@ -433,6 +440,14 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
         if ((section.flags & NoStorage) != 0) {
             continue;
+        }
+
+        fmt::print("{} {:04x}->{:04x}\n", section.name, section.start,
+                   section.data.size() + section.start);
+
+        if (section.start < last_end) {
+            throw machine_error(
+                fmt::format("Section {} overlaps previous", section.name));
         }
 
         auto offset = section.start;
@@ -484,7 +499,6 @@ void Machine::runSetup()
                               section.data.size());
         }
     }
-
 }
 
 void Machine::setOutput(FILE* f)
@@ -555,7 +569,6 @@ AsmResult Machine::assemble(Instruction const& instr)
 
     auto arg = instr;
     std::string opcode = utils::toLower(std::string(instr.opcode));
-
 
     auto const& instructions = sixfive::Machine<>::getInstructions(cpu65C02);
 

@@ -54,6 +54,10 @@ public:
     void writeSymbols(utils::path const& p);
     std::string_view includeFile(std::string_view fileName);
 
+    void setMaxPasses(int mp) {
+        maxPasses = mp;
+    }
+
     bool isFinalPass() { needsFinalPass = true; return finalPass; }
     bool isFirstPass() const { return passNo == 0; }
     template <typename FN>
@@ -107,12 +111,25 @@ public:
     uint32_t testLocation = 0xf800;
 
     utils::path evaluatePath(std::string_view name);
+    std::string_view getLastLabel() const { return lastLabel; }
+    void setLastLabel(std::string_view const &l)  {
+        lastLabel = l;
+    }
+    void setLastLabel(std::string const &l)  {
+        lastLabel = persist(l);
+    }
+
 private:
     template <typename T>
     T& sym(std::string const& s)
     {
         return syms.get<T>(s);
     }
+
+    template <typename T>
+    std::any slice(std::vector<T> const& v, int64_t a, int64_t b);
+    template <typename T>
+    std::any index(std::vector<T> const& v, int64_t index);
 
     void setRegSymbols();
 
@@ -184,6 +201,7 @@ private:
     int inMacro = 0;
 
     int inTest = 0;
+    int maxPasses = 10;
 
     std::any parseResult;
 

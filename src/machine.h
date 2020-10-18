@@ -160,10 +160,7 @@ public:
         CPU_65C02
     };
 
-    void setCpu(CPU cpu) {
-        cpu65C02 = cpu == CPU_65C02;
-    }
-
+    void setCpu(CPU cpu);
 
 private:
 
@@ -182,6 +179,7 @@ private:
     std::unique_ptr<sixfive::Machine<sixfive::DefaultPolicy>> machine;
     std::deque<Section> sections;
     Section* currentSection = nullptr;
+    int anonSection = 0;
     FILE* fp = nullptr;
 
     bool layoutOk{false};
