@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 namespace sixfive {
@@ -33,5 +34,6 @@ enum class Reg
     SR,
     PC
 };
+
 
 } // namespace sixfive

@@ -23,28 +23,31 @@ D011VALUE = 0
     }
 }
 
-!section "main", $c000
+    !section "main", $c000
 
-!rept 6*8 {
-    DrawRasterColors(i + $40)
-}
+    !rept 6*8 {
+        DrawRasterColors(i + $40)
+    }
 
-!test "bad" {
+    !test "bad"
     DrawRasterColors(0)
-}
-!assert tests.bad.cycles == 23
+    rts
 
-!test "good" {
+    !assert tests.bad.cycles == 23
+
+    !test "good"
     DrawRasterColors(1)
-}
-!assert tests.good.cycles == 63
+    rts
 
-!test "modify" {
+    !assert tests.good.cycles == 63
+
+    !test "modify" 
     lda #9
     sta col[$40]+1
     lda #8
     sta col[$41]+1
-}
-!assert tests.modify.ram[$c001] == 9
-!assert tests.modify.ram[$c010] == 8
+    rts
+
+    !assert tests.modify.ram[$c001] == 9
+    !assert tests.modify.ram[$c010] == 8
 

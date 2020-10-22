@@ -2,7 +2,7 @@
 ;
 ;
 !macro apa(x) {
-    ;!error Data type
+    ;!error Data
     lda x
 }
 

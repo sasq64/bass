@@ -1,0 +1,57 @@
+== Testing
+
+Since bass has a built in 6502 emulator, you can test your code as part of
+the build step.
+
+Basic testing is very simple: Just add `!test` in front of a routine you
+want to test:
+
+```asm
+    !test
+add_xy:
+    txa
+    stx $2
+    clc
+    adc $2
+    rts
+```
+
+This will add a test starting at the given position.
+
+After the assembler has successfully compiled your program, it will run
+your tests by just jumping to the indicated position.
+
+Just adding `!test` like this is a great way to make sure you haven't done something
+stupid like an infinite loop or jumping into zero memory. But of course it will
+be more useful if you add checks:
+
+
+```asm
+    !test X=5,Y=9
+add_xy:
+    txa
+    stx $2
+    clc
+    adc $2
+    !check A == 14
+    rts
+```
+
+You can also insert arbitrary lua code, and a "virtual" rts intruction for
+testing parts your code:
+
+
+```asm
+add_xy:
+    txa
+    !test
+    !run {: mem_write($2, $e9) :}
+    ldx $2
+    tax
+    and #$f
+    !check X == 9
+    !rts
+    stx $4
+    nop
+    rts
+```

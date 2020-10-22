@@ -11,18 +11,11 @@
 
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 class Machine;
 
-#ifdef NO_WRAPPER
-#    include "peglib.h"
-using SV = const peg::SemanticValues;
-using Parser = peg::parser;
-#else
-using SV = const SVWrap;
-using Parser = ParserWrapper;
-#endif
 
 inline void Check(bool v, std::string const& txt)
 {
@@ -36,11 +29,37 @@ public:
     Assembler();
     ~Assembler();
 
+    struct Test
+    {
+        std::string name;
+        uint32_t start;
+        RegState regs;
+    };
+
     struct Block
     {
         std::string_view contents;
         size_t line;
+        std::shared_ptr<peg::AstBase<BassNode>> node;
     };
+
+    struct Macro
+    {
+        std::string_view name;
+        std::vector<std::string_view> args;
+        Block contents;
+    };
+
+    struct Call
+    {
+        std::string_view name;
+        std::vector<std::any> args;
+    };
+
+    void handleLabel(std::any const& label);
+
+    void pushScope(std::string_view name);
+    void popScope();
 
     std::vector<Error> getErrors() const;
 
@@ -52,13 +71,15 @@ public:
     Machine& getMachine();
     void printSymbols();
     void writeSymbols(utils::path const& p);
-    std::string_view includeFile(std::string_view fileName);
+    Block includeFile(std::string_view fileName);
 
-    void setMaxPasses(int mp) {
-        maxPasses = mp;
+    void setMaxPasses(int mp) { maxPasses = mp; }
+
+    bool isFinalPass()
+    {
+        needsFinalPass = true;
+        return finalPass;
     }
-
-    bool isFinalPass() { needsFinalPass = true; return finalPass; }
     bool isFirstPass() const { return passNo == 0; }
     template <typename FN>
     void registerFunction(std::string const& name, FN const& fn)
@@ -68,8 +89,16 @@ public:
 
     void addScript(utils::path const& p) { scripting.load(p); }
 
-    using MetaFn = std::function<void(
-        std::string_view, std::vector<Block> const&)>;
+    struct Meta
+    {
+        std::string text;
+        std::string_view name;
+        std::vector<std::any> args;
+        std::vector<Block> blocks;
+        size_t line;
+    };
+
+    using MetaFn = std::function<void(Meta const&)>;
 
     inline void registerMeta(std::string const& name, MetaFn const& fn)
     {
@@ -82,20 +111,18 @@ public:
         std::vector<std::string_view> args;
     };
 
-    std::any evaluateExpression(std::string_view expr, size_t line = 0);
-    Def evaluateDefinition(std::string_view expr, size_t line = 0);
-    std::vector<std::any> evaluateList(std::string_view expr, size_t line = 0);
     void defineMacro(std::string_view name,
-                     std::vector<std::string_view> const& args, size_t line,
-                     std::string_view contents);
+                     std::vector<std::string_view> const& args,
+                     Block const& block);
     void addDefine(std::string_view name,
                    std::vector<std::string_view> const& args, size_t line,
                    std::string_view contents);
 
-    AnyMap evaluateEnum(std::string_view expr, size_t line = 0);
-    void evaluateBlock(std::string_view block, std::string_view fileName = "");
-    void evaluateBlock(std::string_view block, size_t line);
-    AnyMap runTest(std::string_view name, std::string_view contents);
+    void evaluateBlock(Block const& block);
+    void evaluateBlock(std::string_view block, std::string_view fileName);
+
+    void runTest(Test const& test);
+    void addTest(std::string name, uint32_t start, RegState const& state);
 
     enum DebugFlags
     {
@@ -105,19 +132,16 @@ public:
 
     void setDebugFlags(uint32_t flags);
 
-    void addCheck(std::string_view text);
-    void addLog(std::string_view text);
-
-    uint32_t testLocation = 0xf800;
+    void addCheck(Block const& block, size_t line);
+    void addLog(std::string_view text, size_t line);
+    void addRunnable(std::string_view text, size_t line);
 
     utils::path evaluatePath(std::string_view name);
     std::string_view getLastLabel() const { return lastLabel; }
-    void setLastLabel(std::string_view const &l)  {
-        lastLabel = l;
-    }
-    void setLastLabel(std::string const &l)  {
-        lastLabel = persist(l);
-    }
+    void setLastLabel(std::string_view const& l) { lastLabel = l; }
+    void setLastLabel(std::string const& l) { lastLabel = persist(l); }
+
+    std::any applyDefine(Macro const& fn, Call const& call);
 
 private:
     template <typename T>
@@ -136,21 +160,6 @@ private:
     std::vector<Error> errors;
 
     bool passDebug = false;
-    struct Call
-    {
-        std::string_view name;
-        std::vector<std::any> args;
-    };
-
-    struct Macro
-    {
-        std::string_view name;
-        std::vector<std::string_view> args;
-        std::string_view contents;
-        size_t line;
-    };
-
-
     std::unordered_map<std::string, AnyCallable> functions;
     std::unordered_map<std::string, MetaFn> metaFunctions;
 
@@ -162,9 +171,8 @@ private:
     };
 
     void applyMacro(Call const& call);
-    std::any applyDefine(Macro const& fn, Call const& call);
     int checkUndefined();
-    bool pass(std::string_view const& source);
+    bool pass(AstNode const& ast);
     void setupRules();
 
     auto save() { return std::tuple(macros, syms, lastLabel); }
@@ -175,15 +183,27 @@ private:
         std::tie(macros, syms, lastLabel) = t;
     }
 
-    void trace(SVWrap const& sv) const;
+    struct Check
+    {
+        Block expression;
+    };
 
-    bool doTrace = false;
+    struct Log
+    {
+        std::string_view text;
+    };
 
-    std::unordered_map<int32_t, std::string> checks;
-    std::unordered_map<int32_t, std::string> logs;
+    struct EmuAction
+    {
+        size_t line;
+        std::variant<Check, Log, std::function<void()>> action;
+    };
+
+    std::unordered_map<int32_t, std::vector<EmuAction>> actions;
 
     utils::path currentPath;
-    std::unordered_map<std::string, std::string> includes;
+    std::unordered_map<std::string, Block> includes;
+    std::deque<std::string> stored_includes;
     std::shared_ptr<Machine> mach;
     std::unordered_map<std::string_view, Macro> macros;
     std::unordered_map<std::string_view, Macro> definitions;
@@ -203,7 +223,15 @@ private:
     int inTest = 0;
     int maxPasses = 10;
 
-    std::any parseResult;
+    std::function<bool(uint32_t)> logFunction;
+    std::function<bool(uint32_t)> checkFunction;
+
+    std::unordered_map<uint32_t, std::string> labelMap;
+    std::vector<Test> tests;
+
+    std::deque<std::string_view> scopes;
+
+    Number nextEnumValue = 0;
 
     Scripting scripting;
 };

@@ -16,6 +16,7 @@
     jsr other
 }
     !section "main" , $800
+    !test "apa"
     lda #9
 a0:
     apa(3,4)
@@ -29,6 +30,3 @@ a1:
 other:
     rts
 
-!test {
-    jsr $800
-}

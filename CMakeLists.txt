@@ -17,7 +17,7 @@ endif()
 
 # GCC/Clang common warnings
 set(GCC_CLANG_WARNINGS -Werror -Wall -Wextra -Wnon-virtual-dtor -pedantic
-    -Wno-unused-variable -Wno-unused-parameter)
+-Wno-unused-variable -Wno-unused-parameter -Wno-unused-function)
 
 set(MSVC_WARNINGS /W3)
 
@@ -56,6 +56,8 @@ target_compile_options(lodepng PRIVATE ${WARN_EXT})
 add_library(catch INTERFACE)
 target_include_directories(catch INTERFACE external)
 
+add_library(sha512 STATIC src/sha512.c)
+
 add_library(badlib STATIC
     src/assembler.cpp src/grammar.cpp src/functions.cpp
     src/machine.cpp src/wrap.cpp src/meta.cpp
@@ -65,7 +67,7 @@ target_compile_definitions(badlib PUBLIC SOL_USING_CXX_LUA USE_FMT)
 target_compile_options(badlib PUBLIC ${WARNINGS})
 target_include_directories(badlib PRIVATE external/peglib PUBLIC src)
 target_link_libraries(badlib PUBLIC coreutils
-        PRIVATE lua lodepng fmt ${THREAD_LIB} PUBLIC sol2::sol2 )
+        PRIVATE lua lodepng fmt ${THREAD_LIB} PUBLIC sol2::sol2 sha512)
 
 if(FUZZ)
     add_executable(bazz src/fuzz.cpp)
@@ -86,8 +88,9 @@ else()
     target_link_libraries(sectiontest PRIVATE catch coreutils fmt)
 
     add_executable(symtest EXCLUDE_FROM_ALL src/testmain.cpp src/symtest.cpp)
+    target_compile_definitions(symtest PUBLIC USE_FMT)
     target_include_directories(symtest PRIVATE src)
-    target_link_libraries(symtest PRIVATE catch coreutils fmt)
+    target_link_libraries(symtest PRIVATE catch fmt coreutils)
 
     add_executable(tester src/testmain.cpp src/asmtest.cpp)
     target_link_libraries(tester PRIVATE catch fmt badlib)

@@ -1,7 +1,8 @@
 
-    !cpu 6502
+    !cpu "6502"
 
 !section "main", $c000
+    !test
 test_lax:
     lax data
     !check A == $77
@@ -13,6 +14,7 @@ test_lax:
 
     rts
 
+    !test
 test_nop:
 
     nop #3
@@ -26,8 +28,3 @@ data:
 data2:
     !byte 0
 
-
-!test "illegals" {
-    jsr test_lax
-    jsr test_nop
-}

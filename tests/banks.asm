@@ -110,15 +110,14 @@ far_jumps:
     !check Y == $20
     rts
 
-    !test $2000
-
-    !test "test" {
-        jsr game_start
-        lda #2
-        sta $01
-        jsr far_jumps
-        lda #1
-        sta $01
-        jsr $8000
-        !check Y == $10
-    }
+    !section "test", $2000
+    !test "test"
+    jsr game_start
+    lda #2
+    sta $01
+    jsr far_jumps
+    lda #1
+    sta $01
+    jsr $8000
+    !check Y == $10
+    rts

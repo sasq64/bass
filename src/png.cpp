@@ -156,7 +156,7 @@ Image loadPng(std::string_view const& name)
     if (error != 0) {
         return {};
     }
-    std::unique_ptr<unsigned char> out{o};
+    std::unique_ptr<unsigned char, decltype(&free)> out{o, &free};
 
     auto numColors = state.info_png.color.palettesize;
     auto* pal = state.info_png.color.palette;

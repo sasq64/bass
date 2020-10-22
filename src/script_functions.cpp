@@ -1,6 +1,8 @@
 #include "assembler.h"
 #include "machine.h"
 #include "script.h"
+#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <sol/sol.hpp>
 
@@ -9,6 +11,20 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
     auto& lua = s.getState();
     auto& mach = a.getMachine();
 
+    lua["fmt"] = [&](std::string const& f, sol::variadic_args args) {
+        fmt::dynamic_format_arg_store<fmt::format_context> store;
+        for (auto arg : args) {
+            if (arg.is<int32_t>()) {
+                store.push_back(arg.as<int32_t>());
+            } else 
+            if (arg.is<std::string>()) {
+                store.push_back(arg.as<std::string>());
+            }
+        }
+        std::string result = fmt::vformat(f, store);
+        puts(result.c_str());
+    };
+
     lua["sym"] = [&](std::string const& name) {
         auto aval = a.getSymbols().get(name);
         return s.to_object(aval);
@@ -16,12 +32,9 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
 
     lua["start_run"] = [&] {
         mach.runSetup();
-
     };
 
-    lua["call"] = [&](int32_t adr) {
-        mach.go(adr);
-    };
+    lua["call"] = [&](int32_t adr) { mach.go(adr); };
 
     lua["read_mem_6502"] = [&](int adr) { return mach.readRam(adr); };
     lua["mem_read"] = [&](int adr) { return mach.readRam(adr); };
@@ -29,9 +42,10 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
         return mach.writeRam(adr, val);
     };
 
-    lua["set_break_fn"] = [&](int what, std::function<void(int)> const& fn) {
-        mach.setBreakFunction(what, fn);
-    };
+    //    lua["set_break_fn"] = [&](int what, std::function<void(int)> const&
+    //    fn) {
+    //        mach.setBreakFunction(what, fn);
+    //    };
 
     lua["map_bank_write"] =
         [&](int hi_adr, int len,

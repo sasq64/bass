@@ -58,6 +58,7 @@ spritePtrs = screenMem + 1016
     !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
 start:
 
+    !test "setup"
     sei
 
     ; Copy colors and screen data
@@ -99,6 +100,8 @@ $   lda colors,x
     sta $d020
     sta $d021
 
+    !rts
+
     jsr $1000
 
 $   lda #100
@@ -112,13 +115,7 @@ $   lda #100
     jsr update_sprite
     jmp -
 
-test_func:
-    rts
-
-!test "my_test" {
-    jsr test_func
-}
-
+!test
 init_sprite
     ; Enable sprite 2
     lda #$04
@@ -138,6 +135,7 @@ init_sprite
     }
     rts
 
+!test
 update_sprite
     ldxy xy
     lda sine_xy,x
@@ -197,7 +195,6 @@ spriteData:
     }
 
     ; Koala Image
-
     koala = load("../data/oys.koa")
     bitmap = koala[Koala.bitmap : Koala.screen]
     screen_ram = koala[Koala.screen : Koala.colors]
@@ -205,12 +202,9 @@ spriteData:
     bg_color = koala[Koala.bg]
 
     ; Music
-
-    !define swap(x) { (x>>8) | (x<<8) }
-
     sid = load("../data/test.sid")
-    music_init = swap(word(sid[$a:$c]))
-    music_play = swap(word(sid[$c:$e]))
+    music_init = big_word(sid[$a:$c])
+    music_play = big_word(sid[$c:$e])
 
     !assert music_init == musicLocation
 
@@ -223,18 +217,12 @@ spriteData:
 
 %{
     map_bank_write(0xd4, 1, function(adr, val)
-        print("SID", adr - 0xd400, val)
+        fmt("SID ${:04x} <= ${:02x}", adr, val)
     end)
 }%
 
-!test "music_init" {
-    jsr $1000
-}
-
-
-!test "music_play" {
-    jsr $1003
-}
+!test "music_init", $1000
+!test "music_play", $1003
 
 colors:
     !fill color_ram

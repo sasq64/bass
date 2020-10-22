@@ -14,24 +14,23 @@
 
 TMP = 6
 
-WEEKDAY:
-         CPX #3          ; Year starts in March to bypass
+WEEKDAY: CPX #3          ; Year starts in March to bypass
          BCS MARCH       ; leap year problem
          DEY             ; If Jan or Feb, decrement year
 MARCH:   EOR #$7F        ; Invert A so carry works right
          CPY #200        ; Carry will be 1 if 22nd century
          ADC MTAB-1,X    ; A is now day+month offset
          STA TMP
-         !check RAM[6]==$7a
+         ;!check RAM[6]==$7a
          TYA             ; Get the year
          JSR MOD7        ; Do a modulo to prevent overflow
          SBC TMP         ; Combine with day+month
          STA TMP
-         !check RAM[6]==$86
+         ;!check RAM[6]==$86
          TYA             ; Get the year again
          LSR             ; Divide it by 4
          LSR
-         !check A==$1d
+         ;!check A==$1d
          CLC             ; Add it to y+m+d and fall through
          ADC TMP
 MOD7:    ADC #7          ; Returns (A+3) modulo 7
@@ -40,11 +39,34 @@ MOD7:    ADC #7          ; Returns (A+3) modulo 7
 MTAB:    !byte 1,5,6,3,1,5,3,0,4,2,6,4      ; Month offsets
 
 
-    !test {
+    ;!test "week"
         LDY #2016-1900
         LDX #10
         LDA #7
         JSR WEEKDAY
-        !check A==5
+        ;!check A==5
         RTS
-    }
+
+        !rept 6 { nop }
+
+        HEY = 3
+
+        array = bytes(1,2,3,4,5)
+
+        !fill array
+
+        !ifdef HEY {
+            MORE = 2
+            !print "HEY WAS DEFINED"
+        }
+
+        !ifndef HEY {
+            !print "BOOO"
+           nop
+           nop
+           nop
+        }
+
+        !if MORE == 2 {
+            rts
+        }

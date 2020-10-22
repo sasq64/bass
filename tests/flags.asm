@@ -1,6 +1,7 @@
 
     !org $c000
 
+    !test
 start:
     ldx #0
     txa
@@ -18,7 +19,3 @@ start:
 .skip2
     !check X == 5
     rts
-
-    !test {
-    jsr start
-}

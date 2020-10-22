@@ -8,6 +8,7 @@ $   lda $c001
     bne -
     tax
     lda $c000
+    !check A==0
     beq +
     jmp -
 $   rts
@@ -63,11 +64,11 @@ $
 .out
     rts
 
-    !test {
+    !test "labels"
         !log "We are here"
         jsr first
-        !log "X=",X
+        ;!log "X=",X
         jsr many
         !check X == 4
         nop
-    }
+        rts

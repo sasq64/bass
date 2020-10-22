@@ -3,6 +3,7 @@
 #include <coreutils/path.h>
 
 #include <any>
+#include <functional>
 #include <memory>
 #include <sol/forward.hpp>
 #include <string>
@@ -35,6 +36,7 @@ public:
     std::any to_any(sol::object const& obj);
 
     static constexpr int StartIndex = 1;
+    std::function<void()> make_function(std::string_view const& code);
 
 private:
     std::unique_ptr<sol::state> luap;

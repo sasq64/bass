@@ -2,7 +2,7 @@
     ;
     ; test
     ;
-    ;!error Not a definition
+    ;!error syntax
     !macro hey(x {
     }
 

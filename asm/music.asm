@@ -145,12 +145,12 @@ sid_data:
     end)
 }%
 
-    !test $c000
+    !section "test", $c000
 
-!test "fast_play" {
+!test "fast_play"
     jsr fast_init
     jsr fast_play
     jsr fast_play
     jsr fast_play
     jsr fast_play
-}
+    rts

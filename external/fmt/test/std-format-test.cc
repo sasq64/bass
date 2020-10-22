@@ -1,4 +1,5 @@
 #include <format>
+
 #include "gtest.h"
 
 TEST(StdFormatTest, Escaping) {
@@ -29,19 +30,15 @@ TEST(StdFormatTest, Alignment) {
   string s4 = format("{:*^6}", 'x');  // s4 == "**x***"
   // Error: '=' with charT and no integer presentation type
   EXPECT_THROW(string s5 = format("{:=6}", 'x'), std::format_error);
-  string s6 = format("{:6d}", c);       // s6 == "   120"
-  string s7 = format("{:=+06d}", c);    // s7 == "+00120"
-  string s8 = format("{:0=#6x}", 0xa);  // s8 == "0x000a"
-  string s9 = format("{:6}", true);     // s9 == "true  "
+  string s6 = format("{:6d}", c);    // s6 == "   120"
+  string s7 = format("{:6}", true);  // s9 == "true  "
   EXPECT_EQ(s0, "    42");
   EXPECT_EQ(s1, "x     ");
   EXPECT_EQ(s2, "x*****");
   EXPECT_EQ(s3, "*****x");
   EXPECT_EQ(s4, "**x***");
   EXPECT_EQ(s6, "   120");
-  EXPECT_EQ(s7, "+00120");
-  EXPECT_EQ(s8, "0x000a");
-  EXPECT_EQ(s9, "true  ");
+  EXPECT_EQ(s7, "true  ");
 }
 
 TEST(StdFormatTest, Float) {
@@ -65,11 +62,11 @@ TEST(StdFormatTest, Int) {
   string s0 = format("{}", 42);                       // s0 == "42"
   string s1 = format("{0:b} {0:d} {0:o} {0:x}", 42);  // s1 == "101010 42 52 2a"
   string s2 = format("{0:#x} {0:#X}", 42);            // s2 == "0x2a 0X2A"
-  string s3 = format("{:n}", 1234);  // s3 == "1,234" (depends on the locale)
+  string s3 = format("{:L}", 1234);  // s3 == "1234" (depends on the locale)
   EXPECT_EQ(s0, "42");
   EXPECT_EQ(s1, "101010 42 52 2a");
   EXPECT_EQ(s2, "0x2a 0X2A");
-  EXPECT_EQ(s3, "1,234");
+  EXPECT_EQ(s3, "1234");
 }
 
 #include <format>
@@ -107,7 +104,8 @@ template <> struct std::formatter<S> {
   // Parses a width argument id in the format { <digit> }.
   constexpr auto parse(format_parse_context& ctx) {
     auto iter = ctx.begin();
-    auto get_char = [&]() { return iter != ctx.end() ? *iter : 0; };
+    // auto get_char = [&]() { return iter != ctx.end() ? *iter : 0; };
+    auto get_char = [&]() { return iter != ctx.end() ? *iter : '\0'; };
     if (get_char() != '{') return iter;
     ++iter;
     char c = get_char();
@@ -122,12 +120,15 @@ template <> struct std::formatter<S> {
   auto format(S s, format_context& ctx) {
     int width = visit_format_arg(
         [](auto value) -> int {
-          if constexpr (!is_integral_v<decltype(value)>)
+          using type = decltype(value);
+          if constexpr (!is_integral_v<type> || is_same_v<type, bool>)
             throw format_error("width is not integral");
-          else if (value < 0 || value > numeric_limits<int>::max())
+          // else if (value < 0 || value > numeric_limits<int>::max())
+          else if (fmt::detail::is_negative(value) ||
+                   value > numeric_limits<int>::max())
             throw format_error("invalid width");
           else
-            return value;
+            return static_cast<int>(value);
         },
         ctx.arg(width_arg_id));
     return format_to(ctx.out(), "{0:{1}}", s.value, width);
@@ -144,7 +145,7 @@ template <> struct std::formatter<__int128_t> : std::formatter<long long> {
   auto format(__int128_t n, format_context& ctx) {
     // Format as a long long since we only want to check if it is possible to
     // specialize formatter for __int128_t.
-    return formatter<long long>::format(n, ctx);
+    return formatter<long long>::format(static_cast<long long>(n), ctx);
   }
 };
 

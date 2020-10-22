@@ -169,6 +169,8 @@ struct Instruction
 };
 
 
+std::string any_to_string(std::any const& val);
+
 inline void printArg(std::any const& arg)
 {
     if (auto const* l = std::any_cast<Number>(&arg)) {
@@ -185,3 +187,10 @@ inline void printArg(std::any const& arg)
         }
     }
 }
+
+struct RegState
+{
+    std::array<unsigned, 6> regs{0,0,0,0,0,0};
+
+};
+

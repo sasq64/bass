@@ -13,7 +13,7 @@
 
 tileMem = $1e000
 
-USE_BITMAP = 1
+USE_BITMAP = 0
 
 
     !section "main_code",in="code"
@@ -103,12 +103,6 @@ $
 
 ; ---------------------------------------------------------------------------
 
-%{
-set_break_fn(1, function(what)
-    print(mem_read(0x9f61))
-end)
-}%
-
 ; Copy image data to VRAM
 copy_image:
     lda #0
@@ -128,19 +122,17 @@ copy_image:
     bne .loop
 
     inc BANK_SELECT
-    ;brk #1
     lda #8
     cmp BANK_SELECT
     bne .loop2
     rts
 
-!test 0x600
 
-!test "pixel_copy" {
+    
+!test "pixel_copy"
     SetVReg(0)
     SetVAdr($0000 | INC_1)
     jsr copy_image
-}
 
 pixel:
     stx ADDR_L
@@ -159,7 +151,7 @@ mul320_lo:
 mul320_hi:
     nop
 
-!test "pixel" {
+;!test "pixel"
     stx ADDR_L
     tax
     lda mul320_lo,y
@@ -170,7 +162,7 @@ mul320_hi:
     adc #0
     sta ADDR_M
     stx DATA0
-}
+    rts
 
 
 techtech_effect:
@@ -208,35 +200,35 @@ scales:
 
 save: !byte 0,0
 
-    png = load_png("../data/face.png")
-    png_tiles = layout_tiles(png.pixels, png.width, 8, 8)
-    png_indexes = index_tiles(png_tiles, 8*8)
+    load_png("../data/face.png")
+    layout_image($, 8, 8)
+    image = index_tiles($.pixels, 8*8)
 
-    ;!section "indexes", *
 indexes:
 !if !USE_BITMAP {
-    !fill png_indexes.indexes
+    !fill image.indexes
 }
 indexes_end:
 
 ;------------------- INDEX COPY UNIT TEST -----------------
 
-!test "index_copy" {
+;!test "index_copy"
     SetVReg(0)
     SetVAdr(tileMem | INC_1)
     jsr copy_indexes
-}
+    rts
+
 ; Check first 2 line of screen tiles
 vram = get_vram()
-!rept 10 {
-    !assert compare(vram[tileMem+i*128:tileMem+i*128+80], png_indexes.indexes[i*80:(i+1)*80])
-}
+;rept 10 {
+;    !assert compare(vram[tileMem+i*128:tileMem+i*128+80], png_indexes.indexes[i*80:(i+1)*80])
+;}
 
 ;----------------------------------------------------------
 
     ;!section "colors", *
 colors:
-    !fill convert_palette(png.colors, 12)
+    !fill convert_palette($.colors, 12)
 
 
     !section "IMAGE", 0xa000, NO_STORE|TO_PRG
@@ -244,7 +236,7 @@ pixels:
     !if USE_BITMAP {
         !fill png.pixels
     } else {
-        !fill png_indexes.tiles
+        !fill image.tiles
     }
 
 

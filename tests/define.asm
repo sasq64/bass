@@ -1,4 +1,5 @@
-!define toRadians(a) { a / 360 * 2 * Math.Pi }
+
+toRadians = [a -> a / 360 * 2 * Math.Pi]
 
 
 !section "main", 0x1234

@@ -5,6 +5,7 @@ b = "you"
 
     !section "main", $800
 
+!test "main"
 start:
     nop
     rts
@@ -12,10 +13,6 @@ start:
 text:
     !fill a + b
 end:
-
-!test "main" {
-    jsr start
-}
 
 !print a + b
 

@@ -46,3 +46,4 @@ MOD7:    ADC #7          ; Returns (A+3) modulo 7
          RTS
 MTAB:    DB 1,5,6,3,1,5,3,0,4,2,6,4   	; Month offsets
 
+        !rept 6 { nop }

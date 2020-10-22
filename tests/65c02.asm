@@ -1,7 +1,8 @@
 
-    !cpu 65C02
+    !cpu "65C02"
 
     !section "main",$1000
+    !test
 start:
     !log "Start"
     nop
@@ -69,7 +70,3 @@ table:
     !byte 0,0,0,0
     !byte $55,$aa
 
-!test "test" {
-    !log "Testing"
-    jsr start
-}

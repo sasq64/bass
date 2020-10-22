@@ -17,7 +17,7 @@ for i=1,65536 do
 end
 
 map_bank_read(0x9f, 1, function(adr)
-    print("BANK READ", adr)
+    fmt("BANK READ ${:04x}", adr)
     local offset = adr & 0xff
     -- print("Read", offset)
     if offset >= 0x20 and offset < 0x40 then
@@ -28,12 +28,10 @@ map_bank_read(0x9f, 1, function(adr)
         elseif offset == 0x22 then
             return (vadr[vsel] >> 16) | (vinc[vsel]<<3)
         elseif offset == 0x23 then
-            print("HERE1", vinc[1], #vram, vadr[1])
             res = vram[vadr[1]+1]
             vadr[1] = vadr[1] + increments[vinc[1]+1]
             return res
         elseif offset == 0x24 then
-            print("HERE2", vinc[2])
             res = vram[vadr[2]+1]
             vadr[2] = vadr[2] + increments[vinc[2]+1]
             return res
@@ -41,7 +39,7 @@ map_bank_read(0x9f, 1, function(adr)
         res =  vregs[offset-0x20+1]
         return res
     else
-        print("MEM READ", adr)
+        fmt("MEM READ ${:04x}", adr)
         return mem_read(adr)
     end
 end)

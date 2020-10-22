@@ -16,6 +16,8 @@ bass : debug
 	cmake --build builds/debug -- -j8 bass
 
 
+gtest : debug
+	cmake --build builds/debug -- -j8 gtest
 
 test : debug
 	cmake --build builds/debug -- -j8 tester

@@ -13,6 +13,46 @@
 #include <map>
 #include <vector>
 
+struct EmuPolicy : public sixfive::DefaultPolicy
+{
+    explicit EmuPolicy(sixfive::Machine<EmuPolicy>& m) : machine(m) {}
+
+    static constexpr bool ExitOnStackWrap = true;
+
+    // PC accesses does not normally need to work in IO areas
+    static constexpr int PC_AccessMode = sixfive::Banked;
+
+    // Generic reads and writes should normally not be direct
+    static constexpr int Read_AccessMode = sixfive::Callback;
+    static constexpr int Write_AccessMode = sixfive::Callback;
+
+    static constexpr int MemSize = 65536;
+
+    std::array<Intercept*, 64 * 1024> intercepts;
+
+    sixfive::Machine<EmuPolicy>& machine;
+
+    // This function is run after each opcode. Return true to stop emulation.
+    static bool eachOp(EmuPolicy& policy)
+    {
+        //fmt::print("{:04x}\n", policy.machine.regPC());
+        if (auto* ptr = policy.intercepts[policy.machine.regPC()]) {
+            return ptr->fn(policy.machine.regPC());
+        }
+        return false;
+    }
+};
+void Machine::addIntercept(uint32_t address,
+                           std::function<bool(uint32_t)> const& fn)
+{
+    auto*& ptr = machine->policy().intercepts[address & 0xffff];
+    if (!ptr) {
+        ptr = new Intercept();
+    }
+    ptr->type = Call;
+    ptr->fn = fn;
+}
+
 inline void Check(bool v, std::string const& txt)
 {
     if (!v) throw machine_error(txt);
@@ -20,46 +60,18 @@ inline void Check(bool v, std::string const& txt)
 
 Machine::Machine()
 {
-    machine = std::make_unique<sixfive::Machine<>>();
+    machine = std::make_unique<sixfive::Machine<EmuPolicy>>();
     addSection({"default", 0});
     setSection("default");
-    machine->setBreakFunction(breakFunction, this);
 }
 
-void Machine::breakFunction(int what, void* data)
+void Machine::setCpu(CPU cpu)
 {
-    using sixfive::Reg;
-    auto* thiz = static_cast<Machine*>(data);
-
-    auto it = thiz->break_functions.find(what);
-    if (it != thiz->break_functions.end()) {
-        it->second(what);
-    } else {
-        auto a = thiz->getReg(Reg::A);
-        auto x = thiz->getReg(Reg::X);
-        auto y = thiz->getReg(Reg::Y);
-        auto pc = thiz->getReg(Reg::PC);
-
-        fmt::print("**Error: Unhandled BRK #${:x}\n", what);
-        fmt::print("A:{:x} X:{:x} Y:{:x} PC={:04x}\n", a, x, y, pc);
-        fmt::print("{:04x}: {}\n", pc, thiz->disassemble(&pc));
-
-        exit(0);
-    }
-}
-
-void Machine::setCpu(CPU cpu) {
     cpu65C02 = cpu == CPU_65C02;
     machine->setCPU(cpu65C02);
 }
 
 Machine::~Machine() = default;
-
-void Machine::setBreakFunction(uint8_t what,
-                               std::function<void(uint8_t)> const& fn)
-{
-    break_functions[what] = fn;
-}
 
 Section& Machine::addSection(Section const& s)
 {
@@ -424,11 +436,9 @@ void Machine::write(std::string const& name, OutFmt fmt)
     // bool bankFile = false;
 
     for (auto const& section : non_empty) {
-
         if (section.data.empty()) {
             continue;
         }
-
         if ((section.flags & WriteToDisk) != 0) {
             auto of = createFile(section.name);
             of.write<uint8_t>(section.start & 0xff);
@@ -494,7 +504,10 @@ void Machine::runSetup()
 {
     for (auto const& section : sections) {
         if (section.start < 0x10000 && !section.data.empty()) {
-            LOGD("Writing '%s' to %x", section.name, section.start);
+            if((section.flags & NoStorage) != 0) {
+                continue;
+            }
+            LOGD("Writing '%s' to %x-%x", section.name, section.start, section.start + section.data.size());
             machine->writeRam(section.start, section.data.data(),
                               section.data.size());
         }
@@ -531,8 +544,8 @@ std::string Machine::disassemble(uint32_t* pc)
 {
     auto code = machine->readMem(*pc);
     pc++;
-    auto const& instructions = sixfive::Machine<>::getInstructions();
-    sixfive::Machine<>::Opcode opcode{};
+    auto const& instructions = sixfive::Machine<EmuPolicy>::getInstructions();
+    sixfive::Machine<EmuPolicy>::Opcode opcode{};
 
     std::string name = "???";
     for (auto const& i : instructions) {
@@ -570,7 +583,8 @@ AsmResult Machine::assemble(Instruction const& instr)
     auto arg = instr;
     std::string opcode = utils::toLower(std::string(instr.opcode));
 
-    auto const& instructions = sixfive::Machine<>::getInstructions(cpu65C02);
+    auto const& instructions =
+        sixfive::Machine<EmuPolicy>::getInstructions(cpu65C02);
 
     if (arg.mode == Mode::ZP_REL) {
         auto bit = arg.val >> 24;
@@ -718,6 +732,18 @@ std::vector<uint8_t> Machine::getRam()
     std::vector<uint8_t> data(0x10000);
     machine->readRam(0, &data[0], data.size());
     return data;
+}
+
+void Machine::setRegs(RegState const& regs)
+{
+    using sixfive::Reg;
+    auto const& r = regs.regs;
+    machine->set<Reg::A>(r[0]);
+    machine->set<Reg::X>(r[1]);
+    machine->set<Reg::Y>(r[2]);
+    //machine->set<Reg::SR>(r[3]);
+    //machine->set<Reg::SP>(r[4]);
+    //machine->set<Reg::PC>(r[5]);
 }
 
 void Machine::setReg(sixfive::Reg reg, unsigned v)

@@ -6,6 +6,7 @@
 #include <fmt/format.h>
 
 #include <any>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -33,8 +34,14 @@ private:
 struct Symbol
 {
     std::any value;
+    // This symbol has been read since `clear()`
     bool accessed{false};
+    // This symbol has been defined since `clear()`
     bool defined{false};
+
+    // This symbol is constant and may only be set once.
+    bool final{false};
+
 };
 
 struct SymbolTable
@@ -44,6 +51,24 @@ struct SymbolTable
     std::unordered_set<std::string> accessed;
     bool trace = false;
     bool undef_ok = true;
+
+//    std::vector<std::string> get_undefined() const {
+//
+//        std::vector<std::string> result;
+//        for(auto const& [name, symbol] : syms) {
+//            if (!symbol.defined) {
+//                result.push_back(name);
+//            }
+//        }
+//        return result;
+//    }
+
+    bool is_constant(std::string_view name) const {
+        if(auto sym = get_sym(name)) {
+            return sym->final;
+        }
+        return false;
+    }
 
     void acceptUndefined(bool ok) { undef_ok = ok; }
 
@@ -76,11 +101,10 @@ struct SymbolTable
         syms[std::string(name)] = sym;
     }
 
-    Symbol* get_sym(std::string_view name)
+    std::optional<Symbol> get_sym(std::string_view name) const
     {
-
         auto it = syms.find(std::string(name));
-        return it != syms.end() ? &(it->second) : nullptr;
+        return it != syms.end() ? std::optional(it->second) : std::nullopt;
     }
 
     void set(std::string_view name, std::any const& val)
@@ -91,11 +115,12 @@ struct SymbolTable
         } else if (val.type() == typeid(double)) {
             set(name, std::any_cast<double>(val));
         } else {
-            if (accessed.count(s) > 0) {
-                throw sym_error(
-                    fmt::format("Can not redefine generic any type {} ({})", s,
-                                val.type().name()));
-            }
+            /* if (accessed.count(s) > 0) { */
+            /*     throw sym_error( */
+            /*         fmt::format("Can not redefine generic any type {} ({})",
+             * s, */
+            /*                     val.type().name())); */
+            /* } */
             if (trace && undefined.find(s) != undefined.end()) {
                 fmt::print("Defined {}\n", s);
             }
@@ -111,12 +136,19 @@ struct SymbolTable
             set_sym(s, static_cast<AnyMap>(val));
             return;
         } else {
-            auto it = syms.find(std::string(name));
-            if (it != syms.end()) {
-                if (it->second.defined) {
-                    throw sym_error(fmt::format("'{}' already defined", name));
-                }
-            }
+//            auto it = syms.find(std::string(name));
+//            if (it != syms.end()) {
+//                if (it->second.defined) {
+//                    if (it->second.value.type() == typeid(T) &&
+//                        val == std::any_cast<T>(it->second.value)) {
+//                        fmt::print("Warning: '{}' redefined to same value\n",
+//                                   name);
+//                    } else {
+//                        throw sym_error(fmt::format(
+//                            "'{}' already defined (as different value)", name));
+//                    }
+//                }
+//            }
             if (accessed.count(s) > 0) {
                 LOGD("%s has been accessed", s);
                 auto it = syms.find(s);

@@ -7,6 +7,29 @@
 
 using namespace std::string_literals;
 
+/*
+ * Any type should be settable
+ * Default type T = double
+ * Accessing an unknown returns T{} and flags that
+ * symbol as "accessed".
+ * Setting a value also set "defined".
+ * The symbol table is "valid" if all accessed values
+ * are also defined.
+ * A value that was accessed while unknown should not
+ * be allowed to be set a second time, since then it's
+ * not clear what the value should have been while unknown.
+ *
+ * Symbols can be constant (final) or not.
+ * Unknown symbols automatically become final.
+ *
+ * Dotted symbols
+ *
+ * If setting a symbol 'name' with a value that is a string map,
+ * we iterate over the map and set each entry instead.
+ *
+ * If we read a symbol that is the prefix of several symbols followed
+ * by a dot, we create a map and return instead.
+ */
 TEST_CASE("symbol_table.basic", "[symbols]")
 {
     SymbolTable st;
@@ -20,6 +43,8 @@ TEST_CASE("symbol_table.basic", "[symbols]")
     REQUIRE(st.undefined.empty());
     REQUIRE(st.get<float>("not_here") == 0.0);
     REQUIRE(!st.undefined.empty());
+
+    //REQUIRE(st.is_constant("not_here"));
 
     AnyMap s;
     s["x"] = 3;
@@ -48,7 +73,7 @@ TEST_CASE("symbol_table.basic", "[symbols]")
 
     REQUIRE_THROWS(st.set("a", "hey"s));
 
-    REQUIRE_THROWS(st.set("deep.two", syms));
+    //REQUIRE_THROWS(st.set("deep.two", syms));
 
     REQUIRE(!st.ok());
 
