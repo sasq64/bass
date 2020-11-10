@@ -32,12 +32,19 @@ struct EmuPolicy : public sixfive::DefaultPolicy
 
     sixfive::Machine<EmuPolicy>& machine;
 
+    static inline unsigned last_pc = 0xffffffff;
+
     // This function is run after each opcode. Return true to stop emulation.
     static bool eachOp(EmuPolicy& policy)
     {
-        //fmt::print("{:04x}\n", policy.machine.regPC());
-        if (auto* ptr = policy.intercepts[policy.machine.regPC()]) {
-            return ptr->fn(policy.machine.regPC());
+        auto pc = policy.machine.regPC();
+
+        if (pc != last_pc) {
+            fmt::print("{:04x}\n", pc);
+            if (auto* ptr = policy.intercepts[pc]) {
+                return ptr->fn(pc);
+            }
+            last_pc = pc;
         }
         return false;
     }
@@ -504,10 +511,11 @@ void Machine::runSetup()
 {
     for (auto const& section : sections) {
         if (section.start < 0x10000 && !section.data.empty()) {
-            if((section.flags & NoStorage) != 0) {
+            if ((section.flags & NoStorage) != 0) {
                 continue;
             }
-            LOGD("Writing '%s' to %x-%x", section.name, section.start, section.start + section.data.size());
+            LOGD("Writing '%s' to %x-%x", section.name, section.start,
+                 section.start + section.data.size());
             machine->writeRam(section.start, section.data.data(),
                               section.data.size());
         }
@@ -741,9 +749,9 @@ void Machine::setRegs(RegState const& regs)
     machine->set<Reg::A>(r[0]);
     machine->set<Reg::X>(r[1]);
     machine->set<Reg::Y>(r[2]);
-    //machine->set<Reg::SR>(r[3]);
-    //machine->set<Reg::SP>(r[4]);
-    //machine->set<Reg::PC>(r[5]);
+    // machine->set<Reg::SR>(r[3]);
+    // machine->set<Reg::SP>(r[4]);
+    // machine->set<Reg::PC>(r[5]);
 }
 
 void Machine::setReg(sixfive::Reg reg, unsigned v)

@@ -49,7 +49,7 @@ static Section parseArgs(std::vector<std::any> const& args)
                 result.parent = std::any_cast<std::string_view>(p->second);
             } else if (p->first == "pc") {
                 result.pc = number<int32_t>(p->second);
-            } else if(p->first == "NoStore") {
+            } else if (p->first == "NoStore") {
                 result.flags |= NoStorage;
             }
         } else {
@@ -143,6 +143,11 @@ void initMeta(Assembler& assem)
                     regs.regs[1] = number<unsigned>(p->second);
                 } else if (p->first == "Y") {
                     regs.regs[2] = number<unsigned>(p->second);
+                } else {
+                    if (auto sym = assem.getSymbols().get_sym(p->first)) {
+                        mach.writeRam(number<uint16_t>(sym->value),
+                                      number<uint8_t>(p->second));
+                    }
                 }
             }
         }
@@ -403,19 +408,19 @@ void initMeta(Assembler& assem)
                 if (auto* val = any_cast<Number>(&data)) {
                     d = *val;
                 } else {
-                    //LOGI("Found macro");
+                    // LOGI("Found macro");
                     macro = any_cast<Assembler::Macro>(&data);
-                    for(auto const& i : macro->args) {
-                        //LOGI("Arg %s", i);
+                    for (auto const& i : macro->args) {
+                        // LOGI("Arg %s", i);
                     }
                     call.args.resize(macro->args.size());
                 }
             }
 
-            //LOGI("Fill %d bytes", size);
+            // LOGI("Fill %d bytes", size);
             for (size_t i = 0; i < size; i++) {
                 if (macro != nullptr) {
-                    if(call.args.size() > 0) {
+                    if (call.args.size() > 0) {
                         call.args[0] = any_num(i);
                     }
                     auto res = assem.applyDefine(*macro, call);

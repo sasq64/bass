@@ -1167,6 +1167,7 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
             continue;
         }
         if (rc == ERROR) {
+            tests.clear();
             needsFinalPass = true;
         }
 
