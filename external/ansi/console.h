@@ -128,6 +128,15 @@ public:
 
     void write(std::string_view text) const { terminal->write(text); }
 
+    int32_t read_key()
+    {
+        std::string target;
+        if(terminal->read(target)) {
+            return target[0];
+        }
+        return 0;
+    }
+
     void flush()
     {
         for (size_t y = 0; y < height; y++) {

@@ -9,6 +9,7 @@
 
 #include <array>
 #include <chrono>
+#include <deque>
 #include <thread>
 
 using namespace std::chrono_literals;
@@ -32,7 +33,8 @@ struct TextEmu
         CFillOut,
 
         Key,
-        Joy,
+        Joy0,
+        Joy1,
         TimerLo,
         TimerHi,
         Flags,
@@ -125,15 +127,35 @@ struct TextEmu
         }
     }
 
+    std::deque<int32_t> keys;
+
     TextEmu()
     {
         auto terminal = bbs::create_local_terminal();
         terminal->open();
+	    terminal->write("\x1b[?25l");
         console = std::make_unique<bbs::Console>(std::move(terminal));
 
         auto cw = console->get_width();
         auto ch = console->get_height();
 
+        emu.mapReadCallback(0xd7, 1, this, [](uint16_t adr, void* data) ->uint8_t {
+            auto* emu = static_cast<TextEmu*>(data);
+            auto r = adr & 0xff;
+            if (adr < 0xd780) {
+                if(r == Key) {
+                    if(emu->keys.empty()) {
+                     return 0;
+                    }
+                    auto k = emu->keys.front();
+                    emu->keys.pop_front();
+                    return k;
+                }
+                return emu->regs[r];
+            } else {
+                return emu->palette[adr - 0xd780];
+            }
+        });
         emu.mapWriteCallback(0xd7, 1, this,
                              [](uint16_t adr, uint8_t v, void* data) {
                                  auto* emu = static_cast<TextEmu*>(data);
@@ -184,9 +206,29 @@ int main(int argc, char** argv)
 
     // LOGI("Run %04x %02x %02x", start, data[2], data[3]);
     emu.emu.setPC(start);
-    emu.emu.run();
 
-    emu.console->flush();
+    int cycles = 0;
 
+    using clk = std::chrono::steady_clock;
+
+    auto start_t = clk::now();
+
+    while (cycles == 0) {
+        cycles = emu.emu.run(100000);
+        auto key = emu.console->read_key();
+        if (key != 0) {
+            //LOGI("KEY %x", key);
+            emu.keys.push_back(key);
+        }
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            clk::now() - start_t);
+
+        auto frames = ms.count() / 50;
+
+        emu.regs[TextEmu::TimerLo] = frames & 0xff;
+        emu.regs[TextEmu::TimerHi] = (frames >> 8) & 0xff;
+
+        emu.console->flush();
+    }
     return 0;
 }

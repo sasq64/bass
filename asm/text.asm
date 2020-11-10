@@ -10,32 +10,137 @@ dir = $08
 factor1 = $06
 factor2 = $07
 
+start_t = $09
+
 text_screen = $0400
 
-lda
 
-    lda <text_screen
-    sta ypos
-    lda >text_screen
-    sta ypos_hi
-    lda #0
-    sta xpos
+Key = $d708
+
+!enum Regs
+{
+    WinX = $d700
+    WinY
+    WinW
+    WinH
+
+    RealW
+    RealH
+
+    TextPtr
+    ColorPtr
+
+    CFillIn
+    CFillOut
+
+    Key
+    Joy0
+    Joy1
+    TimerLo
+    TimerHi
+    Flags
+
+}
+
+JOY_LEFT = 1
+JOY_UP = 2
+JOY_DOWN = 4
+JOY_RIGHT = 8
+
+
+!enum {
+    Right
+    Down
+    Left
+    Up
+}
+
+
+start:
+    jsr init
 
 loop:
+    clc
+    lda Regs.TimerLo
+    adc #10
+    sta start_t
+    jsr read_joy
 
-    ldx xpos
-    sta (ypos),x
+    jsr move
+
+    jsr draw
+
+$   lda Regs.TimerLo
+    cmp start_t
+    bne -
+
+    jmp loop
+
+read_joy:
+    ldx Regs.Key
+    beq .out
+
+    cpx #'a'
+    bne +
+    lda #-1
+$   cpx #'d'
+    bne +
+    lda #1
+$
+    clc
+    adc dir
+    and #3
+    sta dir
+
+.out
+    rts
 
 
-!test "move_left", dir=2,xpos=3,ypos=0,ypos_hi=$04
-!test "move_down", dir=1,xpos=3,ypos=0,ypos_hi=$04
+try:
+    jsr move
+    jsr draw
+    jsr move
+    jsr draw
+    lda #1
+    sta dir
+    jsr move
+    jsr draw
+    jsr move
+    jsr draw
+    rts
+    
+init:
+    lda #<text_screen
+    sta ypos
+    lda #>text_screen
+    sta ypos_hi
+    lda #Right
+    sta xpos
+    sta dir
+    rts
+
+draw:
+    lda #' '
+    ldy xpos
+    sta (ypos),y
+
+    rts
+
+    !test "draw"
+    jsr init
+    jsr draw
+    rts
+
+
+!test "move_left", dir=Left,xpos=3,ypos=0,ypos_hi=$04
+!test "move_down", dir=Down,xpos=9,ypos=40*6,ypos_hi=$04
 move:
     lda dir
-    cmp #1
+    cmp #Down
     beq down
-    cmp #2
+    cmp #Left
     beq left
-    cmp #3
+    cmp #Up
     beq up
 
 right:
@@ -46,19 +151,20 @@ left:
     jmp done
 down:
     !log "Going down"
-    lda ypos+1
+    lda ypos
+    clc
     adc #40
-    sta ypos+1
+    sta ypos
     bcc done
-    inc ypos
+    inc ypos_hi
     jmp done
 up:
-    lda ypos+1
+    lda ypos
     sec
     sbc #40
-    sta ypos+1
+    sta ypos
     bcs done
-    dec ypos
+    dec ypos_hi
 done:
     rts
 
@@ -73,6 +179,16 @@ $
     jmp -
 $
     rts
+
+    !print tests.move_left.ram[0:16]
+    !print tests.move_down.ram[0:16]
+
+    !assert tests.move_left.ram[dir] == 2
+    !assert tests.move_left.ram[xpos] == 2
+
+    !assert tests.move_down.ram[dir] == 1
+    !assert tests.move_down.ram[ypos] == 24
+    !assert tests.move_down.ram[ypos_hi] == $05
 
 text:
     !ascii

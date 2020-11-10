@@ -191,6 +191,6 @@ inline void printArg(std::any const& arg)
 struct RegState
 {
     std::array<unsigned, 6> regs{0,0,0,0,0,0};
-
+    std::unordered_map<uint16_t, uint8_t> ram;
 };
 

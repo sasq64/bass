@@ -752,6 +752,10 @@ void Machine::setRegs(RegState const& regs)
     // machine->set<Reg::SR>(r[3]);
     // machine->set<Reg::SP>(r[4]);
     // machine->set<Reg::PC>(r[5]);
+    for(auto const& [adr, val] : regs.ram) {
+        machine->writeRam(adr, val);
+    }
+
 }
 
 void Machine::setReg(sixfive::Reg reg, unsigned v)

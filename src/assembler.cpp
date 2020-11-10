@@ -200,6 +200,13 @@ void Assembler::addTest(std::string name, uint32_t start, RegState const& regs)
             name = "unnamed_" + std::to_string(start);
         }
     }
+    if (name != "unnamed" && passNo == 0) {
+        AnyMap res = {{"A", num(0)},      {"X", num(0)},
+                      {"Y", num(0)},      {"SR", num(0)},
+                      {"SP", num(0)},     {"PC", num(0)},
+                      {"cycles", num(0)}, {"ram", mach->getRam()}};
+        syms.set("tests."s + name, res);
+    }
     tests.push_back({name, start, regs});
 }
 
@@ -213,6 +220,7 @@ void Assembler::runTest(Test const& test)
     inTest++;
 
     mach->setRegs(test.regs);
+
     auto cycles = mach->run(start);
     if (cycles > 16777200) {
         fmt::print("*** Test {} : did not end!\n", test.name);
@@ -718,6 +726,17 @@ void Assembler::setupRules()
 
     parser.after("EnumBlock", [&](SV& sv) -> std::any {
         AnyMap m;
+        nextEnumValue = 0;
+        if (!sv[0].has_value()) {
+            for (size_t i = 1; i < sv.size(); i++) {
+                if (sv[i].has_value()) {
+                    auto const& [name, value] =
+                        any_cast<std::pair<std::string_view, Number>>(sv[i]);
+                        syms[name] = value;
+                }
+            }
+            return Meta{};
+        }
         auto sym = any_cast<std::string_view>(sv[0]);
         for (size_t i = 1; i < sv.size(); i++) {
             if (sv[i].has_value()) {

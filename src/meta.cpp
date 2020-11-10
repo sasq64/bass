@@ -145,8 +145,8 @@ void initMeta(Assembler& assem)
                     regs.regs[2] = number<unsigned>(p->second);
                 } else {
                     if (auto sym = assem.getSymbols().get_sym(p->first)) {
-                        mach.writeRam(number<uint16_t>(sym->value),
-                                      number<uint8_t>(p->second));
+                        regs.ram[number<uint16_t>(sym->value)] =
+                            number<uint8_t>(p->second);
                     }
                 }
             }

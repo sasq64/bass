@@ -172,7 +172,6 @@ struct Machine
     {
         while (len > 0) {
             rcallbacks[bank] = cb; // NOLINT
-            LOGI("Mapping bank %x", bank);
             rcbdata[bank++] = data; // NOLINT
             len--;
         }
@@ -199,6 +198,7 @@ struct Machine
     {
         auto& p = policy();
         cycles = 0;
+        realCycles = 0;
         while (cycles < toCycles) {
             if (POLICY::eachOp(p)) break;
             auto code = ReadPC();
@@ -208,9 +208,11 @@ struct Machine
             cycles += op.cycles;
         }
         if (realCycles != 0) {
+            LOGI("RTS");
             cycles = realCycles;
             realCycles = 0;
-        }
+        } else return 0;
+
         return cycles;
     }
 

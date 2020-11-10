@@ -34,8 +34,10 @@ IfDecl <- '!if' WS Expression
 IfDefDecl <- '!ifdef' WS Symbol
 IfNDefDecl <- '!ifndef' WS Symbol
 
-EnumBlock <- '!enum' WS Symbol EndOfLine? _ '{' _ EndOfLine? EnumLine* _ '}'
+EnumBlock <- '!enum' WS OptSymbol EndOfLine? _ '{' _ EndOfLine? EnumLine* _ '}'
 EnumLine <- EndOfLine / ( _ Symbol (_ '=' Expression)?  _ (&'}' / EndOfLine) _)
+
+OptSymbol <- Symbol?
 
 MetaName <- '!' Symbol
 
