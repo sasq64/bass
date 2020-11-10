@@ -14,6 +14,25 @@
 
 using namespace std::chrono_literals;
 
+static constexpr uint8_t c64pal[] = {
+    0xFF, 0xFF, 0xFF, // WHITE
+    0x68, 0x37, 0x2B, // RED
+    0x58, 0x8D, 0x43, // GREEN
+    0x35, 0x28, 0x79, // BLUE
+    0x6F, 0x4F, 0x25, // ORANGE
+    0x00, 0x00, 0x00, // BLACK
+    0x43, 0x39, 0x00, // BROWN
+    0x9A, 0x67, 0x59, // LIGHT_READ
+    0x44, 0x44, 0x44, // DARK_GREY
+    0x6C, 0x6C, 0x6C, // GREY
+    0x9A, 0xD2, 0x84, // LIGHT_GREEN
+    0x6C, 0x5E, 0xB5, // LIGHT_BLUE
+    0x95, 0x95, 0x95, // LIGHT_GREY
+    0x6F, 0x3D, 0x86, // PURPLE
+    0xB8, 0xC7, 0x6F, // YELLOW
+    0x70, 0xA4, 0xB2, // CYAN
+};
+
 struct TextEmu
 {
     enum Regs
@@ -122,6 +141,7 @@ struct TextEmu
                 if (x < regs[WinX] || x >= (regs[WinX] + regs[WinW]) ||
                     y < regs[WinY] || y >= (regs[WinY] + regs[WinH])) {
                     console->set_xy(x, y);
+                    console->put(" ");
                 }
             }
         }
@@ -177,15 +197,18 @@ struct TextEmu
 
         regs[TextPtr] = 0x04;
         regs[ColorPtr] = 0xd8;
-        for (int i = 0; i < 16 * 6; i++) {
-            palette[i] = i >= 16 * 3 ? 0x00 : 0xc0;
+
+
+        for (int i = 0; i < 16 * 3; i++) {
+            palette[i] = c64pal[i];
+            palette[i+16*3] = c64pal[i];
         }
         updateRegs();
         for (auto& c : textRam) {
             c = 0x20;
         }
         for (auto& c : colorRam) {
-            c = 0;
+            c = 0xca;
         }
     }
 };

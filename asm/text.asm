@@ -42,11 +42,6 @@ Key = $d708
 
 }
 
-JOY_LEFT = 1
-JOY_UP = 2
-JOY_DOWN = 4
-JOY_RIGHT = 8
-
 
 !enum {
     Right
@@ -59,10 +54,13 @@ JOY_RIGHT = 8
 start:
     jsr init
 
+    lda #$33
+    sta Regs.CFillOut
+
 loop:
     clc
     lda Regs.TimerLo
-    adc #10
+    adc #3
     sta start_t
     jsr read_joy
 
@@ -120,7 +118,7 @@ init:
     rts
 
 draw:
-    lda #' '
+    lda #'*'
     ldy xpos
     sta (ypos),y
 

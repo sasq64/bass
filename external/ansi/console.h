@@ -15,6 +15,7 @@ namespace bbs {
 class Console
 {
 public:
+
     enum AnsiColors
     {
         WHITE,
@@ -98,7 +99,6 @@ public:
         height = h;
         grid.resize(w * h);
         old_grid.resize(w * h);
-
     }
 
     void set_xy(size_t x, size_t y)
@@ -131,7 +131,7 @@ public:
     int32_t read_key()
     {
         std::string target;
-        if(terminal->read(target)) {
+        if (terminal->read(target)) {
             return target[0];
         }
         return 0;
