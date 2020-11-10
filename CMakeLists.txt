@@ -48,6 +48,7 @@ add_subdirectory(external/CLI11)
 add_subdirectory(external/coreutils)
 add_subdirectory(external/lua)
 add_subdirectory(external/sol3)
+add_subdirectory(external/ansi)
 
 add_library(lodepng STATIC external/lodepng/lodepng)
 target_include_directories(lodepng PUBLIC external/lodepng)
@@ -68,6 +69,11 @@ target_compile_options(badlib PUBLIC ${WARNINGS})
 target_include_directories(badlib PRIVATE external/peglib PUBLIC src)
 target_link_libraries(badlib PUBLIC coreutils
         PRIVATE lua lodepng fmt ${THREAD_LIB} PUBLIC sol2::sol2 sha512)
+
+
+add_executable(atest src/ansi.cpp)
+target_compile_definitions(atest PUBLIC USE_FMT)
+target_link_libraries(atest PRIVATE ansi)
 
 if(FUZZ)
     add_executable(bazz src/fuzz.cpp)
