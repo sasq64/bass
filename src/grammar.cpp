@@ -34,7 +34,7 @@ IfDecl <- '!if' WS Expression
 IfDefDecl <- '!ifdef' WS Symbol
 IfNDefDecl <- '!ifndef' WS Symbol
 
-EnumBlock <- '!enum' WS OptSymbol EndOfLine? _ '{' _ EndOfLine? EnumLine* _ '}'
+EnumBlock <- '!enum' WS OptSymbol EndOfLine? _ '{' EnumLine* _ '}'
 EnumLine <- EndOfLine / ( _ Symbol (_ '=' Expression)?  _ (&'}' / EndOfLine) _)
 
 OptSymbol <- Symbol?
@@ -113,7 +113,7 @@ AsmSymbol <- LabelChar / ( DotSymbol ('[' Expression ']')? )
 
 LabelChar <- '-' / '+' / '$'
 
-~EndOfLine <- Comment? EOL
+~EndOfLine <- _ Comment? EOL
 Comment <- ';' (!EOL .)*
 EOL <- '\r\n' / '\r' / '\n'
 EOT <- !.

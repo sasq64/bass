@@ -12,13 +12,14 @@ factor2 = $07
 
 start_t = $09
 
-text_screen = $0400
+text_screen = $400
 
 
 Key = $d708
 
 !enum Regs
 {
+    ; Window into real console. Default to 40x25
     WinX = $d700
     WinY
     WinW
@@ -30,18 +31,32 @@ Key = $d708
     TextPtr
     ColorPtr
 
+    ; Write to fill inside of window with given
+    ; color
     CFillIn
+    
+    ; Write to fill border with given color
     CFillOut
 
+    ; Read keyboard fifo. 0 means empty
     Key
+    ; Read game controllers, if available. One bit
+    ; per key. Not always available
     Joy0
     Joy1
+
+    ; Timer ticks 1000 / TimerDiv per seond
     TimerLo
     TimerHi
+
+    TimerDiv
+
+    ; 0:1 0 = Ascii
+    ;     1 = Petscii
+    ;     2 = UTF-16
     Flags
 
 }
-
 
 !enum {
     Right
@@ -50,12 +65,34 @@ Key = $d708
     Up
 }
 
+!enum {
+    White
+    ; Comment
+    Red
+    Green
+    Blue
+    Orange
+    Black
+    Brown
+    LightRead
+    DarkGrey
+    Grey
+    LightGreen
+    LightBlue
+    LightGrey
+    Purple
+    Yellow
+    Cyan   
+}
+
 
 start:
     jsr init
 
-    lda #$33
+    lda #LightBlue
     sta Regs.CFillOut
+    lda #Blue
+    sta Regs.CFillIn
 
 loop:
     clc

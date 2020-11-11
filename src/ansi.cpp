@@ -124,15 +124,26 @@ struct TextEmu
     }
     void fillInside()
     {
+        auto cw = console->get_width();
+        auto ch = console->get_height();
         auto v = regs[CFillIn];
-        for (int i = 0; i < regs[WinH] * regs[WinW]; i++) {
-            colorRam[i] = v;
+        set_color(v);
+        size_t i = 0;
+        for (size_t y = 0; y < ch; y++) {
+            for (size_t x = 0; x < cw; x++) {
+                if (x >= regs[WinX] && x < (regs[WinX] + regs[WinW]) &&
+                    y >= regs[WinY] && y < (regs[WinY] + regs[WinH])) {
+                    auto t = textRam[i];
+                    colorRam[i++] = v;
+                    console->set_xy(x, y);
+                    console->put(std::string(1, (char)t));
+                }
+            }
         }
     }
 
     void fillOutside()
     {
-
         auto cw = console->get_width();
         auto ch = console->get_height();
         set_color(regs[CFillOut]);
@@ -153,29 +164,30 @@ struct TextEmu
     {
         auto terminal = bbs::create_local_terminal();
         terminal->open();
-	    terminal->write("\x1b[?25l");
+        terminal->write("\x1b[?25l");
         console = std::make_unique<bbs::Console>(std::move(terminal));
 
         auto cw = console->get_width();
         auto ch = console->get_height();
 
-        emu.mapReadCallback(0xd7, 1, this, [](uint16_t adr, void* data) ->uint8_t {
-            auto* emu = static_cast<TextEmu*>(data);
-            auto r = adr & 0xff;
-            if (adr < 0xd780) {
-                if(r == Key) {
-                    if(emu->keys.empty()) {
-                     return 0;
-                    }
-                    auto k = emu->keys.front();
-                    emu->keys.pop_front();
-                    return k;
-                }
-                return emu->regs[r];
-            } else {
-                return emu->palette[adr - 0xd780];
-            }
-        });
+        emu.mapReadCallback(0xd7, 1, this,
+                            [](uint16_t adr, void* data) -> uint8_t {
+                                auto* emu = static_cast<TextEmu*>(data);
+                                auto r = adr & 0xff;
+                                if (adr < 0xd780) {
+                                    if (r == Key) {
+                                        if (emu->keys.empty()) {
+                                            return 0;
+                                        }
+                                        auto k = emu->keys.front();
+                                        emu->keys.pop_front();
+                                        return k;
+                                    }
+                                    return emu->regs[r];
+                                } else {
+                                    return emu->palette[adr - 0xd780];
+                                }
+                            });
         emu.mapWriteCallback(0xd7, 1, this,
                              [](uint16_t adr, uint8_t v, void* data) {
                                  auto* emu = static_cast<TextEmu*>(data);
@@ -184,6 +196,8 @@ struct TextEmu
                                      emu->regs[r] = v;
                                      if (r == CFillOut) {
                                          emu->fillOutside();
+                                     } else if (r == CFillIn) {
+                                         emu->fillInside();
                                      }
                                      emu->updateRegs();
                                  } else {
@@ -198,10 +212,9 @@ struct TextEmu
         regs[TextPtr] = 0x04;
         regs[ColorPtr] = 0xd8;
 
-
         for (int i = 0; i < 16 * 3; i++) {
             palette[i] = c64pal[i];
-            palette[i+16*3] = c64pal[i];
+            palette[i + 16 * 3] = c64pal[i];
         }
         updateRegs();
         for (auto& c : textRam) {
@@ -240,7 +253,7 @@ int main(int argc, char** argv)
         cycles = emu.emu.run(100000);
         auto key = emu.console->read_key();
         if (key != 0) {
-            //LOGI("KEY %x", key);
+            // LOGI("KEY %x", key);
             emu.keys.push_back(key);
         }
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
