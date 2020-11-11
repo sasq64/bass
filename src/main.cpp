@@ -2,6 +2,7 @@
 #include "assembler.h"
 #include "defines.h"
 #include "machine.h"
+#include "text_emu.h"
 
 #include <coreutils/file.h>
 #include <coreutils/log.h>
@@ -31,6 +32,7 @@ int main(int argc, char** argv)
     bool showUndef = false;
     bool showTrace = false;
     bool quiet = false;
+    bool doRun = false;
     int maxPasses = 10;
     std::string symbolFile;
     OutFmt outFmt = OutFmt::Prg;
@@ -46,6 +48,7 @@ int main(int argc, char** argv)
     app.add_option("-f,--format", outFmt, "Output format")
         ->transform(CLI::CheckedTransformer(tr, CLI::ignore_case));
     app.add_flag("--trace", showTrace, "Trace rule invocations");
+    app.add_flag("--run", doRun, "Run program");
     app.add_option("--max-passes", maxPasses, "Max assembler passes");
     app.add_flag("--show-undefined", showUndef,
                  "Show undefined after each pass");
@@ -124,6 +127,20 @@ int main(int argc, char** argv)
     if (failed) {
         return 1;
     }
+
+    if(doRun) {
+        TextEmu emu;
+        int32_t start = 0x10000;
+        for(auto const& s : mach.getSections()) {
+            if(!s.data.empty() && (s.flags & NoStorage) == 0) {
+            emu.load(s.start, s.data);
+            if(s.start < start) { start = s.start; }
+           }
+        }
+        emu.run(start);
+    }
+
+
     try {
         mach.write(outFile, outFmt);
     } catch (utils::io_exception& e) {

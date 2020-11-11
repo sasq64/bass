@@ -52,9 +52,11 @@ public:
         write(protocol.set_color(cur_fg, cur_bg));
         write(protocol.goto_xy(0, 0));
         write(protocol.clear());
+        write("\x1b[?25l");
 
         resize(terminal->width(), terminal->height());
     }
+    ~Console() { write("\x1b[?25h"); }
 
     using ColorIndex = uint16_t;
     using Char = uint16_t;

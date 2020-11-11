@@ -70,18 +70,13 @@ target_include_directories(badlib PRIVATE external/peglib PUBLIC src)
 target_link_libraries(badlib PUBLIC coreutils
         PRIVATE lua lodepng fmt ${THREAD_LIB} PUBLIC sol2::sol2 sha512)
 
-
-add_executable(atest src/ansi.cpp)
-target_compile_definitions(atest PUBLIC USE_FMT)
-target_link_libraries(atest PRIVATE ansi)
-
 if(FUZZ)
     add_executable(bazz src/fuzz.cpp)
     target_link_libraries(bazz PRIVATE badlib)
 else()
-    add_executable(bass src/main.cpp)
+    add_executable(bass src/main.cpp src/text_emu.cpp)
     target_link_options(bass PRIVATE ${THREAD_OPTIONS})
-    target_link_libraries(bass PRIVATE badlib CLI11::CLI11)
+    target_link_libraries(bass PRIVATE badlib CLI11::CLI11 ansi)
 
     add_executable(gtest src/gtest.cpp src/grammar.cpp)
     target_link_options(gtest PRIVATE ${THREAD_OPTIONS})
