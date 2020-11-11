@@ -2,6 +2,7 @@
 
 #include <ansi/console.h>
 #include <ansi/terminal.h>
+#include <thread>
 
 #include "emulator.h"
 
@@ -184,42 +185,55 @@ TextEmu::TextEmu()
     }
 }
 
-void TextEmu::run(uint16_t start)
+void TextEmu::run(uint16_t pc)
 {
-    regs[TextEmu::CFillOut] = 0x11;
-    fillOutside();
-
-    // LOGI("Run %04x %02x %02x", start, data[2], data[3]);
-    emu->setPC(start);
-
-    int cycles = 0;
-
-    using clk = std::chrono::steady_clock;
-
-    auto start_t = clk::now();
-
-    while (cycles == 0) {
-        cycles = emu->run(100000);
-        auto key = console->read_key();
-        if (key != 0) {
-            // LOGI("KEY %x", key);
-            keys.push_back(key);
-        }
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            clk::now() - start_t);
-
-        auto frames = ms.count() / 50;
-
-        regs[TextEmu::TimerLo] = frames & 0xff;
-        regs[TextEmu::TimerHi] = (frames >> 8) & 0xff;
-
-        console->flush();
+    start(pc);
+    bool quit = false;
+    while(!quit) {
+        quit = update();
     }
+}
+
+bool TextEmu::update()
+{
+    auto cycles = emu->run(10000);
+    auto key = console->read_key();
+    if (key != 0) {
+        keys.push_back(key);
+    }
+
+    std::this_thread::sleep_for(1ms);
+
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(clk::now() -
+                                                                    start_t);
+
+    auto frames = ms.count() / 50;
+
+    regs[TimerLo] = frames & 0xff;
+    regs[TimerHi] = (frames >> 8) & 0xff;
+
+    console->flush();
+
+    if ((regs[Reset] & 1) == 1) {
+        return true;
+    }
+
+    return cycles != 0;
 }
 
 void TextEmu::load(uint16_t start, uint8_t const* ptr, size_t size) const
 {
     emu->writeRam(start, ptr, size);
+}
+
+void TextEmu::start(uint16_t pc)
+{
+    regs[CFillOut] = 0x11;
+    fillOutside();
+
+    // LOGI("Run %04x %02x %02x", start, data[2], data[3]);
+    emu->setPC(pc);
+    start_t = clk::now();
 }
 
 TextEmu::~TextEmu() = default;

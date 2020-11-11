@@ -14,6 +14,7 @@ namespace bbs {
 
 class Console
 {
+    using Protocol = AnsiProtocol;
 public:
 
     enum AnsiColors
@@ -130,11 +131,11 @@ public:
 
     void write(std::string_view text) const { terminal->write(text); }
 
-    int32_t read_key()
+    int32_t read_key() const
     {
         std::string target;
         if (terminal->read(target)) {
-            return target[0];
+            return Protocol::translate_key(target);
         }
         return 0;
     }
@@ -164,36 +165,6 @@ public:
     }
 
 #if 0
-    enum
-    {
-        KEY_ESCAPE = 0x1b,
-        KEY_BACKSPACE = 0x10000,
-        KEY_LEFT,
-        KEY_UP,
-        KEY_RIGHT,
-        KEY_DOWN,
-        KEY_PAGEUP,
-        KEY_PAGEDOWN,
-        KEY_HOME,
-        KEY_END,
-        KEY_ENTER,
-        KEY_TAB,
-        KEY_DELETE,
-
-        KEY_F1,
-        KEY_F2,
-        KEY_F3,
-        KEY_F4,
-        KEY_F5,
-        KEY_F6,
-        KEY_F7,
-        KEY_F8,
-
-        KEY_UNKNOWN = 0x1fffe,
-        KEY_TIMEOUT = 0x1ffff
-
-    };
-
     enum
     {
         CODE_CRLF = 0x2028

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <memory>
@@ -39,7 +40,9 @@ struct TextEmu
         Joy1,
         TimerLo,
         TimerHi,
+        TimerDiv,
         Flags,
+        Reset
 
     };
     std::unique_ptr<sixfive::Machine<sixfive::DefaultPolicy>> emu;
@@ -67,4 +70,9 @@ struct TextEmu
     {
         load(start, data.data(), data.size());
     }
+    void start(uint16_t pc);
+    bool update();
+    using clk = std::chrono::steady_clock;
+    clk::time_point start_t;
 };
+

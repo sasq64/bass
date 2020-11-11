@@ -70,7 +70,7 @@ int main(int argc, char** argv)
         app.parse(argc, argv);
         showHelp = (*help || (sourceFiles.empty() && scriptFiles.empty()));
         if (showHelp) {
-            if(!quiet) puts(banner + 1);
+            if (!quiet) puts(banner + 1);
 
             throw CLI::CallForHelp();
         }
@@ -78,7 +78,7 @@ int main(int argc, char** argv)
         app.exit(e);
     }
     if (showHelp) return 0;
-    
+
     Assembler assem;
     assem.setMaxPasses(maxPasses);
     assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
@@ -112,34 +112,67 @@ int main(int argc, char** argv)
     }
 
     logging::setLevel(logging::Level::Info);
-    bool failed = false;
-    for (auto const& sourceFile : sourceFiles) {
-        auto sp = utils::path(sourceFile);
-        if (!assem.parse_path(sp)) {
-            for (auto const& e : assem.getErrors()) {
-                if (e.level == ErrLevel::Error) failed = true;
-                fmt::print("{}:{}: {}: {}\n", e.file, e.line,
-                           e.level == ErrLevel::Warning ? "warning" : "error",
-                           e.message.c_str());
+
+    while (true) {
+
+        bool failed = false;
+        for (auto const& sourceFile : sourceFiles) {
+            auto sp = utils::path(sourceFile);
+            if (!assem.parse_path(sp)) {
+                for (auto const& e : assem.getErrors()) {
+                    if (e.level == ErrLevel::Error) failed = true;
+                    fmt::print("{}:{}: {}: {}\n", e.file, e.line,
+                               e.level == ErrLevel::Warning ? "warning"
+                                                            : "error",
+                               e.message.c_str());
+                }
             }
         }
-    }
-    if (failed) {
-        return 1;
-    }
-
-    if(doRun) {
-        TextEmu emu;
-        int32_t start = 0x10000;
-        for(auto const& s : mach.getSections()) {
-            if(!s.data.empty() && (s.flags & NoStorage) == 0) {
-            emu.load(s.start, s.data);
-            if(s.start < start) { start = s.start; }
-           }
+        if (failed) {
+            return 1;
         }
-        emu.run(start);
-    }
 
+        if (!doRun) {
+            break;
+        }
+        TextEmu emu;
+
+        std::vector<struct stat> stats(sourceFiles.size());
+        size_t i = 0;
+        for (auto const& sourceFile : sourceFiles) {
+            stat(sourceFile.c_str(), &stats[i++]);
+        }
+        int32_t start = 0x10000;
+        for (auto const& s : mach.getSections()) {
+            if (!s.data.empty() && (s.flags & NoStorage) == 0) {
+                emu.load(s.start, s.data);
+                if (s.start < start) {
+                    start = s.start;
+                }
+            }
+        }
+        emu.start(start);
+        bool quit = false;
+        bool recompile = false;
+        while (!quit) {
+            quit = emu.update();
+            i = 0;
+            struct stat ss{};
+            for (auto const& sourceFile : sourceFiles) {
+                auto* os = &stats[i++];
+                stat(sourceFile.c_str(), &ss);
+                if (os->st_mtim.tv_sec != ss.st_mtim.tv_sec) {
+                    recompile = true;
+                    quit = true;
+                    break;
+                }
+            }
+        }
+        if(recompile) {
+            continue;
+        }
+        return 0;
+    }
 
     try {
         mach.write(outFile, outFmt);

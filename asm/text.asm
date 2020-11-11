@@ -1,3 +1,4 @@
+    !include "text.inc"
 
     !section "main", $8000
 
@@ -7,56 +8,14 @@ ypos_hi = $05
 
 dir = $08
 
+
+
 factor1 = $06
 factor2 = $07
 
 start_t = $09
 
 text_screen = $400
-
-
-Key = $d708
-
-!enum Regs
-{
-    ; Window into real console. Default to 40x25
-    WinX = $d700
-    WinY
-    WinW
-    WinH
-
-    RealW
-    RealH
-
-    TextPtr
-    ColorPtr
-
-    ; Write to fill inside of window with given
-    ; color
-    CFillIn
-    
-    ; Write to fill border with given color
-    CFillOut
-
-    ; Read keyboard fifo. 0 means empty
-    Key
-    ; Read game controllers, if available. One bit
-    ; per key. Not always available
-    Joy0
-    Joy1
-
-    ; Timer ticks 1000 / TimerDiv per seond
-    TimerLo
-    TimerHi
-
-    TimerDiv
-
-    ; 0:1 0 = Ascii
-    ;     1 = Petscii
-    ;     2 = UTF-16
-    Flags
-
-}
 
 !enum {
     Right
@@ -65,31 +24,11 @@ Key = $d708
     Up
 }
 
-!enum {
-    White
-    ; Comment
-    Red
-    Green
-    Blue
-    Orange
-    Black
-    Brown
-    LightRead
-    DarkGrey
-    Grey
-    LightGreen
-    LightBlue
-    LightGrey
-    Purple
-    Yellow
-    Cyan   
-}
-
 
 start:
     jsr init
 
-    lda #LightBlue
+    lda #Grey
     sta Regs.CFillOut
     lda #Blue
     sta Regs.CFillIn
@@ -97,7 +36,7 @@ start:
 loop:
     clc
     lda Regs.TimerLo
-    adc #3
+    adc #5
     sta start_t
     jsr read_joy
 
@@ -115,10 +54,15 @@ read_joy:
     ldx Regs.Key
     beq .out
 
-    cpx #'a'
+    cpx #KEY.ESCAPE
+    bne +
+    inc Regs.Reset
+    jmp  *
+
+$   cpx #KEY.LEFT
     bne +
     lda #-1
-$   cpx #'d'
+$   cpx #KEY.RIGHT
     bne +
     lda #1
 $
@@ -130,19 +74,6 @@ $
 .out
     rts
 
-
-try:
-    jsr move
-    jsr draw
-    jsr move
-    jsr draw
-    lda #1
-    sta dir
-    jsr move
-    jsr draw
-    jsr move
-    jsr draw
-    rts
     
 init:
     lda #<text_screen
