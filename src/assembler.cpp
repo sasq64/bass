@@ -194,20 +194,20 @@ int Assembler::checkUndefined()
 
 void Assembler::addTest(std::string name, uint32_t start, RegState const& regs)
 {
+
+    tests.push_back({name, start, regs});
     if (name.empty()) {
-        name = labelMap[start];
-        if (name.empty()) {
-            name = "unnamed_" + std::to_string(start);
-        }
+        pendingTest = &tests.back();
+        return;
     }
-    if (name != "unnamed" && passNo == 0) {
+
+    if (passNo == 0) {
         AnyMap res = {{"A", num(0)},      {"X", num(0)},
                       {"Y", num(0)},      {"SR", num(0)},
                       {"SP", num(0)},     {"PC", num(0)},
                       {"cycles", num(0)}, {"ram", mach->getRam()}};
         syms.set("tests."s + name, res);
     }
-    tests.push_back({name, start, regs});
 }
 
 void Assembler::runTest(Test const& test)
@@ -451,7 +451,22 @@ void Assembler::handleLabel(std::any const& lbl)
     }
     // LOGI("Label %s=%x", label, mach->getPC());
     syms.set(label, static_cast<Number>(mach->getPC()));
-    labelMap[mach->getPC()] = label;
+    if (pendingTest != nullptr) {
+        auto* test = pendingTest;
+        pendingTest = nullptr;
+        if(passNo == 0) {
+            AnyMap res = {{"A", num(0)},      {"X", num(0)},
+                          {"Y", num(0)},      {"SR", num(0)},
+                          {"SP", num(0)},     {"PC", num(0)},
+                          {"cycles", num(0)}, {"ram", mach->getRam()}};
+            syms.set("tests."s + label, res);
+        }
+        if (mach->getPC() == test->start) {
+            test->name = label;
+        } else {
+            throw parse_error("No label found after anonymous test");
+        }
+    }
 }
 
 template <typename A, typename B>
@@ -732,7 +747,7 @@ void Assembler::setupRules()
                 if (sv[i].has_value()) {
                     auto const& [name, value] =
                         any_cast<std::pair<std::string_view, Number>>(sv[i]);
-                        syms[name] = value;
+                    syms[name] = value;
                 }
             }
             return Meta{};

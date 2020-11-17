@@ -40,7 +40,7 @@ struct EmuPolicy : public sixfive::DefaultPolicy
         auto pc = policy.machine.regPC();
 
         if (pc != last_pc) {
-            fmt::print("{:04x}\n", pc);
+            //fmt::print("{:04x}\n", pc);
             if (auto* ptr = policy.intercepts[pc]) {
                 return ptr->fn(pc);
             }

@@ -226,7 +226,7 @@ private:
     std::function<bool(uint32_t)> logFunction;
     std::function<bool(uint32_t)> checkFunction;
 
-    std::unordered_map<uint32_t, std::string> labelMap;
+    Test* pendingTest = nullptr;
     std::vector<Test> tests;
 
     std::deque<std::string_view> scopes;
