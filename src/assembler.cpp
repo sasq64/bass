@@ -847,7 +847,7 @@ void Assembler::setupRules()
         {"Acc", Mode::ACC}, {"Imm", Mode::IMM},
     };
     auto buildArg = [](SV& sv) -> std::any {
-        auto mode = modeMap.at(sv.name());
+        auto mode = modeMap.at(std::string(sv.name()));
         return Instruction{"", mode,
                            mode == Mode::ACC ? 0 : any_cast<Number>(sv[0])};
     };

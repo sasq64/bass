@@ -46,7 +46,7 @@ public:
     std::any operator[](size_t i) const;
     std::string_view token_view() const;
     size_t size() const;
-    const std::string& name() const;
+    std::string_view name() const;
 
     AstNode get_node() const { return ast; }
 
@@ -90,6 +90,8 @@ class Parser
     std::unordered_map<std::string, ActionFn> postActions;
     std::string currentFile;
     std::string_view currentSource;
+    std::vector<std::string_view> ruleNames;
+    std::unordered_map<std::string_view, size_t> ruleMap;
 
 
     std::unique_ptr<peg::parser> p;

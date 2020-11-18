@@ -48,7 +48,8 @@ size_t SemanticValues::size() const
 {
     return ast->v.size();
 }
-const std::string& SemanticValues::name() const
+
+std::string_view SemanticValues::name() const
 {
     return ast->name;
 }
@@ -113,30 +114,52 @@ void forAllNodesTop(AstNode const& root, FN const& fn)
 //    fn(root);
 //}
 
+void write(utils::File &f, uint32_t const& t) {
+    if((t & 0xffff'8000) == 0) {
+        f.write<uint16_t>(t);
+        return;
+    }
+    f.write<uint16_t>((t & 0x7fff) | 0x8000);
+    f.write<uint16_t>(t >> 15);
+}
+
+uint32_t read(utils::File &f)
+{
+    uint32_t t = f.read<uint16_t>();
+    if((t & 0x8000) == 0) {
+        return t;
+    }
+    t &= 0x7fff;
+    t |= (f.read<uint16_t>() << 15);
+    return t;
+}
+
 void Parser::saveAst(utils::File& f, AstNode const& root)
 {
-    forAllNodesTop(root, [&f](AstNode const& node) {
-        f.write<uint32_t>(node->line);
-        f.write<uint32_t>(node->column);
-        f.write<uint32_t>(node->position);
-        f.write<uint32_t>(node->length);
-        f.write(node->name.c_str(), node->name.size() + 1);
-        f.write<uint32_t>(node->nodes.size());
+    forAllNodesTop(root, [&f, this](AstNode const& node) {
+        write(f, node->line);
+        write(f, node->position);
+        write(f, node->length);
+
+        auto index = ruleMap[node->name];
+        write(f, index);
+        write(f, node->nodes.size());
     });
 }
 
 AstNode Parser::loadAst(utils::File& f)
 {
-    auto line = f.read<uint32_t>();
-    auto column = f.read<uint32_t>();
-    auto pos = f.read<uint32_t>();
-    auto len = f.read<uint32_t>();
-    auto name = f.readString();
-    auto count = f.read<uint32_t>();
+    auto line = read(f);
+    auto column = 0;
+    auto pos = read(f);
+    auto len = read(f);
+    auto index = read(f);
+    auto name = ruleNames[index];
+    auto count = read(f);
 
     auto token = currentSource.substr(pos, len);
     auto node = std::make_shared<peg::AstBase<BassNode>>(
-        currentFile.c_str(), line, column, name.c_str(), token, pos, len);
+        currentFile.c_str(), line, column, name, token, pos, len);
 
     for (size_t i = 0; i < count; i++) {
         node->nodes.push_back(loadAst(f));
@@ -160,6 +183,8 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
     currentSource = source;
     currentFile = file;
 
+    p->get_rule_names(ruleNames);
+
     try {
         AstNode ast;
         bool rc = false;
@@ -176,6 +201,9 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
         } else {
             rc = p->parse_n(source.data(), source.length(), ast);
             if(rc) {
+                for(size_t i = 0; i < ruleNames.size(); i++) {
+                    ruleMap[ruleNames[i]] = i;
+                }
                 utils::File f{target, utils::File::Mode::Write};
                 f.write<uint32_t>(0xba55a570);
                 saveAst(f, ast);
@@ -188,7 +216,7 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
             forAllNodes(ast, [source, file, this](auto const& node) {
                 node->source = source;
                 node->file_name = file;
-                auto it = postActions.find(node->name);
+                auto it = postActions.find(std::string(node->name));
                 if (it != postActions.end()) {
                     node->action = &it->second;
                 }
@@ -213,7 +241,7 @@ std::any Parser::evaluate(AstNode const& node)
     std::function<std::any(AstNode const&, int)> eval =
         [&](AstNode const& ast, int indent) -> std::any {
         bool descend = true;
-        auto it0 = preActions.find(ast->name);
+        auto it0 = preActions.find(std::string(ast->name));
         if (it0 != preActions.end()) {
             SemanticValues sv{ast};
             descend = it0->second(sv);

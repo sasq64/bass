@@ -3328,7 +3328,7 @@ template <typename Annotation> struct AstBase : public Annotation {
         nodes(a_nodes) {}
 
   AstBase(const char *a_path, size_t a_line, size_t a_column,
-          const char *a_name, const std::string_view &a_token,
+          const std::string_view a_name, const std::string_view &a_token,
           size_t a_position = 0, size_t a_length = 0, size_t a_choice_count = 0,
           size_t a_choice = 0)
       : path(a_path ? a_path : ""), line(a_line), column(a_column),
@@ -3338,7 +3338,7 @@ template <typename Annotation> struct AstBase : public Annotation {
         tag(str2tag(a_name)), original_tag(tag), is_token(true),
         token(a_token) {}
 
-  AstBase(const AstBase &ast, const char *a_original_name,
+  AstBase(const AstBase &ast, const std::string_view a_original_name,
           size_t a_position = 0, size_t a_length = 0,
           size_t a_original_choice_count = 0, size_t a_original_choise = 0)
       : path(ast.path), line(ast.line), column(ast.column), name(ast.name),
@@ -3353,12 +3353,12 @@ template <typename Annotation> struct AstBase : public Annotation {
   const size_t line = 1;
   const size_t column = 1;
 
-  const std::string name;
+  const std::string_view name;
   size_t position;
   size_t length;
   const size_t choice_count;
   const size_t choice;
-  const std::string original_name;
+  const std::string_view original_name;
   const size_t original_choice_count;
   const size_t original_choice;
   const unsigned int tag;
@@ -3727,6 +3727,12 @@ public:
     }
     return rules;
   }
+    void get_rule_names(std::vector<std::string_view>& target) {
+        target.reserve(grammar_->size());
+        for (auto const &r : *grammar_) {
+            target.emplace_back(r.first);
+        }
+    }
 
   void enable_packrat_parsing() {
     if (grammar_ != nullptr) {
