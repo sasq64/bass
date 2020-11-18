@@ -208,7 +208,7 @@ struct Machine
             cycles += op.cycles;
         }
         if (realCycles != 0) {
-            LOGI("RTS");
+            //LOGI("RTS");
             cycles = realCycles;
             realCycles = 0;
         } else return 0;

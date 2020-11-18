@@ -114,7 +114,7 @@ void forAllNodesTop(AstNode const& root, FN const& fn)
 //    fn(root);
 //}
 
-void write(utils::File &f, uint32_t const& t) {
+void write(utils::File &f, uint64_t const& t) {
     if((t & 0xffff'8000) == 0) {
         f.write<uint16_t>(t);
         return;
@@ -174,11 +174,11 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
     SHA512(reinterpret_cast<const uint8_t*>(source.data()), source.size(),
            sha.data());
     auto shaName = hex_encode(sha);
-    utils::path home = getHomeDir();
-    if(!utils::exists(home / ".basscache")) {
-        utils::create_directories(home / ".basscache");
+    fs::path home = getHomeDir();
+    if(!fs::exists(home / ".basscache")) {
+        fs::create_directories(home / ".basscache");
     }
-    utils::path target = home / ".basscache" / shaName;
+    fs::path target = home / ".basscache" / shaName;
 
     currentSource = source;
     currentFile = file;
@@ -188,9 +188,9 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
     try {
         AstNode ast;
         bool rc = false;
-        if (utils::exists(target)) {
+        if (fs::exists(target)) {
             fmt::print("Using cached AST\n");
-            utils::File f{target};
+            utils::File f{target.string()};
             auto id = f.read<uint32_t>();
             if(id != 0xba55a570) {
                 fmt::print(stderr, "**Error: Broken AST\n");
@@ -204,7 +204,7 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
                 for(size_t i = 0; i < ruleNames.size(); i++) {
                     ruleMap[ruleNames[i]] = i;
                 }
-                utils::File f{target, utils::File::Mode::Write};
+                utils::File f{target.string(), utils::File::Mode::Write};
                 f.write<uint32_t>(0xba55a570);
                 saveAst(f, ast);
                 f.close();

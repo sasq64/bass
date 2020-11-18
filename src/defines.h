@@ -4,13 +4,15 @@
 #include "symbol_table.h"
 
 #include <coreutils/file.h>
-#include <coreutils/path.h>
 #include <any>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include <filesystem>
+namespace fs = std::filesystem;
 
 // using Number = double;
 
@@ -31,11 +33,11 @@ inline std::string_view persist(std::string const& s)
     return sv;
 }
 
-inline utils::File createFile(utils::path const& p)
+inline utils::File createFile(fs::path const& p)
 {
     auto pp = p.parent_path();
     if(!pp.empty()) {
-        utils::create_directories(pp);
+        fs::create_directories(pp);
     }
     return utils::File{p.string(), utils::File::Mode::Write};
 }

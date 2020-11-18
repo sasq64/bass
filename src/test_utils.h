@@ -1,14 +1,14 @@
 #pragma once
 
+#include <defines.h>
 #include <coreutils/file.h>
-#include <coreutils/path.h>
 
-static utils::path findProjectDir()
+static fs::path findProjectDir()
 {
-    auto current = utils::absolute(".");
+    auto current = fs::absolute(".");
 
     while(!current.empty()) {
-        if (utils::exists(current / ".git")) {
+        if (fs::exists(current / ".git")) {
             return current;
         }
         current = current.parent_path();
@@ -16,9 +16,9 @@ static utils::path findProjectDir()
     return {};
 }
 
-inline utils::path projDir()
+inline fs::path projDir()
 {
-   static utils::path projectDir = findProjectDir();
+   static fs::path projectDir = findProjectDir();
    return projectDir;
 }
 

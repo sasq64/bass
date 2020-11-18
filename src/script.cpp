@@ -56,7 +56,7 @@ Scripting::Scripting() : luap(std::make_unique<sol::state>()), lua(*luap)
 }
 Scripting::~Scripting() = default;
 
-void Scripting::load(utils::path const& p)
+void Scripting::load(fs::path const& p)
 {
     try {
         lua.do_file(p.string());

@@ -89,12 +89,12 @@ void initFunctions(Assembler& a)
                           std::vector<uint8_t> const& v1) { return v0 == v1; });
 
     a.registerFunction("load", [&](std::string_view name) {
-        auto p = utils::path(name);
+        auto p = fs::path(name);
         if (p.is_relative()) {
             p = a.getCurrentPath() / p;
         }
         try {
-            utils::File f{p};
+            utils::File f{p.string()};
             return f.readAll();
         } catch (utils::io_exception&) {
             throw parse_error(fmt::format("Could not load {}", name));
@@ -184,7 +184,7 @@ void initFunctions(Assembler& a)
 
             image.pixels = layoutTiles(image.pixels, stride, tw, th, 0);
             image.width = w;
-            image.height = image.pixels.size() / tw;
+            image.height = (int32_t)(image.pixels.size() / tw);
             return from_image(image);
         });
 
@@ -216,7 +216,7 @@ void initFunctions(Assembler& a)
                        });
 
     a.registerFunction("load_png", [&](std::string_view name) {
-        auto p = utils::path(name);
+        auto p = fs::path(name);
         if (p.is_relative()) {
             p = a.getCurrentPath() / p;
         }

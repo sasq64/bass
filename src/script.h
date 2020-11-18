@@ -1,6 +1,6 @@
 #pragma once
 
-#include <coreutils/path.h>
+#include "defines.h"
 
 #include <any>
 #include <functional>
@@ -24,7 +24,7 @@ class Scripting
 public:
     Scripting();
     ~Scripting();
-    void load(utils::path const& p);
+    void load(fs::path const& p);
     void add(std::string_view const& code);
     bool hasFunction(std::string_view const& name);
     std::any call(std::string_view const& name,

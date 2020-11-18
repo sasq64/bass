@@ -7,8 +7,6 @@
 #include "any_callable.h"
 #include "symbol_table.h"
 
-#include <coreutils/path.h>
-
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -64,13 +62,13 @@ public:
     std::vector<Error> getErrors() const;
 
     bool parse(std::string_view source, std::string const& fname = "");
-    bool parse_path(utils::path const& p);
+    bool parse_path(fs::path const& p);
 
-    utils::path getCurrentPath() const { return currentPath; }
+    fs::path getCurrentPath() const { return currentPath; }
     SymbolTable& getSymbols();
     Machine& getMachine();
     void printSymbols();
-    void writeSymbols(utils::path const& p);
+    void writeSymbols(fs::path const& p);
     Block includeFile(std::string_view fileName);
 
     void setMaxPasses(int mp) { maxPasses = mp; }
@@ -87,7 +85,7 @@ public:
         functions[name] = fn;
     }
 
-    void addScript(utils::path const& p) { scripting.load(p); }
+    void addScript(fs::path const& p) { scripting.load(p); }
 
     struct Meta
     {
@@ -136,7 +134,7 @@ public:
     void addLog(std::string_view text, size_t line);
     void addRunnable(std::string_view text, size_t line);
 
-    utils::path evaluatePath(std::string_view name);
+    fs::path evaluatePath(std::string_view name);
     std::string_view getLastLabel() const { return lastLabel; }
     void setLastLabel(std::string_view const& l) { lastLabel = l; }
     void setLastLabel(std::string const& l) { lastLabel = persist(l); }
@@ -201,7 +199,7 @@ private:
 
     std::unordered_map<int32_t, std::vector<EmuAction>> actions;
 
-    utils::path currentPath;
+    fs::path currentPath;
     std::unordered_map<std::string, Block> includes;
     std::deque<std::string> stored_includes;
     std::shared_ptr<Machine> mach;

@@ -6,7 +6,6 @@
 
 #include <coreutils/file.h>
 #include <coreutils/log.h>
-#include <coreutils/path.h>
 #include <coreutils/split.h>
 
 #include <CLI/CLI.hpp>
@@ -99,7 +98,7 @@ int main(int argc, char** argv)
     mach.setOutput(defFile.filePointer());
 
     for (auto const& sf : scriptFiles) {
-        assem.addScript(utils::path(sf));
+        assem.addScript(fs::path(sf));
     }
 
     for (auto const& d : definitions) {
@@ -117,7 +116,7 @@ int main(int argc, char** argv)
 
         bool failed = false;
         for (auto const& sourceFile : sourceFiles) {
-            auto sp = utils::path(sourceFile);
+            auto sp = fs::path(sourceFile);
             if (!assem.parse_path(sp)) {
                 for (auto const& e : assem.getErrors()) {
                     if (e.level == ErrLevel::Error) failed = true;
@@ -161,7 +160,11 @@ int main(int argc, char** argv)
             for (auto const& sourceFile : sourceFiles) {
                 auto* os = &stats[i++];
                 stat(sourceFile.c_str(), &ss);
+                #ifdef _WIN32
+                if (os->st_mtime != ss.st_mtime) {
+                #else
                 if (os->st_mtim.tv_sec != ss.st_mtim.tv_sec) {
+                #endif
                     recompile = true;
                     quit = true;
                     break;
@@ -176,7 +179,7 @@ int main(int argc, char** argv)
 
     try {
         mach.write(outFile, outFmt);
-    } catch (utils::io_exception& e) {
+    } catch (utils::io_exception&) {
         fmt::print(stderr, "**Error: Could not write output file {}\n",
                    outFile);
         return 1;
@@ -193,7 +196,7 @@ int main(int argc, char** argv)
 
     if (dumpSyms) assem.printSymbols();
     if (!symbolFile.empty()) {
-        assem.writeSymbols(utils::path{symbolFile});
+        assem.writeSymbols(fs::path{symbolFile});
     }
 
     return 0;

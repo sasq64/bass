@@ -473,7 +473,7 @@ void initMeta(Assembler& assem)
         if (assem.isFirstPass()) {
             Check(meta.args.size() == 1, "Incorrect number of arguments");
             auto name = any_cast<std::string_view>(meta.args[0]);
-            auto p = utils::path(name);
+            auto p = fs::path(name);
             if (p.is_relative()) {
                 p = assem.getCurrentPath() / p;
             }
@@ -484,11 +484,11 @@ void initMeta(Assembler& assem)
     assem.registerMeta("incbin", [&](Meta const& meta) {
         Check(meta.args.size() == 1, "Incorrect number of arguments");
         auto name = any_cast<std::string_view>(meta.args[0]);
-        auto p = utils::path(name);
+        auto p = fs::path(name);
         if (p.is_relative()) {
             p = assem.getCurrentPath() / p;
         }
-        utils::File f{p};
+        utils::File f{p.string()};
         for (auto const& b : f.readAll()) {
             mach.writeByte(b);
         }

@@ -3,15 +3,16 @@
 #include "machine.h"
 #include "wrap.h"
 
+#ifndef _WIN32
+#include <cxxabi.h>
+#endif
 #include <coreutils/algorithm.h>
 #include <coreutils/file.h>
 #include <coreutils/log.h>
-#include <coreutils/path.h>
 #include <coreutils/split.h>
 #include <coreutils/text.h>
 
 #include <charconv>
-#include <cxxabi.h>
 #include <fmt/format.h>
 #include <string_view>
 #include <unordered_set>
@@ -73,11 +74,15 @@ std::string any_to_string(std::any const& val)
         return "\""s + *s + "\"";
     }
 
+#ifdef _WIN32
+    return val.type().name();
+#else
     int status{};
     const char* realname =
         abi::__cxa_demangle(val.type().name(), nullptr, nullptr, &status);
 
     return realname;
+#endif
 }
 
 std::string_view rstrip(std::string_view text)
@@ -130,9 +135,9 @@ void Assembler::setDebugFlags(uint32_t flags)
     syms.trace = passDebug;
 }
 
-utils::path Assembler::evaluatePath(std::string_view name)
+fs::path Assembler::evaluatePath(std::string_view name)
 {
-    auto p = utils::path(name);
+    auto p = fs::path(name);
     if (p.is_relative()) {
         p = currentPath / p;
     }
@@ -142,7 +147,7 @@ utils::path Assembler::evaluatePath(std::string_view name)
 Assembler::Block Assembler::includeFile(std::string_view name)
 {
     auto fn = std::string(name);
-    auto p = utils::path(fn);
+    auto p = fs::path(fn);
     if (p.is_relative()) {
         p = currentPath / p;
         fn = p.string();
@@ -677,7 +682,7 @@ void Assembler::setupRules()
         if (it != functions.end()) {
             try {
                 return (it->second)(call.args);
-            } catch (std::bad_any_cast& e) {
+            } catch (std::bad_any_cast&) {
                 return std::any{};
             }
         }
@@ -1139,7 +1144,7 @@ bool Assembler::pass(AstNode const& ast)
     needsFinalPass = false;
     try {
         parser.evaluate(ast);
-    } catch (std::bad_any_cast& e) {
+    } catch (std::bad_any_cast&) {
         Error error = parser.getError();
         error.message = "Data type error";
         errors.push_back(error);
@@ -1157,16 +1162,16 @@ bool Assembler::pass(AstNode const& ast)
             errors.push_back(error);
         }
         return false;
-    } catch (std::exception& e) {
+    } catch (std::exception&) {
         errors.push_back(parser.getError());
         return false;
     }
     return true;
 }
 
-bool Assembler::parse_path(utils::path const& p)
+bool Assembler::parse_path(fs::path const& p)
 {
-    currentPath = utils::absolute(p).parent_path();
+    currentPath = fs::absolute(p).parent_path();
     utils::File f{p.string()};
 
     return parse(f.readAllString() + "\n", p.string());
@@ -1280,7 +1285,7 @@ void Assembler::printSymbols()
     });
 }
 
-void Assembler::writeSymbols(utils::path const& p)
+void Assembler::writeSymbols(fs::path const& p)
 {
     auto f = createFile(p);
     syms.forAll([&](std::string const& name, std::any const& val) {

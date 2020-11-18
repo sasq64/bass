@@ -147,7 +147,7 @@ public:
                 auto& t0 = old_grid[x + y * width];
                 auto& t1 = grid[x + y * width];
                 if (t0 != t1) {
-                    if (cur_y != y or cur_x != x) {
+                    if (cur_y != y || cur_x != x) {
                         write(protocol.goto_xy(x, y));
                         cur_x = x;
                         cur_y = y;
