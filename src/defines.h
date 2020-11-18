@@ -86,12 +86,12 @@ struct Num
     Num operator&&(Num n) const { return b() && n.b(); }
     Num operator||(Num n) const { return b() || n.b(); }
 
-    Num operator==(Num n) const { return d == n.d; }
-    Num operator!=(Num n) const { return d != n.d; }
-    Num operator<(Num n) const { return d < n.d; }
-    Num operator>(Num n) const { return d > n.d; }
-    Num operator<=(Num n) const { return d <= n.d; }
-    Num operator>=(Num n) const { return d >= n.d; }
+    bool operator==(Num n) const { return d == n.d; }
+    bool operator!=(Num n) const { return d != n.d; }
+    bool operator<(Num n) const { return d < n.d; }
+    bool operator>(Num n) const { return d > n.d; }
+    bool operator<=(Num n) const { return d <= n.d; }
+    bool operator>=(Num n) const { return d >= n.d; }
 
     int64_t i() const { return static_cast<int64_t>(d); }
     bool b() const { return static_cast<bool>(d); }

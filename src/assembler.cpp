@@ -454,7 +454,7 @@ void Assembler::handleLabel(std::any const& lbl)
     if (pendingTest != nullptr) {
         auto* test = pendingTest;
         pendingTest = nullptr;
-        if(passNo == 0) {
+        if (passNo == 0) {
             AnyMap res = {{"A", num(0)},      {"X", num(0)},
                           {"Y", num(0)},      {"SR", num(0)},
                           {"SP", num(0)},     {"PC", num(0)},
@@ -469,32 +469,46 @@ void Assembler::handleLabel(std::any const& lbl)
     }
 }
 
+std::vector<uint8_t> operator+(const std::vector<uint8_t>& lhs,
+                               const std::vector<uint8_t>& rhs)
+{
+    std::vector<uint8_t> result = lhs;
+    result.reserve(lhs.size() + rhs.size());
+    result.insert(result.end(), rhs.begin(), rhs.end());
+    return result;
+}
+
 template <typename A, typename B>
-A operation(std::string_view const& ope, A const& a, B const& b)
+std::variant<A, bool> operation(std::string_view const& ope, A const& a,
+                                B const& b)
 {
     // clang-format off
     if (ope == "+") return a + b;
-    if (ope == "-") return a - b;
-    if (ope == "*") return a * b;
-    if (ope == "/") return a / b;
-    if (ope == "\\") return div(a, b);
-    if (ope == "%") return a % b;
-    if (ope == ">>") return a >> b;
-    if (ope == "<<") return a << b;
-    if (ope == "&") return a & b;
-    if (ope == "|") return a | b;
-    if (ope == "^") return a ^ b;
-    if (ope == "&&") return a && b;
-    if (ope == "||") return a || b;
-    if (ope == "<") return a < b;
-    if (ope == ">") return a > b;
-    if (ope == "<=") return a <= b;
-    if (ope == ">=") return a >= b;
     if (ope == "==") return a == b;
     if (ope == "!=") return a != b;
-    if (ope == ":") return (a<<16) | b;
+    if constexpr ((std::is_same_v<A, Num> || std::is_arithmetic_v<A>) &&
+                  (std::is_same_v<B, Num> || std::is_arithmetic_v<B>)) {
+        if (ope == "-") return a - b;
+        if (ope == "*") return a * b;
+        if (ope == "/") return a / b;
+        if (ope == "%") return a % b;
+        if (ope == ">>") return a >> b;
+        if (ope == "<<") return a << b;
+        if (ope == "&") return a & b;
+        if (ope == "|") return a | b;
+        if (ope == "^") return a ^ b;
+        if (ope == "&&") return a && b;
+        if (ope == "||") return a || b;
+        if (ope == "<") return a < b;
+        if (ope == ">") return a > b;
+        if (ope == "<=") return a <= b;
+        if (ope == ">=") return a >= b;
+        if (ope == "\\") return div(a, b);
+        if (ope == ":") return (a<<16) | b;
+    }
     // clang-format on
-    return a;
+    throw parse_error(fmt::format("Unhandled: {} {} {}", typeid(A).name(), ope,
+                                  typeid(B).name()));
 }
 
 void Assembler::setupRules()
@@ -943,34 +957,35 @@ void Assembler::setupRules()
 
         auto ope = any_cast<std::string_view>(sv[1]);
 
-        // Todo: generalize operations on non-numeric types
-        if (ope == "+") {
-            // String addition
-            if (sv[0].type() == typeid(std::string_view)) {
-                auto a = any_cast<std::string_view>(sv[0]);
-                if (sv[2].type() == typeid(std::string_view)) {
-                    auto b = any_cast<std::string_view>(sv[2]);
-                    auto result = a + b;
-                    return std::any(result);
-                }
+        if (sv[0].type() == typeid(std::string_view) &&
+            sv[2].type() == typeid(std::string_view)) {
+            auto a = any_cast<std::string_view>(sv[0]);
+            auto b = any_cast<std::string_view>(sv[2]);
+            auto v = operation(ope, a, b);
+            if (std::holds_alternative<bool>(v)) {
+                return std::any(static_cast<Number>(std::get<bool>(v)));
             }
+            return std::any(std::get<std::string_view>(v));
         }
-        if (ope == "==") {
-            // uint8-vector comparison
-            if (sv[0].type() == typeid(std::vector<uint8_t>)) {
-                auto a = any_cast<std::vector<uint8_t>>(sv[0]);
-                if (sv[2].type() == typeid(std::vector<uint8_t>)) {
-                    auto b = any_cast<std::vector<uint8_t>>(sv[2]);
-                    return std::any((Number)(a == b));
-                }
+        if (sv[0].type() == typeid(std::vector<uint8_t>) &&
+            sv[2].type() == typeid(std::vector<uint8_t>)) {
+            auto a = any_cast<std::vector<uint8_t>>(sv[0]);
+            auto b = any_cast<std::vector<uint8_t>>(sv[2]);
+            auto v = operation(ope, a, b);
+            if (std::holds_alternative<bool>(v)) {
+                return std::any(static_cast<Number>(std::get<bool>(v)));
             }
+            return std::any(std::get<std::vector<uint8_t>>(v));
         }
 
         auto a = Num(any_cast<Number>(sv[0]));
         auto b = Num(any_cast<Number>(sv[2]));
         try {
-            auto result = static_cast<Number>(operation(ope, a, b));
-            return std::any(result);
+            auto v = operation(ope, a, b);
+            if (std::holds_alternative<bool>(v)) {
+                return std::any(static_cast<Number>(std::get<bool>(v)));
+            }
+            return std::any(static_cast<Number>(std::get<Num>(v)));
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
