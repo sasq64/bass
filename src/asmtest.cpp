@@ -73,15 +73,14 @@ TEST_CASE("png.remap", "[assembler]")
 
     int i = 0;
     for_all_pixels(image.pixels, image.bpp, [&](uint8_t& c) {
-        //c = ~c;
+        // c = ~c;
     });
 
     savePng("test.png", image);
 
-
     image = loadPng((projDir() / "data" / "mountain.png").string());
 
-    remap_image(image, { 0x0, 0x444444, 0x888888, 0xccccc, 0xffffff });
+    remap_image(image, {0x0, 0x444444, 0x888888, 0xccccc, 0xffffff});
 
     savePng("remapped.png", image);
 }
@@ -101,7 +100,6 @@ TEST_CASE("png.layout", "[assembler]")
     auto pixels = std::any_cast<std::vector<uint8_t>>(image.pixels);
     auto tiles = layoutTiles(pixels, 32, 8, 8, 0);
 
-
     LOGI("TILES %d", tiles.size());
     for (int i = 0; i < 8 * 8; i++) {
         fmt::print("{:02x} ", tiles[i]);
@@ -119,13 +117,13 @@ TEST_CASE("png.layout", "[assembler]")
     REQUIRE(get(indexes, 2) == get(indexes, 13));
     REQUIRE(tiles.size() == 8 * 8 * 8);
 
-    auto size = 8*8;
-    for(int i =0; i<16; i++) {
+    auto size = 8 * 8;
+    for (int i = 0; i < 16; i++) {
 
-        auto* ptr0 = &pixels[i*size];
+        auto* ptr0 = &pixels[i * size];
         auto index = get(indexes, i);
 
-        auto* ptr1 = &tiles[index*size];
+        auto* ptr1 = &tiles[index * size];
         auto crc0 = crc32(reinterpret_cast<const uint32_t*>(ptr0), size / 4);
         auto crc1 = crc32(reinterpret_cast<const uint32_t*>(ptr1), size / 4);
 
@@ -136,14 +134,11 @@ TEST_CASE("png.layout", "[assembler]")
 TEST_CASE("any_callable", "[assembler]")
 {
     AnyCallable fn;
-    fn = [](std::string s) -> long {
-        return std::stol(s) + 3;
-    };
+    fn = [](std::string s) -> long { return std::stol(s) + 3; };
 
     auto res = fn({std::any("100"s)});
     REQUIRE(std::any_cast<double>(res) == 103);
 }
-
 
 TEST_CASE("png", "[assembler]")
 {
@@ -168,10 +163,10 @@ TEST_CASE("png", "[assembler]")
 
 TEST_CASE("all", "[assembler]")
 {
-    for (auto const& p : utils::listFiles(projDir() / "tests")) {
+    for (auto const& p : fs::directory_iterator(projDir() / "tests")) {
         Assembler ass;
-        fmt::print(fmt::fg(fmt::color::yellow), "{}\n", p.string());
-        ass.parse_path(p);
+        fmt::print(fmt::fg(fmt::color::yellow), "{}\n", p.path().string());
+        ass.parse_path(p.path());
         for (auto const& e : ass.getErrors()) {
             fmt::print(fmt::fg(fmt::color::coral), "ERROR '{}' in {}:{}\n",
                        e.message, e.file, e.line);
