@@ -1,9 +1,9 @@
 :source-highlighter: pygments
 :pygments-linenums-mode: inline
 
-## Intro to the _bass_ (badass) 6502 assembler
+== Intro to the _bass_ (badass) 6502 assembler
 
-### Part 3
+=== Part 3
 
 In part 2 we saw how to use macros to set up a C64 graphics screen, `!section` to
 locate the graphics in memory, and some code to copy it to the right place.
@@ -36,9 +36,9 @@ spriteData:
 ----
 
 The `!rept` command is used to repeat any block of statements a given number
-of times. Here we user it to create a solid rectangle as out sprite.
+of times.Here we user it to create a solid rectangle as out sprite.
 
-But of course we want  to generate something more nice looking.
+But of course we want to generate something more nice looking.
 For this it's time to turn to lua scripting;
 
 [source]
@@ -80,10 +80,10 @@ spriteData:
 ----
 
 The LUA function will take an array as input, and return an array
-with the rendered circle. Just like we did with the graphics and music
+with the rendered circle.Just like we did with the graphics and music
 earlier, we can use the `!fill` command to put it into memory.
 
-Let's make ths sprite move. Here is some code to make the
+Let's make ths sprite move.Here is some code to make the
 sprite move in a sine wave:
 
 [source,ca65]
@@ -111,7 +111,7 @@ sine:
 Here we use the `!rept` command again, this time to create a sine table.
 
 So this is all pretty good - but can we take advantage of the fact that we can
-generate circles of different sizes? How about a small animation?
+generate circles of different sizes?How about a small animation?
 
 First, lets generate 8 sprites with different radiuses:
 

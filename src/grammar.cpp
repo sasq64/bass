@@ -91,7 +91,9 @@ Imm <- '#' Expression
 
 LabelRef <- '-'+ / '+'+
 
-Opcode <- Symbol
+Opcode <- Symbol ('.' Suffix)?
+
+Suffix <- [a-zA-Z0-9]+
 
 HexNum <- ('$' / '0x') [0-9a-fA-F]+
 Octal <- '0o' [0-7]+

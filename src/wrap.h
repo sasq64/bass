@@ -3,6 +3,7 @@
 #include <coreutils/path.h>
 
 #include <any>
+#include <coreutils/file.h>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -20,6 +21,18 @@ struct AstBase;
 
 struct BassNode;
 using AstNode = std::shared_ptr<peg::AstBase<BassNode>>;
+
+template <typename C>
+static std::string hex_encode(C const& c)
+{
+    static const char* hex = "0123456789abcdef";
+    std::string result;
+    for (uint8_t b : c) {
+        result += hex[b >> 4];
+        result += hex[b & 0xf];
+    }
+    return result;
+}
 
 class SemanticValues
 {
@@ -75,6 +88,9 @@ class Parser
     std::unordered_map<std::string, std::function<bool(SemanticValues const&)>>
         preActions;
     std::unordered_map<std::string, ActionFn> postActions;
+    std::string currentFile;
+    std::string_view currentSource;
+
 
     std::unique_ptr<peg::parser> p;
     bool haveError{false};
@@ -105,6 +121,8 @@ public:
     std::any evaluate(AstNode const& node);
 
     void doTrace(bool on) { tracing = on; };
+    void saveAst(utils::File& f, const AstNode& root);
+    AstNode loadAst(utils::File& f);
 };
 
 class parse_error : public std::exception

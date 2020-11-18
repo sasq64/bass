@@ -58,6 +58,7 @@ private:
 struct Num
 {
     double d;
+    int bits = 0;
 
     Num() = default;
     template <typename T>
@@ -167,6 +168,30 @@ struct Instruction
     sixfive::Mode mode;
     int32_t val;
 };
+
+inline std::string getHomeDir()
+{
+    std::string homeDir;
+#if _WIN32
+    char* userProfile = getenv("USERPROFILE");
+    if (userProfile == nullptr) {
+
+        char* homeDrive = getenv("HOMEDRIVE");
+        char* homePath = getenv("HOMEPATH");
+
+        if (homeDrive == nullptr || homePath == nullptr) {
+            fprintf(stderr, "Could not get home directory");
+            return "";
+        }
+
+        homeDir = std::string(homeDrive) + homePath;
+    } else
+        homeDir = std::string(userProfile);
+#else
+    homeDir = std::string(getenv("HOME"));
+#endif
+    return homeDir;
+}
 
 
 std::string any_to_string(std::any const& val);

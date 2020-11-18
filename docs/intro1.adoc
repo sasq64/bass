@@ -1,10 +1,10 @@
 :source-highlighter: pygments
 :pygments-linenums-mode: inline
 
-## Intro to the _bass_ (badass) 6502 assembler
+== Intro to the _bass_ (badass) 6502 assembler
 
-### Part 1
-_bass_ is a new 6502 assembler. It is designed to be powerful (like Kickassembler)
+=== Part 1
+_bass_ is a new 6502 assembler.It is designed to be powerful (like Kickassembler)
 but with a less complex syntax, and more _unified_, _functional_ design.
 
 Let's start with a minimal C64 program, a 3 opcode routine to make a rainbow border:
@@ -31,15 +31,15 @@ start:
     sta $d020
 ----
 
-What happens here ? Well the `!byte` meta command accepts both numbers
+What happens here ?Well the `!byte` meta command accepts both numbers
 and strings, and for strings it inserts each character one by one.
 
-The `str()` function takes a value and converts it to a string. So this
+The `str()` function takes a value and converts it to a string.So this
 is how we insert the correct sys adress into the basic, regardless of
 where that `start:` label is placed.
 
 Let's add some more code;
-    
+
 [source,ca65]
 ----
     !section "main", $801
@@ -62,13 +62,13 @@ start:
 ----
 
 This is a short program that wait for a certain scan line, calls a music routine,
-and loops. The music is expected to reside in the file "music.raw" and must
+and loops.The music is expected to reside in the file "music.raw" and must
 be placed at address $1000.
 
-But what if music is a PRG with 2 bytes load address first. Or a sid file ?
+But what if music is a PRG with 2 bytes load address first.Or a sid file ?
 
 The functional approach of bass lets us manipulate not only numeric data, but also
-byte arrays. So to strip out the 2 first byte of a file and place it in memory we
+byte arrays.So to strip out the 2 first byte of a file and place it in memory we
 can do:
 
 [source,ca65]
@@ -80,10 +80,10 @@ can do:
 A few new things here, the `data` symbol now refers to a byte array, and we use
 the `!fill` meta command to insert it into memory.
 
-The `[2:]` part is called _slicing_. To extract a range from a byte array you use
+The `[2:]` part is called _slicing_.To extract a range from a byte array you use
 it like: `data[start:end]` (where start is inclusive and end exclusive).
 
-So what about the load address, can we use it? Sure;
+So what about the load address, can we use it?Sure;
 
 [source,ca65]
 ----
@@ -95,7 +95,7 @@ music:
 
 As you may have figured out, the `word()` function decodes a little endian 16-bit word from an array.
 
-Except what if the load address is not compatible with our layout? If we load another song at a different adress it will probably break our code.
+Except what if the load address is not compatible with our layout?If we load another song at a different adress it will probably break our code.
 
 Instead we can just _verify_ the load address:
 

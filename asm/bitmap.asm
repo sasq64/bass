@@ -233,10 +233,9 @@ draw_blue:
 raster_lo=$1000
 raster_hi=$1100
 
-!test draw_blue {
+!test "draw_blue"
     ldx #0
     jsr draw_blue
-}
 
 red:
     !byte 0,2,4,8,10,12,13,14,15,15,14,13,12,10,8,4,2,0

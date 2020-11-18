@@ -1,6 +1,6 @@
-## Intro to the _bass_ (badass) 6502 assembler
+== Intro to the _bass_ (badass) 6502 assembler
 
-### Part 4 - Unit Testing
+=== Part 4 - Unit Testing
 
 (NOTE: This part still needs work)
 
@@ -12,6 +12,7 @@ But let's begin with the basic structure of a unit test:
 
 [source,ca65]
 ----
+!test
 my_code:
     lda #$ef
     sta $1
@@ -19,16 +20,12 @@ my_code:
     adc $1
     rts
 
-!test my_test {
-    jsr my_code
-}
-
 !assert tests.my_test.A == (0x70 + 0xef) & 0xff
 ----
 
 Tests works like this:
 
-Any `!test` clause like the one above will be assembled into a special test section, 
+Any `!test` clause like the one above will be assembled into a special test section,
 _after_ all other code has been placed into memory.
 
 Each test will be executed in the internal bass 6502 emulator, and the state of the
@@ -86,28 +83,28 @@ indexes_end:
 ; Check first lines of screen tiles
 vram = get_vram()
 !rept 10 {
-    !assert compare(vram[tileMem+i*128:tileMem+i*128+80], png.indexes[i*80:(i+1)*80])
+    !assert vram[tileMem+i*128:tileMem+i*128+80] = png.indexes[i*80:(i+1)*80])
 }
 ----
 
-So a lot of things happeing here.
+So a lot of things happening here.
 
-First we load a png image using the `png_load()` function. The result of this call
+First we load a png image using the `png_load()` function.The result of this call
 is a structure of several fields, which includes the actual bitmap and colors, but
 also a _tiled_ version of the image, where the bitmap has been split up into 8x8
 characters, and each character is assigned a tile index.
 
-Tiled data is used in a lot of older graphics hardware, and the graphics hardware 
+Tiled data is used in a lot of older graphics hardware, and the graphics hardware
 of the X16 (called Vera) also has a tiled graphics mode which we are using.
 
-After that we have the actual "function under test". Its job is to copy the
-tile indexes to the VRAM of the Vera. But the X16 does not have
+After that we have the actual "function under test".Its job is to copy the
+tile indexes to the VRAM of the Vera.But the X16 does not have
 VRAM directly mapped, so you need to set the offset in VRAM you want to write to,
 and then write the values to the special Vera `DATA0` register.
 
 Then we have the actual test invocation, and the asserts.
 
-But what is `get_vram()` ? And how can the emulator deal with the specific way of
+But what is `get_vram()` ?And how can the emulator deal with the specific way of
 copying data to VRAM unique to the X16/Vera hardware:
 
 It works because we load this LUA script into the Assembler:
@@ -187,17 +184,17 @@ function get_vram()
 end
 ----
 
-So this is a lot of code. If you know and/or are interested in how the
+So this is a lot of code.If you know and/or are interested in how the
 Graphics access works in the X16, you can probably tell that this implements
 parts of the Vera access, and in fact you can find code similar to this in
 the official X16 emulator.
 
 It is an example on how you can _extend_ the internal emulator, by intercepting
-reads and write to certain memory areas. This way you can actually emulate those
+reads and write to certain memory areas.This way you can actually emulate those
 parts of your target system that you need for testing.
 
 And at the end of this LUA code you also see the `get_vram()` function used in the
-asserts above. This function returnes the data written to VRAM, so we can verify
+asserts above.This function returnes the data written to VRAM, so we can verify
 that it contains what we want.
 
 

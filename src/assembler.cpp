@@ -749,7 +749,7 @@ void Assembler::setupRules()
             value = any_cast<Number>(sv[1]);
         }
         nextEnumValue = value + 1;
-        LOGI("%s = %d", sym, (int)value);
+        //LOGI("%s = %d", sym, (int)value);
         return std::pair(sym, value);
     });
 
@@ -780,7 +780,14 @@ void Assembler::setupRules()
         return Meta{};
     });
 
-    parser.after("Opcode", [&](SV& sv) { return sv.token_view(); });
+    parser.after("Opcode", [&](SV& sv) {
+        std::string_view suffix = "";
+        auto name = any_cast<std::string_view>(sv[0]);
+        if(sv.size() == 2) {
+            suffix = any_cast<std::string_view>(sv[1]);
+        }
+        return std::pair(name, suffix);
+    });
     parser.after("StringContents", [](SV& sv) { return sv.token_view(); });
 
     parser.after("OpLine", [&](SV& sv) {
@@ -819,11 +826,14 @@ void Assembler::setupRules()
     });
 
     parser.after("Instruction", [&](SV& sv) {
-        auto opcode = any_cast<std::string_view>(sv[0]);
+        auto [opcode, suffix] = any_cast<std::pair<std::string_view, std::string_view>>(sv[0]);
         // opcode = utils::toLower(opcode);
         Instruction instruction{opcode, Mode::NONE, 0};
         if (sv.size() > 1) {
             auto arg = any_cast<Instruction>(sv[1]);
+            if(arg.mode == sixfive::Mode::ABS && suffix == ".b") {
+                arg.mode = sixfive::Mode::ZP;
+            }
             instruction.mode = arg.mode;
             instruction.val = arg.val;
         }

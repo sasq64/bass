@@ -14,6 +14,8 @@ using namespace std::string_literals;
 
 static std::unordered_map<uint16_t, uint8_t> char_translate;
 
+static bool globalCond = true;
+
 // Reset the translation of characters to Petscii/screen code
 static void resetTranslate()
 {
@@ -51,6 +53,8 @@ static Section parseArgs(std::vector<std::any> const& args)
                 result.pc = number<int32_t>(p->second);
             } else if (p->first == "NoStore") {
                 result.flags |= NoStorage;
+            } else if (p->first == "ToFile") {
+                result.flags |= WriteToDisk;
             }
         } else {
             if (i == 0) {
@@ -270,11 +274,36 @@ void initMeta(Assembler& assem)
     assem.registerMeta("if", [&](Meta const& meta) {
         for (size_t i = 0; i < meta.blocks.size(); i++) {
             auto cond = i < meta.args.size() ? number(meta.args[i]) : 1.0;
+            globalCond = cond != 0;
             if (cond != 0) {
                 assem.evaluateBlock(meta.blocks[i]);
                 break;
             }
         }
+    });
+
+    assem.registerMeta("elseif", [&](Meta const& meta) {
+
+        if(globalCond) return;
+
+        for (size_t i = 0; i < meta.blocks.size(); i++) {
+            auto cond = i < meta.args.size() ? number(meta.args[i]) : 1.0;
+            globalCond = cond != 0;
+            if (cond != 0) {
+                assem.evaluateBlock(meta.blocks[i]);
+                break;
+            }
+        }
+    });
+
+    assem.registerMeta("else", [&](Meta const& meta) {
+
+        if(globalCond) return;
+
+        for (size_t i = 0; i < meta.blocks.size(); i++) {
+            assem.evaluateBlock(meta.blocks[i]);
+        }
+        globalCond = true;
     });
 
     assem.registerMeta("org", [&](Meta const& meta) {

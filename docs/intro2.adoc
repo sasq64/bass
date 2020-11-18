@@ -1,9 +1,9 @@
 :source-highlighter: pygments
 :pygments-linenums-mode: inline
 
-## Intro to the _bass_ (badass) 6502 assembler
+== Intro to the _bass_ (badass) 6502 assembler
 
-### Part 2
+=== Part 2
 
 In the last part we saw how to create a simple C64 program to play some music.
 We used the `load()` function to load the music into the assembler, and then
@@ -38,7 +38,7 @@ The first macro sets the VIC base address, which can only be located in one of
 will not compile if we try to use an incompatible address.
 
 The second macro is similar, but it takes offsets (from the VIC base address)
-and also makes sure the are legal. We use local symbols (starting with a `'.'`)
+and also makes sure the are legal.We use local symbols (starting with a `'.'`)
 to avoid polluting the namespace (yes symbols defined in macros will affect the
 global symbol table).
 

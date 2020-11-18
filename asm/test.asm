@@ -231,7 +231,7 @@ colors:
     !fill convert_palette($.colors, 12)
 
 
-    !section "IMAGE", 0xa000, NO_STORE|TO_PRG
+    !section "IMAGE", 0xa000, NoStore=true, ToFile=true
 pixels:
     !if USE_BITMAP {
         !fill png.pixels

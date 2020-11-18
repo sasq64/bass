@@ -74,7 +74,6 @@ $
 .out
     rts
 
-    
 init:
     lda #<text_screen
     sta ypos

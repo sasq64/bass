@@ -7,6 +7,11 @@
 #include <cstdio>
 #include <string>
 
+extern "C"
+{
+#include <sha512.h>
+}
+
 using namespace std::string_literals;
 
 struct BassNode
@@ -48,8 +53,7 @@ const std::string& SemanticValues::name() const
     return ast->name;
 }
 
-Parser::Parser(const char* s)
-    : p(std::make_unique<peg::parser>(s))
+Parser::Parser(const char* s) : p(std::make_unique<peg::parser>(s))
 {
     if (!(*p)) {
         fprintf(stderr, "Error:: Illegal grammar\n");
@@ -85,21 +89,102 @@ template <typename FN>
 void forAllNodes(AstNode const& root, FN const& fn)
 {
     for (auto const& node : root->nodes) {
-        fn(node);
         forAllNodes(node, fn);
     }
     fn(root);
 }
 
+template <typename FN>
+void forAllNodesTop(AstNode const& root, FN const& fn)
+{
+    fn(root);
+    for (auto const& node : root->nodes) {
+        forAllNodesTop(node, fn);
+    }
+}
+
+// template <typename FN>
+// void save(AstNode const& root, FN const& fn)
+//{
+//    std::vector<uint8_t> data;
+//    for (auto const& node : root->nodes) {
+//        save(node, fn);
+//    }
+//    fn(root);
+//}
+
+void Parser::saveAst(utils::File& f, AstNode const& root)
+{
+    forAllNodesTop(root, [&f](AstNode const& node) {
+        f.write<uint32_t>(node->line);
+        f.write<uint32_t>(node->column);
+        f.write<uint32_t>(node->position);
+        f.write<uint32_t>(node->length);
+        f.write(node->name.c_str(), node->name.size() + 1);
+        f.write<uint32_t>(node->nodes.size());
+    });
+}
+
+AstNode Parser::loadAst(utils::File& f)
+{
+    auto line = f.read<uint32_t>();
+    auto column = f.read<uint32_t>();
+    auto pos = f.read<uint32_t>();
+    auto len = f.read<uint32_t>();
+    auto name = f.readString();
+    auto count = f.read<uint32_t>();
+
+    auto token = currentSource.substr(pos, len);
+    auto node = std::make_shared<peg::AstBase<BassNode>>(
+        currentFile.c_str(), line, column, name.c_str(), token, pos, len);
+
+    for (size_t i = 0; i < count; i++) {
+        node->nodes.push_back(loadAst(f));
+    }
+
+    return node;
+}
+
 AstNode Parser::parse(std::string_view source, std::string_view file)
 {
+    std::array<uint8_t, SHA512_DIGEST_LENGTH> sha;
+    SHA512(reinterpret_cast<const uint8_t*>(source.data()), source.size(),
+           sha.data());
+    auto shaName = hex_encode(sha);
+    utils::path home = getHomeDir();
+    if(!utils::exists(home / ".basscache")) {
+        utils::create_directories(home / ".basscache");
+    }
+    utils::path target = home / ".basscache" / shaName;
+
+    currentSource = source;
+    currentFile = file;
+
     try {
         AstNode ast;
-        bool rc = p->parse_n(source.data(), source.length(), ast);
+        bool rc = false;
+        if (utils::exists(target)) {
+            fmt::print("Using cached AST\n");
+            utils::File f{target};
+            auto id = f.read<uint32_t>();
+            if(id != 0xba55a570) {
+                fmt::print(stderr, "**Error: Broken AST\n");
+                exit(1);
+            }
+            ast = loadAst(f);
+            rc = true;
+        } else {
+            rc = p->parse_n(source.data(), source.length(), ast);
+            if(rc) {
+                utils::File f{target, utils::File::Mode::Write};
+                f.write<uint32_t>(0xba55a570);
+                saveAst(f, ast);
+                f.close();
+            }
+        }
         if (rc) {
 
-            //ast = peg::AstOptimizer(true, exceptions).optimize(ast);
-
+            // ast = peg::AstOptimizer(true, exceptions).optimize(ast);
             forAllNodes(ast, [source, file, this](auto const& node) {
                 node->source = source;
                 node->file_name = file;
@@ -173,15 +258,15 @@ void Parser::enter(
     (*p)[name].enter = fn;
 }
 
-void Parser::leave(
-    const char* name, std::function<void(const char*, size_t, size_t, std::any&,
-                                         std::any&)> const& fn) const
+void Parser::leave(const char* name,
+                   std::function<void(const char*, size_t, size_t, std::any&,
+                                      std::any&)> const& fn) const
 {
     (*p)[name].leave = fn;
 }
 
 void Parser::setError(std::string const& what, std::string_view file,
-                             size_t line)
+                      size_t line)
 {
     if (!haveError) {
         currentError.message = what;
@@ -192,7 +277,7 @@ void Parser::setError(std::string const& what, std::string_view file,
 }
 
 void Parser::after(const char* name,
-                          std::function<std::any(SemanticValues const&)> const& fn)
+                   std::function<std::any(SemanticValues const&)> const& fn)
 {
     auto names = p->get_rule_names();
     auto it = std::find(names.begin(), names.end(), name);
@@ -203,7 +288,7 @@ void Parser::after(const char* name,
 }
 
 void Parser::before(const char* name,
-                           std::function<bool(SemanticValues const&)> const& fn)
+                    std::function<bool(SemanticValues const&)> const& fn)
 {
     auto names = p->get_rule_names();
     auto it = std::find(names.begin(), names.end(), name);
