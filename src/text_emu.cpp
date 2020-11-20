@@ -1,23 +1,27 @@
 #include "text_emu.h"
 
+#include <coreutils/utf8.h>
 #include <ansi/console.h>
 #include <ansi/terminal.h>
 #include <thread>
 
 #include "emulator.h"
+#include "petscii.h"
 
 #include <array>
 #include <chrono>
 
 using namespace std::chrono_literals;
-
 static constexpr std::array<uint8_t, 16 * 3> c64pal = {
+    0x00, 0x00, 0x00, // BLACK
     0xFF, 0xFF, 0xFF, // WHITE
     0x68, 0x37, 0x2B, // RED
+    0x70, 0xA4, 0xB2, // CYAN
+    0x6F, 0x3D, 0x86, // PURPLE
     0x58, 0x8D, 0x43, // GREEN
     0x35, 0x28, 0x79, // BLUE
+    0xB8, 0xC7, 0x6F, // YELLOW
     0x6F, 0x4F, 0x25, // ORANGE
-    0x00, 0x00, 0x00, // BLACK
     0x43, 0x39, 0x00, // BROWN
     0x9A, 0x67, 0x59, // LIGHT_READ
     0x44, 0x44, 0x44, // DARK_GREY
@@ -25,15 +29,20 @@ static constexpr std::array<uint8_t, 16 * 3> c64pal = {
     0x9A, 0xD2, 0x84, // LIGHT_GREEN
     0x6C, 0x5E, 0xB5, // LIGHT_BLUE
     0x95, 0x95, 0x95, // LIGHT_GREY
-    0x6F, 0x3D, 0x86, // PURPLE
-    0xB8, 0xC7, 0x6F, // YELLOW
-    0x70, 0xA4, 0xB2, // CYAN
 };
+
+
+std::string translate(uint8_t c)
+{
+    char32_t u = sc2uni_up(c);
+    std::u32string s = { u };
+    return utils::utf8_encode(s);
+}
 
 void TextEmu::set_color(uint8_t col)
 {
-    int f = (col & 0xf) * 3;
-    int b = ((col >> 4) + 16) * 3;
+    int b = (col & 0xf) * 3;
+    int f = ((col >> 4) + 16) * 3;
     uint32_t fg =
         (palette[f] << 24) | (palette[f + 1] << 16) | (palette[f + 2] << 8);
     uint32_t bg =
@@ -45,24 +54,29 @@ void TextEmu::writeChar(uint16_t adr, uint8_t t)
 {
     auto offset = adr - (regs[TextPtr] * 256);
     textRam[offset] = t;
-    std::string s(1, static_cast<char>(t));
     console->set_xy(offset % regs[WinW] + regs[WinX],
                     offset / regs[WinW] + regs[WinY]);
-    set_color(colorRam[offset]);
-    console->put(s);
+    auto c = colorRam[offset];
+    if(t & 0x80) {
+        c = ((c<<4) & 0xf0) | (c>>4);
+    }
+    set_color(c);
+    console->put(translate(t));
 }
 
 void TextEmu::writeColor(uint16_t adr, uint8_t c)
 {
     auto offset = adr - (regs[ColorPtr] * 256);
+    auto t = textRam[offset];
     colorRam[offset] = c;
     console->set_xy(offset % regs[WinW] + regs[WinX],
                     offset / regs[WinW] + regs[WinY]);
+    if(t & 0x80) {
+        c = ((c<<4) & 0xf0) | (c>>4);
+    }
     set_color(c);
 
-    auto t = textRam[offset];
-    std::string s(1, static_cast<char>(t));
-    console->put(s);
+    console->put(translate(t));
 }
 
 void TextEmu::updateRegs()
@@ -77,6 +91,12 @@ void TextEmu::updateRegs()
                               auto* thiz = static_cast<TextEmu*>(data);
                               thiz->writeChar(adr, v);
                           });
+    emu->mapReadCallback(regs[TextPtr], banks, this,
+                         [](uint16_t adr, void* data) {
+                             auto* thiz = static_cast<TextEmu*>(data);
+                             auto offset = adr - (thiz->regs[TextPtr] * 256);
+                             return thiz->textRam[offset];
+                         });
     emu->mapWriteCallback(regs[ColorPtr], banks, this,
                           [](uint16_t adr, uint8_t v, void* data) {
                               auto* thiz = static_cast<TextEmu*>(data);
@@ -97,7 +117,7 @@ void TextEmu::fillInside()
                 auto t = textRam[i];
                 colorRam[i++] = v;
                 console->set_xy(x, y);
-                console->put(std::string(1, static_cast<char>(t)));
+                console->put(translate(t));
             }
         }
     }
@@ -181,7 +201,7 @@ TextEmu::TextEmu()
         c = 0x20;
     }
     for (auto& c : colorRam) {
-        c = 0xca;
+        c = 0x05;
     }
 }
 
@@ -189,7 +209,7 @@ void TextEmu::run(uint16_t pc)
 {
     start(pc);
     bool quit = false;
-    while(!quit) {
+    while (!quit) {
         quit = update();
     }
 }
@@ -228,7 +248,7 @@ void TextEmu::load(uint16_t start, uint8_t const* ptr, size_t size) const
 
 void TextEmu::start(uint16_t pc)
 {
-    regs[CFillOut] = 0x11;
+    regs[CFillOut] = 0x01;
     fillOutside();
 
     // LOGI("Run %04x %02x %02x", start, data[2], data[3]);

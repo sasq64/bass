@@ -67,7 +67,7 @@ $
     rts
 
 text:
-    !text "hello people what's up ?"
+    !text "HELLO PEOPLE WHAT'S UP ?"
     !byte 0
 
 font:

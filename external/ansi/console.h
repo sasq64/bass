@@ -1,9 +1,12 @@
 #pragma once
 
+#include "../../unicode.h"
+
 #include "ansi_protocol.h"
 #include "terminal.h"
 
 #include <coreutils/log.h>
+#include <coreutils/utf8.h>
 
 #include <cstdint>
 #include <memory>
@@ -60,7 +63,7 @@ public:
     ~Console() { write("\x1b[?25h"); }
 
     using ColorIndex = uint16_t;
-    using Char = uint16_t;
+    using Char = char32_t;
 
     std::vector<uint32_t> palette;
 
@@ -118,7 +121,8 @@ public:
 
     void put(std::string const& text)
     {
-        for (auto c : text) {
+        auto ut = utils::utf8_decode(text);
+        for (auto c : ut) {
             // TODO: UTF8 decode
             grid[put_x + width * put_y] = {static_cast<Char>(c), put_fg, put_bg,
                                            0};
@@ -157,7 +161,7 @@ public:
                         cur_fg = t1.fg;
                         cur_bg = t1.bg;
                     }
-                    terminal->write(std::string(1, t1.c));
+                    terminal->write(utils::utf8_encode({t1.c}));
                     t0 = t1;
                 }
             }

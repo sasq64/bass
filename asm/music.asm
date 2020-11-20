@@ -32,11 +32,11 @@ start:
     ;sta $d018
     sei
 
-    !chartrans "♥*", 0x53,0x51
+    ;!chartrans "♥*", 0x53,0x51
 
-    print("* playing * sid ♥", 1, 1)
-    print(to_lower(sid.title), 1, 2)
-    print(to_lower(sid.composer), 1, 3)
+    print("* PLAYING * SID ♥", 1, 1)
+    print(to_upper(sid.title), 1, 2)
+    print(to_upper(sid.composer), 1, 3)
 
     lda #0
     ;jsr sid.init

@@ -1,6 +1,7 @@
 #include "assembler.h"
 #include "defines.h"
 #include "machine.h"
+#include "petscii.h"
 
 #include <any>
 #include <coreutils/file.h>
@@ -12,22 +13,62 @@
 
 using namespace std::string_literals;
 
-static std::unordered_map<uint16_t, uint8_t> char_translate;
+static std::unordered_map<int32_t, uint8_t> char_translate;
 
 static bool globalCond = true;
 
-// Reset the translation of characters to Petscii/screen code
-static void resetTranslate()
+enum class Translation
 {
-    char_translate.clear();
-    for (int i = 0; i < 256; i++) {
-        auto c = i;
-        if (c >= 'a' && c <= 'z')
-            c = c - 'a' + 1;
-        else if (c >= 'A' && c <= 'Z')
-            c = c - 'A' + 0x41;
-        char_translate[i] = c;
+    Ascii,
+    PetsciiUpper,
+    PetsciiLower,
+    ScreencodeUpper,
+    ScreencodeLower
+};
+
+static std::array translationNames{"ascii", "petscii_upper", "petscii_lower",
+                                   "screencode_upper", "screencode_lower"};
+Translation currentTranslation = Translation::Ascii;
+
+static void setTranslation(Translation t)
+{
+    int32_t (*ptr)(uint8_t) = nullptr;
+    currentTranslation = t;
+    switch (t) {
+    case Translation::Ascii:
+        ptr = [](uint8_t i) -> int32_t { return i; };
+        break;
+    case Translation::PetsciiUpper:
+        ptr = &pet2uni_up;
+        break;
+    case Translation::PetsciiLower:
+        ptr = &pet2uni_lo;
+        break;
+    case Translation::ScreencodeUpper:
+        ptr = &sc2uni_up;
+        break;
+    case Translation::ScreencodeLower:
+        ptr = &sc2uni_lo;
+        break;
     }
+    char_translate.clear();
+    for (int i = 0; i < 128; i++) {
+
+        auto u = ptr(i);
+        char_translate[u] = i;
+    }
+}
+
+static uint8_t translate(uint32_t c)
+{
+    auto it = char_translate.find(c);
+    if (it != char_translate.end()) {
+        return it->second;
+    }
+    auto s = utils::utf8_encode({c});
+    throw parse_error(
+        fmt::format("Char '{}' (0x{:x}) not available in '{}'", s, c,
+                    translationNames[static_cast<int>(currentTranslation)]));
 }
 
 static Section parseArgs(std::vector<std::any> const& args)
@@ -81,7 +122,7 @@ void initMeta(Assembler& assem)
     using Meta = Assembler::Meta;
     auto& mach = assem.getMachine();
 
-    resetTranslate();
+    setTranslation(Translation::ScreencodeUpper);
 
     static auto is_space = [](char const c) {
         return c == ' ' || c == '\t' || c == '\n' || c == '\r';
@@ -167,19 +208,24 @@ void initMeta(Assembler& assem)
         assem.defineMacro(macroName, macroArgs, meta.blocks[0]);
     });
 
-    assem.registerMeta("ascii", [&](Meta const&) {
-        resetTranslate();
-        for (int i = 0; i < 256; i++) {
-            char_translate[i] = i;
+    assem.registerMeta(
+        "ascii", [&](Meta const&) { setTranslation(Translation::Ascii); });
+
+    assem.registerMeta("encoding", [&](Meta const& meta) {
+        auto name = any_cast<std::string_view>(meta.args[0]);
+
+        for (size_t i = 0; i < translationNames.size(); i++) {
+            auto const& n = translationNames[i];
+            if (n == name) {
+                setTranslation((Translation)i);
+                return;
+            }
         }
+        throw parse_error(fmt::format("Unknown encoding '{}'", name));
     });
 
     assem.registerMeta("chartrans", [&](Meta const& meta) {
-        if (meta.args.empty()) {
-            resetTranslate();
-            return;
-        }
-        std::wstring text;
+        std::u32string text;
         size_t index = 0;
         for (auto const& v : meta.args) {
             if (auto* s = any_cast<std::string_view>(&v)) {
@@ -202,7 +248,8 @@ void initMeta(Assembler& assem)
             if (auto* s = any_cast<std::string_view>(&v)) {
                 auto ws = utils::utf8_decode(*s);
                 for (auto c : ws) {
-                    auto b = char_translate.at(c);
+                    // LOGI("UC %x", (int32_t)c);
+                    auto b = translate(c);
                     mach.writeChar(b);
                 }
             } else {
@@ -222,7 +269,7 @@ void initMeta(Assembler& assem)
                     first = false;
                 }
                 for (auto c : ws) {
-                    auto b = char_translate.at(c);
+                    auto b = translate(c);
                     mach.writeChar(b);
                 }
             }
@@ -283,8 +330,7 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("elseif", [&](Meta const& meta) {
-
-        if(globalCond) return;
+        if (globalCond) return;
 
         for (size_t i = 0; i < meta.blocks.size(); i++) {
             auto cond = i < meta.args.size() ? number(meta.args[i]) : 1.0;
@@ -297,8 +343,7 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("else", [&](Meta const& meta) {
-
-        if(globalCond) return;
+        if (globalCond) return;
 
         for (size_t i = 0; i < meta.blocks.size(); i++) {
             assem.evaluateBlock(meta.blocks[i]);
@@ -425,7 +470,7 @@ void initMeta(Assembler& assem)
             auto utext = utils::utf8_decode(*sv);
             for (size_t i = 0; i < utext.size(); i++) {
                 auto d = utext[i];
-                mach.writeByte(char_translate.at(d));
+                mach.writeByte(translate(d));
             }
         } else {
             auto size = number<size_t>(data);

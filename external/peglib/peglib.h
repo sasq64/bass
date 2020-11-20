@@ -3732,6 +3732,7 @@ public:
         for (auto const &r : *grammar_) {
             target.emplace_back(r.first);
         }
+        std::sort(target.begin(), target.end());
     }
 
   void enable_packrat_parsing() {

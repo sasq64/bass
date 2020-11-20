@@ -1,4 +1,26 @@
 
+
+!macro Wait(msec)
+{
+    lda Regs.TimerLo
+    adc #5
+    sta wait_t
+.w  lda Regs.TimerLo
+    cmp wait_t
+    bne .w
+}
+!macro CheckQuit()
+{
+    lda Regs.Key
+    cmp #KEY.ESCAPE
+    bne .out
+    inc Regs.Reset
+    jmp  *
+.out
+}
+    wait_t = $11
+
+
 !enum Regs
 {
     ; Window into real console. Default to 40x25

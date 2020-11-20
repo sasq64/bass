@@ -80,17 +80,16 @@ inline size_t utf8_decode(const std::string& utf8, uint32_t* target)
     return ptr - target;
 }
 
-inline std::wstring utf8_decode(const std::string_view& txt)
+inline std::u32string utf8_decode(const std::string_view& txt)
 {
-    std::wstring result;
-    using C = std::wstring::value_type;
+    std::u32string result;
+    using C = std::u32string::value_type;
 
     uint32_t codepoint;
     uint32_t state = 0;
 
     for (auto s : txt) {
         if (!decode(&state, &codepoint, s)) {
-            if (codepoint <= 0xffff)
                 result.push_back((C)codepoint);
         }
     }
@@ -113,19 +112,24 @@ inline std::string utf8_encode(const std::string_view& txt)
     return out;
 }
 
-inline std::string utf8_encode(const std::wstring& s)
+inline std::string utf8_encode(const std::u32string& s)
 {
     std::string out;
-    for (uint16_t c : s) {
-        if (c <= 0x7f)
+    for (auto c : s) {
+        if (c < 0x80)
             out.push_back(c & 0xff);
         else if (c < 0x800) {
-            out.push_back(0xC0 | (c >> 6));
-            out.push_back(0x80 | (c & 0x3F));
-        } else /*if (c < 0x10000) */ {
-            out.push_back(0xE0 | (c >> 12));
+            out.push_back(0xC0 | ((c >> 6) & 0x1f));
+            out.push_back(0x80 | (c & 0x3f));
+        } else if (c < 0x10000) {
+            out.push_back(0xE0 | ((c >> 12) & 0xf));
             out.push_back(0x80 | ((c >> 6) & 0x3f));
-            out.push_back(0x80 | (c & 0x3F));
+            out.push_back(0x80 | (c & 0x3f));
+        } else {
+            out.push_back(0xF0 | ((c >> 18) & 0x07));
+            out.push_back(0x80 | ((c >> 12) & 0x3f));
+            out.push_back(0x80 | ((c >> 6) & 0x3f));
+            out.push_back(0x80 | (c & 0x3f));
         }
     }
     return out;
