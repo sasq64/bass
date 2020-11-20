@@ -1,8 +1,8 @@
 #include "text_emu.h"
 
-#include <coreutils/utf8.h>
 #include <ansi/console.h>
 #include <ansi/terminal.h>
+#include <coreutils/utf8.h>
 #include <thread>
 
 #include "emulator.h"
@@ -31,11 +31,10 @@ static constexpr std::array<uint8_t, 16 * 3> c64pal = {
     0x95, 0x95, 0x95, // LIGHT_GREY
 };
 
-
 std::string translate(uint8_t c)
 {
     char32_t u = sc2uni_up(c);
-    std::u32string s = { u };
+    std::u32string s = {u};
     return utils::utf8_encode(s);
 }
 
@@ -57,8 +56,8 @@ void TextEmu::writeChar(uint16_t adr, uint8_t t)
     console->set_xy(offset % regs[WinW] + regs[WinX],
                     offset / regs[WinW] + regs[WinY]);
     auto c = colorRam[offset];
-    if(t & 0x80) {
-        c = ((c<<4) & 0xf0) | (c>>4);
+    if (t & 0x80) {
+        c = ((c << 4) & 0xf0) | (c >> 4);
     }
     set_color(c);
     console->put(translate(t));
@@ -71,8 +70,8 @@ void TextEmu::writeColor(uint16_t adr, uint8_t c)
     colorRam[offset] = c;
     console->set_xy(offset % regs[WinW] + regs[WinX],
                     offset / regs[WinW] + regs[WinY]);
-    if(t & 0x80) {
-        c = ((c<<4) & 0xf0) | (c>>4);
+    if (t & 0x80) {
+        c = ((c << 4) & 0xf0) | (c >> 4);
     }
     set_color(c);
 
@@ -82,10 +81,12 @@ void TextEmu::writeColor(uint16_t adr, uint8_t c)
 void TextEmu::updateRegs()
 {
 
-    textRam.resize(regs[WinW] * regs[WinH]);
-    colorRam.resize(regs[WinW] * regs[WinH]);
+    auto sz = (regs[WinW] * regs[WinH] + 255) & 0xffff00;
 
-    auto banks = (regs[WinW] * regs[WinH] + 255) / 256;
+    textRam.resize(sz);
+    colorRam.resize(sz);
+
+    auto banks = sz / 256;
     emu->mapWriteCallback(regs[TextPtr], banks, this,
                           [](uint16_t adr, uint8_t v, void* data) {
                               auto* thiz = static_cast<TextEmu*>(data);
@@ -102,6 +103,12 @@ void TextEmu::updateRegs()
                               auto* thiz = static_cast<TextEmu*>(data);
                               thiz->writeColor(adr, v);
                           });
+    emu->mapReadCallback(regs[ColorPtr], banks, this,
+                         [](uint16_t adr, void* data) {
+                             auto* thiz = static_cast<TextEmu*>(data);
+                             auto offset = adr - (thiz->regs[ColorPtr] * 256);
+                             return thiz->colorRam[offset];
+                         });
 }
 void TextEmu::fillInside()
 {
@@ -188,9 +195,12 @@ TextEmu::TextEmu()
     regs[WinW] = 40;
     regs[WinX] = (cw - regs[WinW]) / 2;
     regs[WinY] = (ch - regs[WinH]) / 2;
+    regs[RealW] = cw;
+    regs[RealH] = ch;
 
     regs[TextPtr] = 0x04;
     regs[ColorPtr] = 0xd8;
+    regs[TimerDiv] = 50;
 
     for (int i = 0; i < 16 * 3; i++) {
         palette[i] = c64pal[i];
@@ -201,7 +211,7 @@ TextEmu::TextEmu()
         c = 0x20;
     }
     for (auto& c : colorRam) {
-        c = 0x05;
+        c = 0x01;
     }
 }
 
@@ -227,12 +237,16 @@ bool TextEmu::update()
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(clk::now() -
                                                                     start_t);
 
-    auto frames = ms.count() / 50;
-
-    regs[TimerLo] = frames & 0xff;
-    regs[TimerHi] = (frames >> 8) & 0xff;
+    auto d = regs[TimerDiv];
+    if (d != 0) {
+        auto frames = ms.count() / d;
+        regs[TimerLo] = frames & 0xff;
+        regs[TimerHi] = (frames >> 8) & 0xff;
+    }
 
     console->flush();
+    regs[RealW] = console->get_width();
+    regs[RealH] = console->get_height();
 
     if ((regs[Reset] & 1) == 1) {
         return true;
@@ -255,5 +269,8 @@ void TextEmu::start(uint16_t pc)
     emu->setPC(pc);
     start_t = clk::now();
 }
+
+int TextEmu::get_width() const { return console->get_width(); }
+int TextEmu::get_height() const { return console->get_height(); }
 
 TextEmu::~TextEmu() = default;

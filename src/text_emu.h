@@ -60,6 +60,9 @@ struct TextEmu
     void fillInside();
     void fillOutside();
 
+    int get_width() const;
+    int get_height() const;
+
     TextEmu();
     ~TextEmu();
 

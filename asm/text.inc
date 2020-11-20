@@ -2,8 +2,17 @@
 
 !macro Wait(msec)
 {
+    ;!if msec < 256 {
+    ;    .div = 1
+    ;    .n = msec
+    ;} else {
+        .div = 10
+        .n = msec/10
+    ;}
+    lda #.div
+    sta Regs.TimerDiv
     lda Regs.TimerLo
-    adc #5
+    adc #.n
     sta wait_t
 .w  lda Regs.TimerLo
     cmp wait_t
@@ -20,6 +29,17 @@
 }
     wait_t = $11
 
+!macro Border(col)
+{
+    lda #col<<4
+    sta Regs.CFillOut
+}
+
+!macro Clear(fg, bg)
+{
+    lda #(bg << 4) | fg
+    sta Regs.CFillIn
+}
 
 !enum Regs
 {
@@ -66,7 +86,8 @@
 
 !enum KEY
 {
-    BACKSPACE = 1
+    NO_KEY
+    BACKSPACE
     LEFT
     UP
     RIGHT
@@ -90,23 +111,22 @@
 }
 
 !enum {
+    Black
     White
-    ; Comment
     Red
+    Cyan   
+    Purple
     Green
     Blue
+    Yellow
     Orange
-    Black
     Brown
-    LightRead
+    LightRed
     DarkGrey
     Grey
     LightGreen
     LightBlue
     LightGrey
-    Purple
-    Yellow
-    Cyan   
 }
 
 

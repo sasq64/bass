@@ -10,6 +10,9 @@
 
 #include <CLI/CLI.hpp>
 
+#include <thread>
+using namespace std::chrono_literals;
+
 static const char* const banner = R"(
  _               _
 | |__   __ _  __| | __ _ ___ ___
@@ -83,7 +86,6 @@ int main(int argc, char** argv)
     assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
                         (showTrace ? Assembler::DEB_TRACE : 0));
 
-
     assem.useCache(!doRun);
 
     if (outFile.empty()) {
@@ -117,8 +119,14 @@ int main(int argc, char** argv)
 
     while (true) {
 
+        TextEmu emu;
+
         bool failed = false;
         assem.clear();
+
+        assem.getSymbols().set("CONSOLE_WIDTH", (Number)emu.get_width());
+        assem.getSymbols().set("CONSOLE_HEIGHT", (Number)emu.get_height());
+
         for (auto const& sourceFile : sourceFiles) {
             auto sp = fs::path(sourceFile);
             if (!assem.parse_path(sp)) {
@@ -132,13 +140,16 @@ int main(int argc, char** argv)
             }
         }
         if (failed) {
+            if (doRun) {
+                std::this_thread::sleep_for(1000ms);
+                continue;
+            }
             return 1;
         }
 
         if (!doRun) {
             break;
         }
-        TextEmu emu;
 
         std::vector<fs::file_time_type> times;
         for (auto const& sourceFile : sourceFiles) {

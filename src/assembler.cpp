@@ -163,6 +163,9 @@ Assembler::Block Assembler::includeFile(std::string_view name)
 
     std::string_view source = stored_includes.back();
     auto ast = parser.parse(source, name);
+    if(ast == nullptr) {
+        throw parse_error("");
+    }
 
     Block block{source, 1, ast};
 
@@ -1335,5 +1338,7 @@ void Assembler::popScope()
 
 void Assembler::clear()
 {
+    macros.clear();
+    definitions.clear();
     passNo = 0;
 }
