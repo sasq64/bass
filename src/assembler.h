@@ -141,6 +141,10 @@ public:
 
     std::any applyDefine(Macro const& fn, Call const& call);
 
+    void clear();
+
+    void useCache(bool on);
+
 private:
     template <typename T>
     T& sym(std::string const& s)

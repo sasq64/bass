@@ -83,6 +83,9 @@ int main(int argc, char** argv)
     assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
                         (showTrace ? Assembler::DEB_TRACE : 0));
 
+
+    assem.useCache(!doRun);
+
     if (outFile.empty()) {
         outFile = outFmt == OutFmt::Prg
                       ? "result.prg"
@@ -115,6 +118,7 @@ int main(int argc, char** argv)
     while (true) {
 
         bool failed = false;
+        assem.clear();
         for (auto const& sourceFile : sourceFiles) {
             auto sp = fs::path(sourceFile);
             if (!assem.parse_path(sp)) {
@@ -136,10 +140,9 @@ int main(int argc, char** argv)
         }
         TextEmu emu;
 
-        std::vector<struct stat> stats(sourceFiles.size());
-        size_t i = 0;
+        std::vector<fs::file_time_type> times;
         for (auto const& sourceFile : sourceFiles) {
-            stat(sourceFile.c_str(), &stats[i++]);
+            times.push_back(fs::last_write_time(sourceFile));
         }
         int32_t start = 0x10000;
         for (auto const& s : mach.getSections()) {
@@ -155,23 +158,22 @@ int main(int argc, char** argv)
         bool recompile = false;
         while (!quit) {
             quit = emu.update();
-            i = 0;
-            struct stat ss{};
+            size_t i = 0;
             for (auto const& sourceFile : sourceFiles) {
-                auto* os = &stats[i++];
-                stat(sourceFile.c_str(), &ss);
-                #ifdef _WIN32
-                if (os->st_mtime != ss.st_mtime) {
-                #else
-                if (os->st_mtim.tv_sec != ss.st_mtim.tv_sec) {
-                #endif
-                    recompile = true;
-                    quit = true;
-                    break;
+                auto lastTime = times[i];
+                try {
+                    auto thisTime = fs::last_write_time(sourceFile);
+                    times[i] = thisTime;
+                    if (thisTime != lastTime) {
+                        recompile = true;
+                        quit = true;
+                        break;
+                    }
+                } catch (fs::filesystem_error&) {
                 }
             }
         }
-        if(recompile) {
+        if (recompile) {
             continue;
         }
         return 0;

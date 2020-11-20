@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../../unicode.h"
-
 #include "ansi_protocol.h"
 #include "terminal.h"
 

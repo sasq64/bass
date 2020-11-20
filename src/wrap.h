@@ -97,11 +97,17 @@ class Parser
 
     std::any callAction(SemanticValues& sv, ActionFn const& fn);
 
+    bool useCache = true;
+
 public:
     ~Parser();
 
     explicit Parser(const char* grammar);
     void setError(std::string const& what, std::string_view file, size_t line);
+
+
+    void use_cache(bool on) { useCache = on; }
+
 
     void packrat() const;
     void before(const char* name, std::function<bool(SemanticValues const&)> const& fn);

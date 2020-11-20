@@ -114,8 +114,9 @@ void forAllNodesTop(AstNode const& root, FN const& fn)
 //    fn(root);
 //}
 
-void write(utils::File &f, uint64_t const& t) {
-    if((t & 0xffff'8000) == 0) {
+void write(utils::File& f, uint64_t const& t)
+{
+    if ((t & 0xffff'8000) == 0) {
         f.write<uint16_t>(t);
         return;
     }
@@ -123,10 +124,10 @@ void write(utils::File &f, uint64_t const& t) {
     f.write<uint16_t>(t >> 15);
 }
 
-uint32_t read(utils::File &f)
+uint32_t read(utils::File& f)
 {
     uint32_t t = f.read<uint16_t>();
-    if((t & 0x8000) == 0) {
+    if ((t & 0x8000) == 0) {
         return t;
     }
     t &= 0x7fff;
@@ -175,7 +176,7 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
            sha.data());
     auto shaName = hex_encode(sha);
     fs::path home = getHomeDir();
-    if(!fs::exists(home / ".basscache")) {
+    if (!fs::exists(home / ".basscache")) {
         fs::create_directories(home / ".basscache");
     }
     fs::path target = home / ".basscache" / shaName;
@@ -188,11 +189,11 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
     try {
         AstNode ast;
         bool rc = false;
-        if (fs::exists(target)) {
+        if (useCache && fs::exists(target)) {
             fmt::print("Using cached AST\n");
             utils::File f{target.string()};
             auto id = f.read<uint32_t>();
-            if(id != 0xba55a570) {
+            if (id != 0xba55a570) {
                 fmt::print(stderr, "**Error: Broken AST\n");
                 exit(1);
             }
@@ -200,14 +201,16 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
             rc = true;
         } else {
             rc = p->parse_n(source.data(), source.length(), ast);
-            if(rc) {
-                for(size_t i = 0; i < ruleNames.size(); i++) {
+            if (rc) {
+                for (size_t i = 0; i < ruleNames.size(); i++) {
                     ruleMap[ruleNames[i]] = i;
                 }
-                utils::File f{target.string(), utils::File::Mode::Write};
-                f.write<uint32_t>(0xba55a570);
-                saveAst(f, ast);
-                f.close();
+                if (useCache) {
+                    utils::File f{target.string(), utils::File::Mode::Write};
+                    f.write<uint32_t>(0xba55a570);
+                    saveAst(f, ast);
+                    f.close();
+                }
             }
         }
         if (rc) {

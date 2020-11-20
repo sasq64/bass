@@ -422,6 +422,11 @@ Assembler::~Assembler()
     mach = nullptr;
 }
 
+void Assembler::useCache(bool on)
+{
+    parser.use_cache(on);
+}
+
 void Assembler::handleLabel(std::any const& lbl)
 {
     if (auto* p = std::any_cast<std::pair<std::string_view, int32_t>>(&lbl)) {
@@ -1326,4 +1331,9 @@ void Assembler::pushScope(std::string_view name)
 void Assembler::popScope()
 {
     scopes.pop_back();
+}
+
+void Assembler::clear()
+{
+    passNo = 0;
 }
