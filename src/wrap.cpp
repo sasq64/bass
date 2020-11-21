@@ -7,11 +7,6 @@
 #include <cstdio>
 #include <string>
 
-extern "C"
-{
-#include <sha512.h>
-}
-
 using namespace std::string_literals;
 
 struct BassNode
@@ -56,13 +51,17 @@ std::string_view SemanticValues::name() const
 
 Parser::Parser(const char* s) : p(std::make_unique<peg::parser>(s))
 {
+    if (useCache) {
+        SHA512(reinterpret_cast<const uint8_t*>(s), strlen(s),
+               grammarSHA.data());
+    }
     if (!(*p)) {
         fprintf(stderr, "Error:: Illegal grammar\n");
         exit(0);
     }
     p->enable_ast<peg::AstBase<BassNode>>();
     p->log = [&](size_t line, size_t col, std::string const& msg) {
-        LOGI("ERROR %d/%d %s", line, col, msg);
+        //LOGI("ERROR %d/%d %s", line, col, msg);
         if (!haveError) {
             LOGI("Msg %s", msg);
             setError(msg, "", line);
@@ -174,7 +173,7 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
     std::array<uint8_t, SHA512_DIGEST_LENGTH> sha;
     SHA512(reinterpret_cast<const uint8_t*>(source.data()), source.size(),
            sha.data());
-    auto shaName = hex_encode(sha);
+    auto shaName = hex_encode(sha, 32);
     fs::path home = getHomeDir();
     if (!fs::exists(home / ".basscache")) {
         fs::create_directories(home / ".basscache");
@@ -187,7 +186,7 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
     p->get_rule_names(ruleNames);
 
     try {
-        AstNode ast;
+        AstNode ast = nullptr;
         bool rc = false;
         if (useCache && fs::exists(target)) {
             fmt::print("Using cached AST\n");
@@ -197,9 +196,18 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
                 fmt::print(stderr, "**Error: Broken AST\n");
                 exit(1);
             }
-            ast = loadAst(f);
-            rc = true;
-        } else {
+            std::array<uint8_t, 32> gs; //NOLINT
+            f.read(gs.data(), 32);
+            if(memcmp(gs.data(), grammarSHA.data(), 32) == 0) {
+                ast = loadAst(f);
+                rc = true;
+            } else {
+                fmt::print("**Warn: Old grammar in AST\n");
+            }
+        }
+
+        if(ast == nullptr)
+        {
             rc = p->parse_n(source.data(), source.length(), ast);
             if (rc) {
                 for (size_t i = 0; i < ruleNames.size(); i++) {
@@ -208,6 +216,7 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
                 if (useCache) {
                     utils::File f{target.string(), utils::File::Mode::Write};
                     f.write<uint32_t>(0xba55a570);
+                    f.write(grammarSHA.data(), 32);
                     saveAst(f, ast);
                     f.close();
                 }

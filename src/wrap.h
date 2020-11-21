@@ -11,6 +11,10 @@
 #include <unordered_map>
 #include <vector>
 
+extern "C" {
+    #include <sha512.h>
+}
+
 namespace peg {
 class parser;
 template <typename T>
@@ -21,13 +25,16 @@ struct BassNode;
 using AstNode = std::shared_ptr<peg::AstBase<BassNode>>;
 
 template <typename C>
-static std::string hex_encode(C const& c)
+inline std::string hex_encode(C const& c, int len = 0)
 {
     static const char* hex = "0123456789abcdef";
     std::string result;
     for (uint8_t b : c) {
         result += hex[b >> 4];
         result += hex[b & 0xf];
+        if(len-- == 0) {
+            break;
+        }
     }
     return result;
 }
@@ -91,6 +98,7 @@ class Parser
     std::vector<std::string_view> ruleNames;
     std::unordered_map<std::string_view, size_t> ruleMap;
 
+    std::array<uint8_t, SHA512_DIGEST_LENGTH> grammarSHA{};
 
     std::unique_ptr<peg::parser> p;
     bool haveError{false};

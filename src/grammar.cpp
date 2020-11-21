@@ -104,9 +104,7 @@ Multi <- '0m' [0-3]+
 Number <-  HexNum / Binary / Octal / Multi / Decimal / Char
 
 ~_ <- Space*
-
 ~WS <- Space+
-
 ~Space <- [ \u200b\t]
 
 Symbol <- [_A-Za-z] [_A-Za-z0-9]*

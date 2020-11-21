@@ -12,7 +12,7 @@
 
 #include <cstdio>
 #ifndef _WIN32
-#include <signal.h>
+#    include <csignal>
 #endif
 #include <thread>
 using namespace std::chrono_literals;
@@ -156,15 +156,15 @@ int main(int argc, char** argv)
     auto& mach = assem.getMachine();
 
 #ifndef _WIN32
-    struct sigaction sh;
-    sh.sa_handler = [](int s) {
+    struct sigaction sh = {};
+    sh.sa_handler = [](int) {
         // Restore cursor
         fputs("\x1b[?25h", stdout);
         exit(0);
     };
     sigemptyset(&sh.sa_mask);
     sh.sa_flags = 0;
-    sigaction(SIGINT, &sh, NULL);
+    sigaction(SIGINT, &sh, nullptr);
 #endif
 
     while (state.doRun) {
