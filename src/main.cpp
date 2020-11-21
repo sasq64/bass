@@ -10,6 +10,10 @@
 
 #include <CLI/CLI.hpp>
 
+#include <cstdio>
+#ifndef _WIN32
+#include <signal.h>
+#endif
 #include <thread>
 using namespace std::chrono_literals;
 
@@ -22,9 +26,8 @@ static const char* const banner = R"(
 6502 assembler (beta6)      /sasq
 )";
 
-int main(int argc, char** argv)
+struct AssemblerState
 {
-    using std::any_cast;
     std::vector<std::string> sourceFiles;
     std::vector<std::string> scriptFiles;
     std::vector<std::string> definitions;
@@ -38,95 +41,94 @@ int main(int argc, char** argv)
     int maxPasses = 10;
     std::string symbolFile;
     OutFmt outFmt = OutFmt::Prg;
-    std::map<std::string, OutFmt> tr{
-        {"raw"s, OutFmt::Raw},
-        {"prg"s, OutFmt::Prg},
-        {"crt"s, OutFmt::Crt},
-    };
 
-    CLI::App app{"badass"};
-    app.set_help_flag();
-    auto help = app.add_flag("-h,--help", "Request help");
-    app.add_option("-f,--format", outFmt, "Output format")
-        ->transform(CLI::CheckedTransformer(tr, CLI::ignore_case));
-    app.add_flag("--trace", showTrace, "Trace rule invocations");
-    app.add_flag("--run", doRun, "Run program");
-    app.add_option("--max-passes", maxPasses, "Max assembler passes");
-    app.add_flag("--show-undefined", showUndef,
-                 "Show undefined after each pass");
-    app.add_flag("-q,--quiet", quiet, "Less noise");
-    app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
-    app.add_flag("--65c02", use65c02, "Target 65c02");
-    app.add_option("-s,--table", symbolFile, "Write numeric symbols to file");
-    app.add_option("-o,--out", outFile, "Output file");
-    app.add_option("-D", definitions, "Add symbol");
-    app.add_option("-i", sourceFiles, "Sources to compile");
-    app.add_option("-x,--lua", scriptFiles, "LUA scripts to load")
-        ->check(CLI::ExistingFile);
-    app.add_option("source", sourceFiles, "Sources to compile")
-        ->check(CLI::ExistingFile);
+    void parseArgs(int argc, char** argv)
+    {
+        static const std::map<std::string, OutFmt> tr{
+            {"raw"s, OutFmt::Raw},
+            {"prg"s, OutFmt::Prg},
+            {"crt"s, OutFmt::Crt},
+        };
 
-    bool showHelp = false;
+        CLI::App app{"badass"};
+        app.set_help_flag();
+        auto* help = app.add_flag("-h,--help", "Request help");
+        app.add_option("-f,--format", outFmt, "Output format")
+            ->transform(CLI::CheckedTransformer(tr, CLI::ignore_case));
+        app.add_flag("--trace", showTrace, "Trace rule invocations");
+        app.add_flag("--run", doRun, "Run program");
+        app.add_option("--max-passes", maxPasses, "Max assembler passes");
+        app.add_flag("--show-undefined", showUndef,
+                     "Show undefined after each pass");
+        app.add_flag("-q,--quiet", quiet, "Less noise");
+        app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
+        app.add_flag("--65c02", use65c02, "Target 65c02");
+        app.add_option("-s,--table", symbolFile,
+                       "Write numeric symbols to file");
+        app.add_option("-o,--out", outFile, "Output file");
+        app.add_option("-D", definitions, "Add symbol");
+        app.add_option("-i", sourceFiles, "Sources to compile");
+        app.add_option("-x,--lua", scriptFiles, "LUA scripts to load")
+            ->check(CLI::ExistingFile);
+        app.add_option("source", sourceFiles, "Sources to compile")
+            ->check(CLI::ExistingFile);
 
-    try {
-        app.parse(argc, argv);
-        showHelp = (*help || (sourceFiles.empty() && scriptFiles.empty()));
-        if (showHelp) {
-            if (!quiet) puts(banner + 1);
+        bool showHelp = false;
 
-            throw CLI::CallForHelp();
+        try {
+            app.parse(argc, argv);
+            showHelp = (*help || (sourceFiles.empty() && scriptFiles.empty()));
+            if (showHelp) {
+                if (!quiet) puts(banner + 1);
+
+                throw CLI::CallForHelp();
+            }
+        } catch (const CLI::ParseError& e) {
+            app.exit(e);
         }
-    } catch (const CLI::ParseError& e) {
-        app.exit(e);
-    }
-    if (showHelp) return 0;
-
-    Assembler assem;
-    assem.setMaxPasses(maxPasses);
-    assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
-                        (showTrace ? Assembler::DEB_TRACE : 0));
-
-    assem.useCache(!doRun);
-
-    if (outFile.empty()) {
-        outFile = outFmt == OutFmt::Prg
-                      ? "result.prg"
-                      : (outFmt == OutFmt::Crt ? "result.crt" : "result.bin");
+        if (showHelp) exit(0);
     }
 
-    auto& mach = assem.getMachine();
-    auto& syms = assem.getSymbols();
+    void setupAssembler(Assembler& assem)
+    {
+        assem.setMaxPasses(maxPasses);
+        assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
+                            (showTrace ? Assembler::DEB_TRACE : 0));
 
-    mach.setCpu(use65c02 ? Machine::CPU::CPU_65C02 : Machine::CPU_6502);
+        assem.useCache(!doRun);
 
-    utils::File defFile{"out.def", utils::File::Write};
-    mach.setOutput(defFile.filePointer());
-
-    for (auto const& sf : scriptFiles) {
-        assem.addScript(fs::path(sf));
-    }
-
-    for (auto const& d : definitions) {
-        auto parts = utils::split(d, "=");
-        if (parts.size() == 1) {
-            syms.at<Number>(parts[0]) = 1;
-        } else {
-            syms.at<Number>(parts[0]) = std::strtod(parts[1], nullptr);
+        if (outFile.empty()) {
+            outFile =
+                outFmt == OutFmt::Prg
+                    ? "result.prg"
+                    : (outFmt == OutFmt::Crt ? "result.crt" : "result.bin");
         }
+        auto& mach = assem.getMachine();
+        auto& syms = assem.getSymbols();
+        mach.setCpu(use65c02 ? Machine::CPU::CPU_65C02 : Machine::CPU_6502);
+
+        utils::File defFile{"out.def", utils::File::Write};
+        mach.setOutput(defFile.filePointer());
+
+        for (auto const& sf : scriptFiles) {
+            assem.addScript(fs::path(sf));
+        }
+
+        for (auto const& d : definitions) {
+            auto parts = utils::split(d, "=");
+            if (parts.size() == 1) {
+                syms.at<Number>(parts[0]) = 1;
+            } else {
+                syms.at<Number>(parts[0]) = std::strtod(parts[1], nullptr);
+            }
+        }
+
+        logging::setLevel(logging::Level::Info);
     }
 
-    logging::setLevel(logging::Level::Info);
-
-    while (true) {
-
-        TextEmu emu;
-
+    bool assemble(Assembler& assem)
+    {
         bool failed = false;
-        assem.clear();
-
-        assem.getSymbols().set("CONSOLE_WIDTH", (Number)emu.get_width());
-        assem.getSymbols().set("CONSOLE_HEIGHT", (Number)emu.get_height());
-
         for (auto const& sourceFile : sourceFiles) {
             auto sp = fs::path(sourceFile);
             if (!assem.parse_path(sp)) {
@@ -139,20 +141,47 @@ int main(int argc, char** argv)
                 }
             }
         }
-        if (failed) {
-            if (doRun) {
-                std::this_thread::sleep_for(1000ms);
-                continue;
-            }
-            return 1;
-        }
+        return !failed;
+    }
+};
 
-        if (!doRun) {
-            break;
+int main(int argc, char** argv)
+{
+    AssemblerState state;
+    state.parseArgs(argc, argv);
+
+    Assembler assem;
+    state.setupAssembler(assem);
+
+    auto& mach = assem.getMachine();
+
+#ifndef _WIN32
+    struct sigaction sh;
+    sh.sa_handler = [](int s) {
+        // Restore cursor
+        fputs("\x1b[?25h", stdout);
+        exit(0);
+    };
+    sigemptyset(&sh.sa_mask);
+    sh.sa_flags = 0;
+    sigaction(SIGINT, &sh, NULL);
+#endif
+
+    while (state.doRun) {
+
+        TextEmu emu;
+        assem.getSymbols().set("CONSOLE_WIDTH",
+                               static_cast<Number>(emu.get_width()));
+        assem.getSymbols().set("CONSOLE_HEIGHT",
+                               static_cast<Number>(emu.get_height()));
+
+        if (!state.assemble(assem)) {
+            std::this_thread::sleep_for(1s);
+            continue;
         }
 
         std::vector<fs::file_time_type> times;
-        for (auto const& sourceFile : sourceFiles) {
+        for (auto const& sourceFile : state.sourceFiles) {
             times.push_back(fs::last_write_time(sourceFile));
         }
         int32_t start = 0x10000;
@@ -170,7 +199,7 @@ int main(int argc, char** argv)
         while (!quit) {
             quit = emu.update();
             size_t i = 0;
-            for (auto const& sourceFile : sourceFiles) {
+            for (auto const& sourceFile : state.sourceFiles) {
                 auto lastTime = times[i];
                 try {
                     auto thisTime = fs::last_write_time(sourceFile);
@@ -190,26 +219,31 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    try {
-        mach.write(outFile, outFmt);
-    } catch (utils::io_exception&) {
-        fmt::print(stderr, "**Error: Could not write output file {}\n",
-                   outFile);
+    assem.clear();
+    if (!state.assemble(assem)) {
         return 1;
     }
 
-    if (!quiet) {
+    try {
+        mach.write(state.outFile, state.outFmt);
+    } catch (utils::io_exception&) {
+        fmt::print(stderr, "**Error: Could not write output file {}\n",
+                   state.outFile);
+        return 1;
+    }
+
+    if (!state.quiet) {
         for (auto const& section : mach.getSections()) {
-            if (section.data.size() > 0) {
+            if (!section.data.empty()) {
                 fmt::print("{:04x}-{:04x} {}\n", section.start,
                            section.start + section.data.size(), section.name);
             }
         }
     }
 
-    if (dumpSyms) assem.printSymbols();
-    if (!symbolFile.empty()) {
-        assem.writeSymbols(fs::path{symbolFile});
+    if (state.dumpSyms) assem.printSymbols();
+    if (!state.symbolFile.empty()) {
+        assem.writeSymbols(fs::path{state.symbolFile});
     }
 
     return 0;
