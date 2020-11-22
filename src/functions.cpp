@@ -51,6 +51,7 @@ void initFunctions(Assembler& a)
     auto& syms = a.getSymbols();
 
     syms.set("Math.Pi", M_PI);
+    syms.set("M_PI", M_PI);
 
     // Allowed data types:
     // * Any arithmetic type, but they will always be converted to/from double

@@ -170,6 +170,7 @@ int main(int argc, char** argv)
     while (state.doRun) {
 
         TextEmu emu;
+        assem.clear();
         assem.getSymbols().set("CONSOLE_WIDTH",
                                static_cast<Number>(emu.get_width()));
         assem.getSymbols().set("CONSOLE_HEIGHT",
