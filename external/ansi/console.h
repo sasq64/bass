@@ -16,8 +16,8 @@ namespace bbs {
 class Console
 {
     using Protocol = AnsiProtocol;
-public:
 
+public:
     enum AnsiColors
     {
         WHITE,
@@ -51,14 +51,18 @@ public:
         cur_bg = 0x00000000;
         put_fg = cur_fg;
         put_bg = cur_bg;
+        write("\x1b[?1049h");
         write(protocol.set_color(cur_fg, cur_bg));
         write(protocol.goto_xy(0, 0));
         write(protocol.clear());
         write("\x1b[?25l");
-
         resize(terminal->width(), terminal->height());
     }
-    ~Console() { write("\x1b[?25h"); }
+    ~Console()
+    {
+        write("\x1b[?25h");
+        write("\x1b[?1049l");
+    }
 
     using ColorIndex = uint16_t;
     using Char = char32_t;

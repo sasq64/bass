@@ -1,18 +1,12 @@
 #include "assembler.h"
 #include "png.h"
 #include "wrap.h"
+#include "chars.h"
 
 #include <cmath>
 #include <coreutils/algorithm.h>
 #include <coreutils/file.h>
 #include <lodepng.h>
-
-static uint8_t to_pet(uint8_t c)
-{
-    if (c >= 'a' && c <= 'z') return c - 'a' + 1;
-    if (c >= 'A' && c <= 'Z') return c - 'A' + 0x41;
-    return c;
-}
 
 template <typename Out, typename In>
 std::vector<Out> convert_vector(std::vector<In> const& in)
@@ -111,11 +105,11 @@ void initFunctions(Assembler& a)
         return data[1] | (data[0] << 8);
     });
 
-    a.registerFunction("to_cbm", [](std::vector<uint8_t> const& data) {
+    a.registerFunction("translate", [](std::vector<uint8_t> const& data) {
         std::vector<uint8_t> res;
         res.reserve(data.size());
         for (auto d : data) {
-            res.push_back(to_pet(d));
+            res.push_back(translateChar(d));
         }
         return res;
     });

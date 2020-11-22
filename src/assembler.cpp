@@ -945,11 +945,13 @@ void Assembler::setupRules()
 
     parser.after("Char", [&](SV& sv) -> Number {
         auto t = sv.token_view();
+        t.remove_suffix(1);
+        t.remove_prefix(1);
         auto s = utils::utf8_decode(t);
         if(s.size() != 1) {
             throw parse_error("Illegal character literal");
         }
-        return translateChar(s[0]);
+        return s[0];
     });
 
     parser.after("HexNum", [&](SV& sv) -> Number {
