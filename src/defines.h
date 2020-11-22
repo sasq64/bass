@@ -3,8 +3,8 @@
 #include "6502.h"
 #include "symbol_table.h"
 
-#include <coreutils/file.h>
 #include <any>
+#include <coreutils/file.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -36,12 +36,11 @@ inline std::string_view persist(std::string const& s)
 inline utils::File createFile(fs::path const& p)
 {
     auto pp = p.parent_path();
-    if(!pp.empty()) {
+    if (!pp.empty()) {
         fs::create_directories(pp);
     }
     return utils::File{p.string(), utils::File::Mode::Write};
 }
-
 
 class dbz_error : public std::exception
 {
@@ -55,12 +54,11 @@ private:
 };
 
 #define DBZ(x)                                                                 \
-    if (x == 0) throw dbz_error()
+    if (x == 0) throw dbz_error() // NOLINT
 
 struct Num
 {
-    double d;
-    int bits = 0;
+    double d{};
 
     Num() = default;
     template <typename T>
@@ -195,7 +193,6 @@ inline std::string getHomeDir()
     return homeDir;
 }
 
-
 std::string any_to_string(std::any const& val);
 
 inline void printArg(std::any const& arg)
@@ -217,7 +214,7 @@ inline void printArg(std::any const& arg)
 
 struct RegState
 {
-    std::array<unsigned, 6> regs{0,0,0,0,0,0};
+    std::array<unsigned, 6> regs{0, 0, 0, 0, 0, 0};
     std::unordered_map<uint16_t, uint8_t> ram;
 };
 

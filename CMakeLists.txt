@@ -60,7 +60,7 @@ target_include_directories(catch INTERFACE external)
 add_library(sha512 STATIC src/sha512.c)
 
 add_library(badlib STATIC
-    src/assembler.cpp src/grammar.cpp src/functions.cpp
+    src/assembler.cpp src/grammar.cpp src/functions.cpp src/chars.cpp
     src/machine.cpp src/wrap.cpp src/meta.cpp src/petscii.cpp
     src/png.cpp src/script.cpp src/script_functions.cpp)
 

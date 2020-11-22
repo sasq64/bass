@@ -28,19 +28,18 @@ struct EmuPolicy : public sixfive::DefaultPolicy
 
     static constexpr int MemSize = 65536;
 
-    std::array<Intercept*, 64 * 1024> intercepts;
+    std::array<Intercept*, 64 * 1024> intercepts{};
 
     sixfive::Machine<EmuPolicy>& machine;
-
-    static inline unsigned last_pc = 0xffffffff;
 
     // This function is run after each opcode. Return true to stop emulation.
     static bool eachOp(EmuPolicy& policy)
     {
+        static unsigned last_pc = 0xffffffff;
         auto pc = policy.machine.regPC();
 
         if (pc != last_pc) {
-            //fmt::print("{:04x}\n", pc);
+            // fmt::print("{:04x}\n", pc);
             if (auto* ptr = policy.intercepts[pc]) {
                 return ptr->fn(pc);
             }
@@ -53,7 +52,7 @@ void Machine::addIntercept(uint32_t address,
                            std::function<bool(uint32_t)> const& fn)
 {
     auto*& ptr = machine->policy().intercepts[address & 0xffff];
-    if (!ptr) {
+    if (ptr == nullptr) {
         ptr = new Intercept();
     }
     ptr->type = Call;
@@ -151,25 +150,25 @@ void Machine::removeSection(std::string const& name)
 // Layout section 's', exactly at address if Floating, otherwise
 // it must at least be placed after address
 // Return section end
-int32_t Machine::layoutSection(int32_t address, Section& s)
+int32_t Machine::layoutSection(int32_t start, Section& s)
 {
     if (!s.valid) {
         LOGI("Skipping invalid section %s", s.name);
-        return address;
+        return start;
     }
 
     LOGD("Layout %s", s.name);
     if ((s.flags & FixedStart) == 0) {
-        if (s.start != address) {
-            LOGD("%s: %x differs from %x", s.name, s.start, address);
+        if (s.start != start) {
+            LOGD("%s: %x differs from %x", s.name, s.start, start);
             layoutOk = false;
         }
-        s.start = address;
+        s.start = start;
     }
 
-    Check(s.start >= address,
+    Check(s.start >= start,
           fmt::format("Section {} starts at {:x} which is before {:x}", s.name,
-                      s.start, address));
+                      s.start, start));
 
     if (!s.data.empty()) {
         Check(s.children.empty(), "Data section may not have children");
@@ -180,14 +179,14 @@ int32_t Machine::layoutSection(int32_t address, Section& s)
     if (!s.children.empty()) {
         // Lay out children
         for (auto const& child : s.children) {
-            address = layoutSection(address, getSection(child));
+            start = layoutSection(start, getSection(child));
         }
     }
     // Unless fixed size, update size to total of its children
     if ((s.flags & FixedSize) == 0) {
-        s.size = address - s.start;
+        s.size = start - s.start;
     }
-    if (address - s.start > s.size) {
+    if (start - s.start > s.size) {
         throw machine_error(fmt::format("Section {} is too large", s.name));
     }
     return s.start + s.size;
@@ -210,9 +209,10 @@ bool Machine::layoutSections()
 Error Machine::checkOverlap()
 {
     for (auto& a : sections) {
-        if (!a.data.empty() && (!(a.flags & NoStorage))) {
+        if (!a.data.empty() && ((a.flags & NoStorage) == 0)) {
             for (auto const& b : sections) {
-                if (&a != &b && !b.data.empty() && (!(b.flags & NoStorage))) {
+                if (&a != &b && !b.data.empty() &&
+                    ((b.flags & NoStorage) == 0)) {
                     auto as = a.start;
                     auto ae = as + static_cast<int32_t>(a.data.size());
                     auto bs = b.start;
@@ -329,8 +329,8 @@ void writeChip(utils::File const& outFile, int bank, int startAddress,
 
 struct Chip
 {
-    int bank;
-    uint16_t start;
+    int bank = 0;
+    uint16_t start = 0;
     std::vector<uint8_t> data = std::vector<uint8_t>(0x2000);
 };
 
@@ -527,23 +527,23 @@ void Machine::setOutput(FILE* f)
     fp = f;
 }
 
-uint32_t Machine::writeByte(uint8_t w)
+uint32_t Machine::writeByte(uint8_t b)
 {
-    currentSection->data.push_back(w);
+    currentSection->data.push_back(b);
     currentSection->pc++;
     return currentSection->pc;
 }
 
-uint32_t Machine::writeChar(uint8_t w)
+uint32_t Machine::writeChar(uint8_t b)
 {
     if (fp != nullptr) {
         if (!inData) {
             fprintf(fp, "%04x : \"", currentSection->pc);
         }
         inData = true;
-        fputc(w, fp);
+        fputc(b, fp);
     }
-    currentSection->data.push_back(w);
+    currentSection->data.push_back(b);
     currentSection->pc++;
     return currentSection->pc;
 }
@@ -707,11 +707,11 @@ uint8_t Machine::bankReadFunction(uint16_t adr, void* data)
     return thiz->bank_read_functions[adr >> 8](adr);
 }
 
-void Machine::setBankWrite(int bank, int len,
+void Machine::setBankWrite(int hi_adr, int len,
                            std::function<void(uint16_t, uint8_t)> const& fn)
 {
-    bank_write_functions[bank] = fn;
-    machine->mapWriteCallback(bank, len, this, bankWriteFunction);
+    bank_write_functions[hi_adr] = fn;
+    machine->mapWriteCallback(hi_adr, len, this, bankWriteFunction);
 }
 
 void Machine::setBankRead(int hi_adr, int len,
@@ -752,10 +752,9 @@ void Machine::setRegs(RegState const& regs)
     // machine->set<Reg::SR>(r[3]);
     // machine->set<Reg::SP>(r[4]);
     // machine->set<Reg::PC>(r[5]);
-    for(auto const& [adr, val] : regs.ram) {
+    for (auto const& [adr, val] : regs.ram) {
         machine->writeRam(adr, val);
     }
-
 }
 
 void Machine::setReg(sixfive::Reg reg, unsigned v)

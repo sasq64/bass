@@ -33,7 +33,7 @@ enum InterceptType
 
 struct Intercept
 {
-    enum InterceptType type;
+    enum InterceptType type { InterceptType::None };
     std::function<bool(uint32_t)> fn;
 };
 
@@ -165,9 +165,9 @@ public:
     static void bankWriteFunction(uint16_t adr, uint8_t val, void* data);
     static uint8_t bankReadFunction(uint16_t adr, void* data);
 
-    void setBankWrite(int bank, int len,
+    void setBankWrite(int hi_adr, int len,
                       std::function<void(uint16_t, uint8_t)> const& fn);
-    void setBankRead(int bank, int len,
+    void setBankRead(int hi_adr, int len,
                      std::function<uint8_t(uint16_t)> const& fn);
     void setBankRead(int hi_adr, int len, int bank);
 

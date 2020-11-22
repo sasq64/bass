@@ -38,6 +38,6 @@ scroll:
     !align 256
 text:
     !encoding "screencode_upper"
-    !text "THIS IS A SCROLLER THAT EXEMPLIFIES A VERY SIMPLE ROUTINE "
+    !text " -= THIS IS A SCROLLER THAT EXEMPLIFIES A VERY SIMPLE ROUTINE "
     !text "RENDERING ON THE TEXT CONSOLE.   "
     !byte 0

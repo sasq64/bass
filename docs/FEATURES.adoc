@@ -1,0 +1,85 @@
+
+=== Unit Tests
+
+You can pop a `!test` line in front of any subroutine
+and it will be executed in the bass emulator as part of
+the build process.
+
+You can also use `!check` to verify register contents,
+or even execute lua code during the test run.
+
+This wont affect code generation.
+
+
+[source,ca65]
+----
+    !test A=3,X=4,Y=5
+add_axy:
+    clc
+    stx $02
+    !run {: print_fmt("{:x}", mem_read(2)) :}
+    adc $02
+    sty $02
+    adc $02
+    !check A == 12
+    rts
+----
+
+=== Indexed Labels
+
+Labels can be indexed. This is convenient for creating repeated
+labels inside macros or rept statements.
+
+[source,ca65]
+----
+    !rept 5 {
+vec[i]:
+        lda #0
+        jmp jump_start + i * 3
+}
+    jsr vec[3]
+----
+
+=== Arrays and slices
+
+Symbols can refer to arrays in addition to numbers. Arrays can
+be sliced. Array literals can be used directly.
+
+Note that there is a difference between an array of bytes and an
+array of numbers.
+
+----
+some_bytes = bytes(9,8,7,6,5)
+!assert some_bytes[3:2] == bytes(6,5)
+
+a_list = [3.14, 9999, $5000]
+!rept a_list { !print v }
+
+data = load("some.prg")
+load_address = be_word(data[0:2])
+----
+
+=== Lua
+
+Lua is fully integrated in the assembler. Lua code can be used to
+generate data, or even be called from 6502 code during testing.
+
+
+
+=== Functional
+
+A lot of logic can be performed directly in assembly
+expressions
+
+Symbols can take on non numeric values.
+
+load_adress = be_word(load("some.prg")[0:2])
+
+
+=== $-variable
+
+
+
+=== Lambdas
+
+

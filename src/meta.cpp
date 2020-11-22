@@ -1,7 +1,7 @@
 #include "assembler.h"
 #include "defines.h"
 #include "machine.h"
-#include "petscii.h"
+#include "chars.h"
 
 #include <any>
 #include <coreutils/file.h>
@@ -13,64 +13,7 @@
 
 using namespace std::string_literals;
 
-static std::unordered_map<int32_t, uint8_t> char_translate;
-
 static bool globalCond = true;
-
-enum class Translation
-{
-    Ascii,
-    PetsciiUpper,
-    PetsciiLower,
-    ScreencodeUpper,
-    ScreencodeLower
-};
-
-static std::array translationNames{"ascii", "petscii_upper", "petscii_lower",
-                                   "screencode_upper", "screencode_lower"};
-Translation currentTranslation = Translation::Ascii;
-
-static void setTranslation(Translation t)
-{
-    int32_t (*ptr)(uint8_t) = nullptr;
-    currentTranslation = t;
-    switch (t) {
-    case Translation::Ascii:
-        ptr = [](uint8_t i) -> int32_t { return i; };
-        break;
-    case Translation::PetsciiUpper:
-        ptr = &pet2uni_up;
-        break;
-    case Translation::PetsciiLower:
-        ptr = &pet2uni_lo;
-        break;
-    case Translation::ScreencodeUpper:
-        ptr = &sc2uni_up;
-        break;
-    case Translation::ScreencodeLower:
-        ptr = &sc2uni_lo;
-        break;
-    }
-    char_translate.clear();
-    for (int i = 0; i < 128; i++) {
-
-        auto u = ptr(i);
-        char_translate[u] = i;
-    }
-}
-
-static uint8_t translate(uint32_t c)
-{
-    auto it = char_translate.find(c);
-    if (it != char_translate.end()) {
-        return it->second;
-    }
-    auto s = utils::utf8_encode({c});
-    throw parse_error(
-        fmt::format("Char '{}' (0x{:x}) not available in '{}'", s, c,
-                    translationNames[static_cast<int>(currentTranslation)]));
-}
-
 static Section parseArgs(std::vector<std::any> const& args)
 {
     Section result;
@@ -214,14 +157,7 @@ void initMeta(Assembler& assem)
     assem.registerMeta("encoding", [&](Meta const& meta) {
         auto name = any_cast<std::string_view>(meta.args[0]);
 
-        for (size_t i = 0; i < translationNames.size(); i++) {
-            auto const& n = translationNames[i];
-            if (n == name) {
-                setTranslation((Translation)i);
-                return;
-            }
-        }
-        throw parse_error(fmt::format("Unknown encoding '{}'", name));
+        setTranslation(name);
     });
 
     assem.registerMeta("chartrans", [&](Meta const& meta) {
@@ -238,7 +174,7 @@ void initMeta(Assembler& assem)
                 auto n = number<uint8_t>(v);
                 auto c = text[index++];
                 LOGD("%x %x", n, (uint16_t)c);
-                char_translate[c] = n;
+                setTranslation(c, n);
             }
         }
     });
@@ -248,8 +184,7 @@ void initMeta(Assembler& assem)
             if (auto* s = any_cast<std::string_view>(&v)) {
                 auto ws = utils::utf8_decode(*s);
                 for (auto c : ws) {
-                    // LOGI("UC %x", (int32_t)c);
-                    auto b = translate(c);
+                    auto b = translateChar(c);
                     mach.writeChar(b);
                 }
             } else {
@@ -269,7 +204,7 @@ void initMeta(Assembler& assem)
                     first = false;
                 }
                 for (auto c : ws) {
-                    auto b = translate(c);
+                    auto b = translateChar(c);
                     mach.writeChar(b);
                 }
             }
@@ -470,7 +405,7 @@ void initMeta(Assembler& assem)
             auto utext = utils::utf8_decode(*sv);
             for (size_t i = 0; i < utext.size(); i++) {
                 auto d = utext[i];
-                mach.writeByte(translate(d));
+                mach.writeByte(translateChar(d));
             }
         } else {
             auto size = number<size_t>(data);

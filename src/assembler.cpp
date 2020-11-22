@@ -2,6 +2,7 @@
 #include "defines.h"
 #include "machine.h"
 #include "wrap.h"
+#include "chars.h"
 
 #ifndef _WIN32
 #include <cxxabi.h>
@@ -11,6 +12,7 @@
 #include <coreutils/log.h>
 #include <coreutils/split.h>
 #include <coreutils/text.h>
+#include <coreutils/utf8.h>
 
 #include <charconv>
 #include <fmt/format.h>
@@ -432,7 +434,7 @@ void Assembler::useCache(bool on)
 
 void Assembler::handleLabel(std::any const& lbl)
 {
-    if (auto* p = std::any_cast<std::pair<std::string_view, int32_t>>(&lbl)) {
+    if (auto const* p = std::any_cast<std::pair<std::string_view, int32_t>>(&lbl)) {
         // Indexed symbol: Label is array of values
         if (!syms.is_defined(p->first)) {
             syms.set(p->first, std::vector<Number>{});
@@ -591,7 +593,7 @@ void Assembler::setupRules()
 
     parser.after("IfBlock", [&](SV& sv) -> std::any {
         Meta meta;
-        meta.args.push_back(any_cast<Number>(sv[0]));
+        meta.args.emplace_back(any_cast<Number>(sv[0]));
         for (size_t i = 1; i < sv.size(); i++) {
             meta.blocks.push_back(std::any_cast<Block>(sv[i]));
         }
@@ -943,7 +945,11 @@ void Assembler::setupRules()
 
     parser.after("Char", [&](SV& sv) -> Number {
         auto t = sv.token_view();
-        return t[1];
+        auto s = utils::utf8_decode(t);
+        if(s.size() != 1) {
+            throw parse_error("Illegal character literal");
+        }
+        return translateChar(s[0]);
     });
 
     parser.after("HexNum", [&](SV& sv) -> Number {
