@@ -56,7 +56,7 @@ void TextEmu::writeChar(uint16_t adr, uint8_t t)
     console->set_xy(offset % regs[WinW] + regs[WinX],
                     offset / regs[WinW] + regs[WinY]);
     auto c = colorRam[offset];
-    if (t & 0x80) {
+    if ((t & 0x80) != 0) {
         c = ((c << 4) & 0xf0) | (c >> 4);
     }
     set_color(c);
@@ -70,7 +70,7 @@ void TextEmu::writeColor(uint16_t adr, uint8_t c)
     colorRam[offset] = c;
     console->set_xy(offset % regs[WinW] + regs[WinX],
                     offset / regs[WinW] + regs[WinY]);
-    if (t & 0x80) {
+    if ((t & 0x80) != 0) {
         c = ((c << 4) & 0xf0) | (c >> 4);
     }
     set_color(c);
@@ -164,7 +164,7 @@ TextEmu::TextEmu()
                                  return thiz->palette[adr - 0xd780];
                              }
                              auto r = adr & 0xff;
-                             if (r == Key) {
+                             if (r == Keys) {
                                  if (thiz->keys.empty()) {
                                      return 0;
                                  }
@@ -248,7 +248,7 @@ bool TextEmu::update()
     regs[RealW] = console->get_width();
     regs[RealH] = console->get_height();
 
-    if ((regs[Reset] & 1) == 1) {
+    if ((regs[Control] & 1) == 1) {
         return true;
     }
 

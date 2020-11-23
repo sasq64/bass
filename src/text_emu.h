@@ -35,14 +35,14 @@ struct TextEmu
         CFillIn,
         CFillOut,
 
-        Key,
-        Joy0,
-        Joy1,
+        Keys,
         TimerLo,
         TimerHi,
         TimerDiv,
-        Flags,
-        Reset
+        Control,
+        Charset,
+        IrqE,
+        IrqR
 
     };
     std::unique_ptr<sixfive::Machine<sixfive::DefaultPolicy>> emu;

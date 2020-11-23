@@ -1,0 +1,108 @@
+
+== The _pet-100_ specification
+
+=== Intro
+
+The _pet-100_ is an emulator for a "fantasy" text mode 6502 based system.
+
+It was developed as a part of _bass_, a 6502 assembler with a built in emulator.
+
+The emulator was initially added to support unit tests only, but the functionality
+was extended so it could run complete programs in a text only (terminal) environment.
+
+=== Overview
+
+The pet-100 defines only a few set of registers, and special memory. It tries to
+be compatible with the C64 so that it's easy to write code that can target both
+machines.
+
+The machine can write colored text to the screen, and read key events. It also
+has a simple timer that can cause interrupts if necessary.
+
+The text is written as Petscii (upper case screencode by default) and translated into
+unicode. Terminals with modern fonts should be able to display all characters in the
+petscii character set.
+
+At startup, a 40x25 character window is mapped to address $400, and it's corresponding
+colors is mapped to $d800. This is the same as the C64 memory map.
+The window is located at the center of the current PC terminal, but can then be moved
+and resized, and the location in memory can also be changed.
+
+A single register is used for reading keys. The register returns the next character in
+the keyboard input buffer. If the buffer is empty, zero is returned.
+
+
+
+
+=== Default Memory Map
+
+[cols="1,2,8a", options="header"]
+|===
+|Offset|Name|Description
+| $0400 | Text RAM | Character grid, one byte per character
+| $d700 | IO Registers | See below
+| $d780 | Palette | 2 palettes * 16 colors * 3 RGB
+| $d800 | Color RAM | One byte containing 4bits of background and 4bits of
+foreground color, corresponding to the same offset in Text RAM.
+| $fffc | IRQ Vector | Jumped to if IRQ is enabled and timer reaches zero, or key is pressed
+|===
+
+==== Palette
+
+First half is foreground colors, second half background.
+Default to C64 palette.
+
+Changing the palette does not change characters on screen like on
+a C64. This can be used to have more than 16 colors on screen at
+the same time.
+
+==== Color RAM
+
+Low 4 bits of each byte is foreground color for that character.
+Top 4 bits is background (these bits are ignored on a C64).
+
+=== IO Registers
+[cols="1,2,1,1,8a", options="header"]
+|===
+|Offset|Name|Access|Default|Description
+| `$00` | `WinX` | RW | 0 | Current window X position
+| `$01` | `WinY` | RW | 0 | Current window Y position
+| `$02` | `WinW` | RW | 40 | Current window width
+| `$03` | `WinH` | RW | 25 | Current window height
+| `$04` | `RealW` | R |  | Actual console width
+| `$05` | `RealH` | R |  | Actual console height
+| `$06` | `TextPtr` | RW | $04 | High address of current text window
+| `$07` | `ColorPtr` | RW | $d8 | High address of current color window
+| `$08` | `FillOut` | W |  | Fill area around current window with color
+| `$09` | `FillIn` | W |  | Fill current window with color
+| `$0A` | `Keys` | R |  | Returns the next read character from the keyboard.
+`0` means no keys available.
+| `$0B` | `TimerLo` | RW | 1 | Low 8 bits of timer
+| `$0C` | `TimerHi` | RW | 1 | High 8 bits of timer
+| `$0D` | `TimerDiv` | RW | 1 | Timer divider. The millisecond clock is divided
+by this value and written to TimerLo/TimerHi
+| `$0E` | `Control` | W |  | Writing specific bits causes certain effects:
+
+* 0: Exit : Writing `1` will cause the emulator to exit
+* 1: Reset : Writing `1` causes the emulator to reset
+* 2: Stop : Writing `1` causes the emulator to sleep until an IRQ occurs
+
+| `$0F` | `Charset` | RW | 0 | Set the charset to use for translation:
+
+* 0: Screencode upper
+* 1: Screencode lower
+* 2: Petscii upper
+* 3: Petscii lower
+* 4: Ascii
+* 5: Extended Petscii (TBD)
+
+| `$10` | `IrqE` | RW | | Interrupt enable
+
+* 0: Timer IRQ enable
+* 1: Key IRQ enable
+
+| `$11` | `IrqR` | RW | | Interrupt request
+
+* 0 : Timer IRQ occurred
+* 1 : Key IRQ occurred
+|===
