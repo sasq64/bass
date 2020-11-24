@@ -19,7 +19,7 @@ endif()
 set(GCC_CLANG_WARNINGS -Werror -Wall -Wextra -Wnon-virtual-dtor -pedantic
 -Wno-unused-variable -Wno-unused-parameter -Wno-unused-function)
 
-set(MSVC_WARNINGS /W3)
+set(MSVC_WARNINGS /W2)
 
 if(FUZZ)
     set(CMAKE_CXX_FLAGS  ${CMAKE_CXX_FLAGS} -fsanitize=fuzzer,address)

@@ -82,11 +82,11 @@ struct Machine
     Machine(Machine&& op) noexcept = default;
     Machine& operator=(Machine&& op) noexcept = default;
 
-    static inline Opcode illgalOpcode = {
+    Opcode illgalOpcode = {
         0xff, 0, Mode::IMM, [](Machine& m) {
             fmt::print("** Illegal opcode at {:04x}\n", m.regPC());
             m.realCycles = m.cycles;
-            m.cycles = std::numeric_limits<decltype(m.cycles)>::max() - 32;
+            m.cycles = std::numeric_limits<uint32_t>::max() - 32;
         }};
 
     Machine()

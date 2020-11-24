@@ -113,7 +113,7 @@ void forAllNodesTop(AstNode const& root, FN const& fn)
 //    fn(root);
 //}
 
-void write(utils::File& f, uint64_t const& t)
+void write(utils::File& f, uint32_t const& t)
 {
     if ((t & 0xffff'8000) == 0) {
         f.write<uint16_t>(t);

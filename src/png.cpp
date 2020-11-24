@@ -162,7 +162,7 @@ Image loadPng(std::string_view name)
     auto* pal = state.info_png.color.palette;
 
     if(state.info_png.color.colortype == LCT_GREY) {
-        numColors = 1 << state.info_png.color.bitdepth;
+        numColors = 1 << static_cast<size_t>(state.info_png.color.bitdepth);
         pal = nullptr;
     }
 
