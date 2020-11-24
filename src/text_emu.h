@@ -53,6 +53,8 @@ struct TextEmu
     std::array<uint8_t, 128> palette{};
     std::deque<int32_t> keys;
 
+    mutable int32_t basicStart = -1;
+
     void set_color(uint8_t col);
     void writeChar(uint16_t adr, uint8_t t);
     void writeColor(uint16_t adr, uint8_t c);

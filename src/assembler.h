@@ -136,7 +136,7 @@ public:
 
     fs::path evaluatePath(std::string_view name);
     std::string_view getLastLabel() const { return lastLabel; }
-    void setLastLabel(std::string_view const& l) { lastLabel = l; }
+    void setLastLabel(std::string_view l) { lastLabel = l; }
     void setLastLabel(std::string const& l) { lastLabel = persist(l); }
 
     std::any applyDefine(Macro const& fn, Call const& call);

@@ -101,13 +101,13 @@ struct Num
     explicit operator bool() const { return d != 0; }
 };
 
-inline std::string_view operator+(std::string_view const& sv, Num n)
+inline std::string_view operator+(std::string_view sv, Num n)
 {
     return persist(std::string(sv) + std::to_string(n.i()));
 }
 
-inline std::string_view operator+(std::string_view const& sv,
-                                  std::string_view const& n)
+inline std::string_view operator+(std::string_view sv,
+                                  std::string_view n)
 {
     return persist(std::string(sv) + std::string(n));
 }
@@ -161,7 +161,7 @@ private:
 
 struct Instruction
 {
-    Instruction(std::string_view const& op, sixfive::Mode m, double v)
+    Instruction(std::string_view op, sixfive::Mode m, double v)
         : opcode(op), mode(m), val(static_cast<int32_t>(v))
     {}
     std::string_view opcode;

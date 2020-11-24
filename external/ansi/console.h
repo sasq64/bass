@@ -302,7 +302,7 @@ public:
     void moveCursor(const vec& pos) { moveCursor(pos.first, pos.second); }
     void crlf() { moveCursor(0, curY++); }
 
-    void push(std::string_view const& sv);
+    void push(std::string_view sv);
 
     void showCursor(bool show);
 

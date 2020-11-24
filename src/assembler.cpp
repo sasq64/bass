@@ -494,7 +494,7 @@ std::vector<uint8_t> operator+(const std::vector<uint8_t>& lhs,
 }
 
 template <typename A, typename B>
-std::variant<A, bool> operation(std::string_view const& ope, A const& a,
+std::variant<A, bool> operation(std::string_view ope, A const& a,
                                 B const& b)
 {
     // clang-format off

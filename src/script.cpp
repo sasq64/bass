@@ -65,7 +65,7 @@ void Scripting::load(fs::path const& p)
     }
 }
 
-std::function<void()> Scripting::make_function(std::string_view const& code)
+std::function<void()> Scripting::make_function(std::string_view code)
 {
     sol::load_result fn = lua.load(code);
     return [code, this]() {
@@ -74,7 +74,7 @@ std::function<void()> Scripting::make_function(std::string_view const& code)
 
 }
 
-void Scripting::add(std::string_view const& code)
+void Scripting::add(std::string_view code)
 {
     try {
         auto res = lua.script(code);
@@ -87,7 +87,7 @@ void Scripting::add(std::string_view const& code)
     }
 }
 
-bool Scripting::hasFunction(std::string_view const& name)
+bool Scripting::hasFunction(std::string_view name)
 {
     sol::protected_function test = lua[name];
     return test.valid();
@@ -173,7 +173,7 @@ sol::object Scripting::to_object(std::any const& a)
     return sol::object{};
 }
 
-std::any Scripting::call(std::string_view const& name,
+std::any Scripting::call(std::string_view name,
                          std::vector<std::any> const& args)
 {
     std::vector<sol::object> objs;

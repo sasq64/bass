@@ -65,7 +65,7 @@ public:
         openAndThrow(name.c_str(), mode);
     }
 
-    explicit File(std::string_view const& name, const Mode mode = Read)
+    explicit File(std::string_view name, const Mode mode = Read)
     {
         openAndThrow(std::string(name).c_str(), mode);
     }

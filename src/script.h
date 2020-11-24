@@ -25,9 +25,9 @@ public:
     Scripting();
     ~Scripting();
     void load(fs::path const& p);
-    void add(std::string_view const& code);
-    bool hasFunction(std::string_view const& name);
-    std::any call(std::string_view const& name,
+    void add(std::string_view code);
+    bool hasFunction(std::string_view name);
+    std::any call(std::string_view name,
                   std::vector<std::any> const& args);
 
     sol::state& getState() { return *luap; }
@@ -36,7 +36,7 @@ public:
     std::any to_any(sol::object const& obj);
 
     static constexpr int StartIndex = 1;
-    std::function<void()> make_function(std::string_view const& code);
+    std::function<void()> make_function(std::string_view code);
 
 private:
     std::unique_ptr<sol::state> luap;

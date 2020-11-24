@@ -180,7 +180,7 @@ struct SymbolTable
 
     // Return a map containing all symbols beginning with
     // name.
-    AnyMap collect(std::string_view const& name) const
+    AnyMap collect(std::string_view name) const
     {
         AnyMap s;
         for (auto const& p : syms) {

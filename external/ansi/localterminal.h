@@ -12,7 +12,7 @@ namespace bbs {
 
 struct LocalTerminal : public Terminal
 {
-    size_t write(std::string_view const& source) override
+    size_t write(std::string_view source) override
     {
         return 0;
     }
@@ -65,7 +65,7 @@ struct LocalTerminal : public Terminal
         tcsetattr(fileno(stdin), TCSANOW, &orig_term_attr);
     }
 
-    size_t write(std::string_view const& source) override
+    size_t write(std::string_view source) override
     {
         return ::write(fileno(stdout), &source[0], source.length());
     }

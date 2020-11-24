@@ -137,7 +137,7 @@ std::vector<uint8_t> convertPalette(std::vector<double> const& colors32)
     return pal12;
 }
 
-Image loadPng(std::string_view const& name)
+Image loadPng(std::string_view name)
 {
     unsigned w{};
     unsigned h{};

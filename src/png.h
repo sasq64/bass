@@ -14,7 +14,7 @@ struct Image
     explicit operator bool() const { return bpp != 0; }
 };
 
-Image loadPng(std::string_view const& name);
+Image loadPng(std::string_view name);
 std::vector<uint8_t> layoutTiles(std::vector<uint8_t> const& pixels, int stride,
                                  int w, int h, int gap);
 std::vector<uint8_t> indexTiles(std::vector<uint8_t>& pixels, int size);

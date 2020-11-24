@@ -82,6 +82,13 @@ struct Machine
     Machine(Machine&& op) noexcept = default;
     Machine& operator=(Machine&& op) noexcept = default;
 
+    static inline Opcode illgalOpcode = {
+        0xff, 0, Mode::IMM, [](Machine& m) {
+            fmt::print("** Illegal opcode at {:04x}\n", m.regPC());
+            m.realCycles = m.cycles;
+            m.cycles = std::numeric_limits<decltype(m.cycles)>::max() - 32;
+        }};
+
     Machine()
     {
         sp = 0xff;
@@ -98,19 +105,17 @@ struct Machine
             wcallbacks.at(i) = &write_bank;
             wcbdata.at(i) = this;
         }
-        for (const auto& i : getInstructions<false>()) {
-            for (const auto& o : i.opcodes)
-                jumpTable_normal[o.code] = o;
-        }
-        for (const auto& i : getInstructions<true>()) {
-            for (const auto& o : i.opcodes)
-                jumpTable_bcd[o.code] = o;
-        }
+        setCPU(false);
         jumpTable = &jumpTable_normal[0];
     }
 
-    void setCPU(bool cpu6502) {
+    void setCPU(bool cpu6502)
+    {
 
+        for (int i = 0; i < 256; i++) {
+            jumpTable_normal[i] = illgalOpcode;
+            jumpTable_bcd[i] = illgalOpcode;
+        }
         for (const auto& i : getInstructions<false>(cpu6502)) {
             for (const auto& o : i.opcodes)
                 jumpTable_normal[o.code] = o;
@@ -137,6 +142,12 @@ struct Machine
     {
         for (size_t i = 0; i < size; i++)
             ram[org + i] = data[i];
+    }
+
+    void writeMemory(uint16_t org, const uint8_t* data, size_t size)
+    {
+        for (size_t i = 0; i < size; i++)
+            Write(org + i, data[i]);
     }
 
     void readRam(uint16_t org, uint8_t* data, size_t size) const
@@ -171,7 +182,7 @@ struct Machine
                          uint8_t (*cb)(uint16_t, void*))
     {
         while (len > 0) {
-            rcallbacks[bank] = cb; // NOLINT
+            rcallbacks[bank] = cb;  // NOLINT
             rcbdata[bank++] = data; // NOLINT
             len--;
         }
@@ -187,9 +198,15 @@ struct Machine
     }
 
     template <enum Reg REG>
-    unsigned get() const { return Reg<REG>(); }
+    unsigned get() const
+    {
+        return Reg<REG>();
+    }
     template <enum Reg REG>
-    void set(unsigned v)  { Reg<REG>() = v; }
+    void set(unsigned v)
+    {
+        Reg<REG>() = v;
+    }
 
     Adr regPC() const { return pc; }
     void setPC(const uint16_t& p) { pc = p; }
@@ -202,16 +219,16 @@ struct Machine
         while (cycles < toCycles) {
             if (POLICY::eachOp(p)) break;
             auto code = ReadPC();
-//            LOGI("%04x: %02x", pc-1, code);
             auto& op = jumpTable[code];
             op.op(*this);
             cycles += op.cycles;
         }
         if (realCycles != 0) {
-            //LOGI("RTS");
+            // LOGI("RTS");
             cycles = realCycles;
             realCycles = 0;
-        } else return 0;
+        } else
+            return 0;
 
         return cycles;
     }
@@ -228,7 +245,6 @@ struct Machine
     }
 
 private:
-
     // The 6502 registers
     unsigned pc;
     unsigned a;
@@ -493,7 +509,7 @@ private:
         m.sr = (m.sr & ~(1 << FLAG)) | (ON << FLAG);
     }
 
-    template <enum Reg REG,  enum Mode MODE>
+    template <enum Reg REG, enum Mode MODE>
     static constexpr void Store(Machine& m)
     {
         m.StoreEA<MODE>(m.Reg<REG>());
@@ -505,7 +521,7 @@ private:
         m.StoreEA<MODE>(0);
     }
 
-    template <enum Reg REG,  enum Mode MODE>
+    template <enum Reg REG, enum Mode MODE>
     static constexpr void Load(Machine& m)
     {
         m.Reg<REG>() = m.LoadEA<MODE>();
@@ -544,8 +560,8 @@ private:
     template <enum Reg REG, int INC>
     static constexpr void Inc(Machine& m)
     {
-            m.Reg<REG>() = (m.Reg<REG>() + INC) & 0xff;
-            m.set<SZ>(m.Reg<REG>());
+        m.Reg<REG>() = (m.Reg<REG>() + INC) & 0xff;
+        m.set<SZ>(m.Reg<REG>());
     }
 
     // === COMPARE, ADD & SUBTRACT
@@ -558,7 +574,7 @@ private:
         m.sr = (m.sr & ~V) | (z & V);
     }
 
-    template <enum Reg REG,  enum Mode MODE>
+    template <enum Reg REG, enum Mode MODE>
     static constexpr void Cmp(Machine& m)
     {
         unsigned z = (~m.LoadEA<MODE>()) & 0xff;
@@ -1082,22 +1098,20 @@ private:
         };
 
         auto mergeInstructions = [&](std::vector<Instruction> const& vec) {
-          for (auto const& v : vec) {
-              auto it = std::find_if(
-                  instructionTable.begin(), instructionTable.end(),
-                  [&](auto const& i) {
-                    return strcmp(i.name, v.name) == 0;
-                  });
-              if (it != instructionTable.end()) {
-                  it->opcodes.insert(it->opcodes.begin(),
-                                     v.opcodes.begin(), v.opcodes.end());
-              } else {
-                  instructionTable.push_back(v);
-              }
-          }
+            for (auto const& v : vec) {
+                auto it = std::find_if(
+                    instructionTable.begin(), instructionTable.end(),
+                    [&](auto const& i) { return strcmp(i.name, v.name) == 0; });
+                if (it != instructionTable.end()) {
+                    it->opcodes.insert(it->opcodes.begin(), v.opcodes.begin(),
+                                       v.opcodes.end());
+                } else {
+                    instructionTable.push_back(v);
+                }
+            }
         };
 
-        if  (cpu65c02) {
+        if (cpu65c02) {
 
             std::vector<Instruction> instructions65c02 = {
                 {"adc", {{0x72, 5, Mode::INDZ, Adc<Mode::INDZ, USE_BCD>}}},
@@ -1175,40 +1189,40 @@ private:
         } else {
 
             std::vector<Instruction> instructionsIllegal = {
-                { "lax", {
-                    { 0xa7, 3, Mode::ZP, Lax<Mode::ZP>},
-                    { 0xb7, 4, Mode::ZPY, Lax<Mode::ZPY>},
-                    { 0xaf, 4, Mode::ABS, Lax<Mode::ABS>},
-                    { 0xbf, 4, Mode::ABSY, Lax<Mode::ABSY>},
-                    { 0xa3, 6, Mode::INDX, Lax<Mode::INDX>},
-                    { 0xb3, 5, Mode::INDY, Lax<Mode::INDY>},
-                    // NOTE: Emulate as unstable ?
-                    { 0xab, 2, Mode::IMM, Lax<Mode::IMM>},
-                } },
+                {"lax",
+                 {
+                     {0xa7, 3, Mode::ZP, Lax<Mode::ZP>},
+                     {0xb7, 4, Mode::ZPY, Lax<Mode::ZPY>},
+                     {0xaf, 4, Mode::ABS, Lax<Mode::ABS>},
+                     {0xbf, 4, Mode::ABSY, Lax<Mode::ABSY>},
+                     {0xa3, 6, Mode::INDX, Lax<Mode::INDX>},
+                     {0xb3, 5, Mode::INDY, Lax<Mode::INDY>},
+                     // NOTE: Emulate as unstable ?
+                     {0xab, 2, Mode::IMM, Lax<Mode::IMM>},
+                 }},
 
-                { "sax", {
-                    { 0x87, 3, Mode::ZP, Sax<Mode::ZP>},
-                    { 0x97, 4, Mode::ZPY, Sax<Mode::ZPY>},
-                    { 0x8f, 4, Mode::ABS, Sax<Mode::ABS>},
-                    { 0x83, 6, Mode::INDX, Sax<Mode::INDX>},
-                } },
-                { "lxa", {
-                    { 0xab, 2, Mode::IMM, [](Machine& m) {
-                      m.a &= m.LoadEA<Mode::IMM>();
-                      m.x = m.a;
-                    } }
-                } },
-                { "nop", {
-                    { 0xe2, 2, Mode::IMM, [](Machine& m) {
-                        m.LoadEA<Mode::IMM>();
-                    } },
-                    { 0x04, 3, Mode::ZP, [](Machine& m) {
-                        m.LoadEA<Mode::ZP>();
-                    } },
-                    { 0x0c, 4, Mode::ABS, [](Machine& m) {
-                        m.LoadEA<Mode::ABS>();
-                    } },
-                } },
+                {"sax",
+                 {
+                     {0x87, 3, Mode::ZP, Sax<Mode::ZP>},
+                     {0x97, 4, Mode::ZPY, Sax<Mode::ZPY>},
+                     {0x8f, 4, Mode::ABS, Sax<Mode::ABS>},
+                     {0x83, 6, Mode::INDX, Sax<Mode::INDX>},
+                 }},
+                {"lxa",
+                 {{0xab, 2, Mode::IMM,
+                   [](Machine& m) {
+                       m.a &= m.LoadEA<Mode::IMM>();
+                       m.x = m.a;
+                   }}}},
+                {"nop",
+                 {
+                     {0xe2, 2, Mode::IMM,
+                      [](Machine& m) { m.LoadEA<Mode::IMM>(); }},
+                     {0x04, 3, Mode::ZP,
+                      [](Machine& m) { m.LoadEA<Mode::ZP>(); }},
+                     {0x0c, 4, Mode::ABS,
+                      [](Machine& m) { m.LoadEA<Mode::ABS>(); }},
+                 }},
             };
             mergeInstructions(instructionsIllegal);
         }

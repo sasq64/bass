@@ -51,7 +51,7 @@ void Console::clear()
     // curX = curY = 0;
 }
 
-void Console::push(std::string_view const& sv)
+void Console::push(std::string_view sv)
 {
     utils::copy(sv, outBuffer);
 }

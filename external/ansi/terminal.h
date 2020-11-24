@@ -13,7 +13,7 @@ class Terminal
 
 public:
 
-    virtual size_t write(std::string_view const& source) = 0;
+    virtual size_t write(std::string_view source) = 0;
     virtual bool read(std::string& target) = 0;
 
     virtual void open() {}

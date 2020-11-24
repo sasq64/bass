@@ -257,11 +257,31 @@ bool TextEmu::update()
 
 void TextEmu::load(uint16_t start, uint8_t const* ptr, size_t size) const
 {
-    emu->writeRam(start, ptr, size);
+    constexpr uint8_t Sys_Token = 0x9e;
+    constexpr uint8_t Space = 0x20;
+
+    if(start == 0x0801) {
+        const auto* p = ptr;
+        size_t sz = size > 12 ? 12 : size;
+        const auto* endp = ptr + sz;
+
+        while(*p != Sys_Token && p < endp) p++;
+        p++;
+        while(*p == Space && p < endp) p++;
+        if(p < endp) {
+            basicStart = std::atoi(reinterpret_cast<char const*>(p));
+            fmt::print("Detected basic start at {:04x}", basicStart);
+        }
+    }
+    emu->writeMemory(start, ptr, size);
 }
 
 void TextEmu::start(uint16_t pc)
 {
+    if(pc == 0x0801 && basicStart >= 0) {
+        pc = basicStart;
+    }
+
     regs[CFillOut] = 0x01;
     fillOutside();
 
