@@ -84,6 +84,8 @@ $   lda colors,x
     }
     inx
     bne -
+    !log "copy done, A = ${A:x}"
+    !run {: fmt("d810 = {:x}", mem_read(0xd810)) :}
 
     VicAdr($4000)
     BitmapAndScreen(bitmapMem-$4000, screenMem-$4000)

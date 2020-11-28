@@ -14,7 +14,11 @@
 #ifndef _WIN32
 #    include <csignal>
 #endif
+
+#include <chrono>
 #include <thread>
+
+using clk = std::chrono::steady_clock;
 using namespace std::chrono_literals;
 
 static const char* const banner = R"(

@@ -3,6 +3,7 @@
 #include <ansi/console.h>
 #include <ansi/terminal.h>
 #include <coreutils/utf8.h>
+#include <coreutils/algorithm.h>
 #include <thread>
 
 #include "emulator.h"
@@ -51,10 +52,15 @@ void TextEmu::set_color(uint8_t col)
 
 void TextEmu::writeChar(uint16_t adr, uint8_t t)
 {
+    if(regs[RealW] == 0 || regs[RealH] == 0) {
+        return;
+    }
     auto offset = adr - (regs[TextPtr] * 256);
     textRam[offset] = t;
-    console->set_xy(offset % regs[WinW] + regs[WinX],
-                    offset / regs[WinW] + regs[WinY]);
+
+    auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
+    auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
+    console->set_xy(x, y);
     auto c = colorRam[offset];
     if ((t & 0x80) != 0) {
         c = ((c << 4) & 0xf0) | (c >> 4);
@@ -65,11 +71,16 @@ void TextEmu::writeChar(uint16_t adr, uint8_t t)
 
 void TextEmu::writeColor(uint16_t adr, uint8_t c)
 {
+    if(regs[RealW] == 0 || regs[RealH] == 0) {
+        return;
+    }
     auto offset = adr - (regs[ColorPtr] * 256);
     auto t = textRam[offset];
     colorRam[offset] = c;
-    console->set_xy(offset % regs[WinW] + regs[WinX],
-                    offset / regs[WinW] + regs[WinY]);
+
+    auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
+    auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
+    console->set_xy(x, y);
     if ((t & 0x80) != 0) {
         c = ((c << 4) & 0xf0) | (c >> 4);
     }
@@ -180,7 +191,12 @@ TextEmu::TextEmu()
                               auto* thiz = static_cast<TextEmu*>(data);
                               if (adr < 0xd780) {
                                   auto r = adr & 0xff;
-                                  thiz->regs[r] = v;
+                                  if (r == IrqR) {
+                                      thiz->regs[r] ^= v;
+
+                                  } else {
+                                      thiz->regs[r] = v;
+                                  }
                                   if (r == CFillOut) {
                                       thiz->fillOutside();
                                   } else if (r == CFillIn) {
@@ -200,27 +216,54 @@ TextEmu::TextEmu()
 
     regs[TextPtr] = 0x04;
     regs[ColorPtr] = 0xd8;
-    regs[TimerDiv] = 50;
+    regs[Freq] = 20;
+    regs[IrqE] = 0;
+    regs[IrqR] = 0;
 
-    for (int i = 0; i < 16 * 3; i++) {
-        palette[i] = c64pal[i];
-        palette[i + 16 * 3] = c64pal[i];
-    }
     updateRegs();
-    for (auto& c : textRam) {
-        c = 0x20;
-    }
-    for (auto& c : colorRam) {
-        c = 0x01;
-    }
+    utils::fill(textRam, 0x20);
+    utils::fill(colorRam, 0x01);
+    utils::copy(c64pal, palette.data());
+    utils::copy(c64pal, palette.data() + 16*3);
 }
 
 void TextEmu::run(uint16_t pc)
 {
+    /*
+
+       set start_t
+       run for n cycles
+       calc t/cycle
+
+       if t > nextUpdate
+         update
+
+       */
     start(pc);
-    bool quit = false;
-    while (!quit) {
-        quit = update();
+    int32_t cycles = 1000;
+    auto t = clk::now();
+
+    auto nextUpdate = t + 20ms;
+
+    while (true) {
+        emu->run(cycles);
+        auto tpc = (clk::now() - t).count() / cycles;
+
+        if (t >= nextUpdate) {
+            auto key = console->read_key();
+            if (key != 0) {
+                keys.push_back(key);
+            }
+            console->flush();
+            regs[RealW] = console->get_width();
+            regs[RealH] = console->get_height();
+
+            if ((regs[Control] & 1) == 1) {
+                return;
+            }
+
+            nextUpdate += 20ms;
+        }
     }
 }
 
@@ -232,17 +275,15 @@ bool TextEmu::update()
         keys.push_back(key);
     }
 
-    std::this_thread::sleep_for(1ms);
+    std::this_thread::sleep_for(10ms);
 
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(clk::now() -
+    auto ms = std::chrono::duration_cast<std::chrono::microseconds>(clk::now() -
                                                                     start_t);
 
-    auto d = regs[TimerDiv];
-    if (d != 0) {
-        auto frames = ms.count() / d;
-        regs[TimerLo] = frames & 0xff;
-        regs[TimerHi] = (frames >> 8) & 0xff;
-    }
+
+    auto t = ms.count() / 100;
+    regs[TimerLo] = t & 0xff;
+    regs[TimerHi] = (t >> 8) & 0xff;
 
     console->flush();
     regs[RealW] = console->get_width();
@@ -250,6 +291,15 @@ bool TextEmu::update()
 
     if ((regs[Control] & 1) == 1) {
         return true;
+    }
+
+    auto oldR = regs[IrqR];
+    regs[IrqR] |= 1;
+
+    if((oldR ^ regs[IrqR]) != 0) {
+        if ((regs[IrqR] & regs[IrqE]) != 0) {
+            emu->irq(emu->readMem(0xfffc) | (emu->readMem(0xfffd) << 8));
+        }
     }
 
     return cycles != 0;
@@ -260,15 +310,17 @@ void TextEmu::load(uint16_t start, uint8_t const* ptr, size_t size) const
     constexpr uint8_t Sys_Token = 0x9e;
     constexpr uint8_t Space = 0x20;
 
-    if(start == 0x0801) {
+    if (start == 0x0801) {
         const auto* p = ptr;
         size_t sz = size > 12 ? 12 : size;
         const auto* endp = ptr + sz;
 
-        while(*p != Sys_Token && p < endp) p++;
+        while (*p != Sys_Token && p < endp)
+            p++;
         p++;
-        while(*p == Space && p < endp) p++;
-        if(p < endp) {
+        while (*p == Space && p < endp)
+            p++;
+        if (p < endp) {
             basicStart = std::atoi(reinterpret_cast<char const*>(p));
             fmt::print("Detected basic start at {:04x}", basicStart);
         }
@@ -278,19 +330,24 @@ void TextEmu::load(uint16_t start, uint8_t const* ptr, size_t size) const
 
 void TextEmu::start(uint16_t pc)
 {
-    if(pc == 0x0801 && basicStart >= 0) {
+    if (pc == 0x0801 && basicStart >= 0) {
         pc = basicStart;
     }
 
     regs[CFillOut] = 0x01;
     fillOutside();
 
-    // LOGI("Run %04x %02x %02x", start, data[2], data[3]);
     emu->setPC(pc);
     start_t = clk::now();
 }
 
-int TextEmu::get_width() const { return console->get_width(); }
-int TextEmu::get_height() const { return console->get_height(); }
+int TextEmu::get_width() const
+{
+    return console->get_width();
+}
+int TextEmu::get_height() const
+{
+    return console->get_height();
+}
 
 TextEmu::~TextEmu() = default;

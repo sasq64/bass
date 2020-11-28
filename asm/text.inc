@@ -1,29 +1,22 @@
 
 
-!macro Wait(msec)
+!macro Wait(frames)
 {
-    ;!if msec < 256 {
-    ;    .div = 1
-    ;    .n = msec
-    ;} else {
-        .div = 10
-        .n = msec/10
-    ;}
-    lda #.div
-    sta Regs.TimerDiv
-    lda Regs.TimerLo
-    adc #.n
-    sta wait_t
-.w  lda Regs.TimerLo
-    cmp wait_t
-    bne .w
+    ldx #frames
+.l  lda Regs.IrqReq
+    and #1
+    beq .l
+    sta Regs.IrqReq
+    dex
+    bne .l
+
 }
 !macro CheckQuit()
 {
     lda Regs.Key
     cmp #KEY.ESCAPE
     bne .out
-    inc Regs.Reset
+    inc Regs.Control
     jmp  *
 .out
 }
@@ -64,23 +57,18 @@
 
     ; Read keyboard fifo. 0 means empty
     Key
-    ; Read game controllers, if available. One bit
-    ; per key. Not always available
-    Joy0
-    Joy1
 
-    ; Timer ticks 1000 / TimerDiv per seond
+    Freq
+
+    ; Timer ticks 1000 / TimerDiv per second
     TimerLo
     TimerHi
 
-    TimerDiv
+    Control
+    Charset
 
-    ; 0:1 0 = Ascii
-    ;     1 = Petscii
-    ;     2 = UTF-16
-    Flags
-
-    Reset
+    IrqEna
+    IrqReq
 
 }
 

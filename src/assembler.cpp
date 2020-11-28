@@ -381,6 +381,17 @@ void Assembler::setRegSymbols()
     syms.set("RAM", mach->getRam());
 }
 
+void Assembler::machineLog(std::string_view text)
+{
+    fmt::dynamic_format_arg_store<fmt::format_context> store;
+    store.push_back(fmt::arg("X", mach->getReg(sixfive::Reg::X)));
+    store.push_back(fmt::arg("Y", mach->getReg(sixfive::Reg::Y)));
+    store.push_back(fmt::arg("A", mach->getReg(sixfive::Reg::A)));
+    store.push_back(fmt::arg("SP", mach->getReg(sixfive::Reg::SP)));
+    store.push_back(fmt::arg("SR", mach->getReg(sixfive::Reg::SR)));
+    fmt::vprint(std::string(text) + "\n", store);
+}
+
 Assembler::Assembler() : parser(grammar6502)
 {
     parser.packrat();
@@ -405,8 +416,7 @@ Assembler::Assembler() : parser(grammar6502)
                 }
             } else if (std::holds_alternative<Log>(action.action)) {
                 auto const& log = std::get<Log>(action.action);
-                // TODO:
-                puts("TODO: Log");
+                machineLog(log.text);
             } else {
                 auto const& fn = std::get<std::function<void()>>(action.action);
                 fn();
@@ -764,7 +774,6 @@ void Assembler::setupRules()
             value = any_cast<Number>(sv[1]);
         }
         nextEnumValue = value + 1;
-        //LOGI("%s = %d", sym, (int)value);
         return std::pair(sym, value);
     });
 
@@ -894,7 +903,6 @@ void Assembler::setupRules()
     parser.after("Decimal", [&](SV& sv) -> Number {
         try {
             return to_number(sv.token_view());
-            // return std::stod(sv.c_str(), nullptr);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
@@ -906,7 +914,6 @@ void Assembler::setupRules()
     parser.after("Octal", [&](SV& sv) -> Number {
         try {
             return to_number(sv.token_view(), 8, 2);
-            // return std::stoi(sv.c_str() + 2, nullptr, 8);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
@@ -918,7 +925,6 @@ void Assembler::setupRules()
     parser.after("Multi", [&](SV& sv) -> Number {
         try {
             return to_number(sv.token_view(), 4, 2);
-            // return std::stoi(sv.c_str() + 2, nullptr, 4);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
@@ -929,12 +935,9 @@ void Assembler::setupRules()
 
     parser.after("Binary", [&](SV& sv) -> Number {
         try {
-            // const char* ptr = sv.c_str();
-            // if (*ptr == '0') ptr++;
             int skip = 1;
             if (sv.token_view()[0] == '0') skip++;
             return to_number(sv.token_view(), 2, skip);
-            // return std::stoi(ptr + 1, nullptr, 2);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
@@ -959,9 +962,6 @@ void Assembler::setupRules()
             int skip = 1;
             if (sv.token_view()[0] == '0') skip++;
             return to_number(sv.token_view(), 16, skip);
-            // const char* ptr = sv.c_str();
-            // if (*ptr == '0') ptr++;
-            // return std::stol(ptr + 1, nullptr, 16);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");

@@ -36,9 +36,9 @@ struct TextEmu
         CFillOut,
 
         Keys,
+        Freq,
         TimerLo,
         TimerHi,
-        TimerDiv,
         Control,
         Charset,
         IrqE,

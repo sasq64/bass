@@ -46,7 +46,14 @@ start:
     sta $d800+i
     stx $400+i
     }
-        
+
+    lda #>irq
+    sta $fffd
+    lda #<irq
+    sta $fffc
+
+    lda #1
+    sta Regs.IrqEna
 
 loop:
     !rept 79 {
@@ -58,9 +65,14 @@ loop:
     sta Line+79
     inc .x+1
     CheckQuit()
-    Wait(30)
+    Wait(8)
     jmp loop
 
+irq:
+    lda Regs.IrqReq
+    sta Regs.IrqReq
+    dec Regs.WinX
+    rti
 
 copy_pet:
 
@@ -127,3 +139,6 @@ play:
 text:
     !text "THIS ♥ IS A SCROLLER THAT EXEMPLIFIES A VERY SIMPLE ROUTINE "
     !text "RENDERING ON THE TEXT CONSOLE. "
+
+    !section "irq", $fffc
+    !word irq

@@ -97,20 +97,20 @@ by this value and written to TimerLo/TimerHi
 * 4: Ascii
 * 5: Extended Petscii (TBD)
 
-| `$10` | `IrqE` | RW | | Interrupt enable
+| `$10` | `IrqEna` | RW | | Interrupt enable
 
-* 0: Timer IRQ enable
-* 1: Key IRQ enable
-* 2: Terminal update enable
+* 0: Screen update enable
+* 1: Timer IRQ enable
+* 2: Key IRQ enable
 
 These bits indicate whether and interrupt should cause the CPU
 to jump to $FFFC.
 
-| `$11` | `IrqS` | RW | | Interrupt status
+| `$11` | `IrqReq` | RW | | Interrupt Request
 
-* 0 : Timer IRQ occurred
-* 1 : Key IRQ occurred
-* 2 : Terminal update occurred
+* 0 : Screen update occurred
+* 1 : Timer IRQ occurred
+* 2 : Key IRQ occurred
 
 Writing a 1 clears the corresponding IRQ
 

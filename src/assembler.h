@@ -59,6 +59,8 @@ public:
     void pushScope(std::string_view name);
     void popScope();
 
+    void machineLog(std::string_view text);
+
     std::vector<Error> getErrors() const;
 
     bool parse(std::string_view source, std::string const& fname = "");

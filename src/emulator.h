@@ -197,6 +197,14 @@ struct Machine
         }
     }
 
+    void irq(unsigned adr) {
+        stack[sp] = pc >> 8;
+        stack[sp-1] = pc & 0xff;
+        stack[sp-2] = get_SR();
+        sp -= 3;
+        pc = adr;
+    }
+
     template <enum Reg REG>
     unsigned get() const
     {
@@ -224,7 +232,6 @@ struct Machine
             cycles += op.cycles;
         }
         if (realCycles != 0) {
-            // LOGI("RTS");
             cycles = realCycles;
             realCycles = 0;
         } else
