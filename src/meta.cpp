@@ -121,7 +121,7 @@ void initMeta(Assembler& assem)
             if (auto const* s = any_cast<std::string_view>(&v)) {
                 testName = *s;
             } else if (auto const* n = any_cast<Number>(&v)) {
-                start = *n;
+                start = static_cast<uint32_t>(*n);
             } else if (auto const* p =
                            std::any_cast<std::pair<std::string_view, std::any>>(
                                &v)) {
@@ -381,10 +381,6 @@ void initMeta(Assembler& assem)
         mach.setSection(section.name);
     });
 
-    // count,value
-    // count,lambda
-    // vector
-    // string
     assem.registerMeta("fill", [&](Meta const& meta) {
         auto& syms = assem.getSymbols();
         auto data = meta.args[0];
@@ -399,7 +395,7 @@ void initMeta(Assembler& assem)
                 if (d > 255 || d < -127) {
                     throw parse_error("Value does not fit");
                 }
-                mach.writeByte(d);
+                mach.writeByte(static_cast<uint8_t>(d));
             }
         } else if (auto* sv = any_cast<std::string_view>(&data)) {
             auto utext = utils::utf8_decode(*sv);
@@ -415,7 +411,7 @@ void initMeta(Assembler& assem)
             if (meta.args.size() > 1) {
                 data = meta.args[1];
                 if (auto* val = any_cast<Number>(&data)) {
-                    d = *val;
+                    d = static_cast<uint8_t>(*val);
                 } else {
                     // LOGI("Found macro");
                     macro = any_cast<Assembler::Macro>(&data);

@@ -163,8 +163,8 @@ TextEmu::TextEmu()
     terminal->open();
     console = std::make_unique<bbs::Console>(std::move(terminal));
 
-    auto cw = console->get_width();
-    auto ch = console->get_height();
+    uint8_t cw = console->get_width() > 255 ? 0 : (uint8_t)console->get_width();
+    uint8_t ch = console->get_height();
 
     emu = std::make_unique<sixfive::Machine<>>();
 

@@ -115,7 +115,7 @@ public:
         put_y = y;
     }
 
-    void set_color(uint32_t fg, size_t bg)
+    void set_color(uint32_t fg, uint32_t bg)
     {
         put_fg = bg;
         put_bg = fg;
