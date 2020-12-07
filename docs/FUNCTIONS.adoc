@@ -1,130 +1,134 @@
-# Functions
+== Functions
 
-## Assembler functions
+=== Assembler functions
 
 These functions are used directly from the assembler. They
 normally do not have any side effects.
 
-### `sin(f), cos(f), tan(f), asin(f), acos(f), atan(f)`
+==== sin(f), cos(f), tan(f), asin(f), acos(f), atan(f)
 
 Trigonometric functions.
 
-### `sqrt(f), min(a,b), max(a,b), pow(f), round(f)`
+==== sqrt(f), min(a,b), max(a,b), pow(f), round(f)
 
 Other math functions.
 
-### `len(v)`
+==== len(v)
 
 Returns the length of the given array.
 
-### `load(file)`
+==== load(file)
 
 Loads the file and returns an array of the content.
 
-### `compare(v0, v1)`
+==== compare(v0, v1)
 
 Compares two arrays
 
-```
+----
     !assert compare(data, bytes(0,1,2,3))
-```
 
-### `word(v)`
+----
+
+==== word(v)
 
 Takes an array of at least 2 elements and returns the 16-bit
 value stored.
 
-```
+----
     data = load("file.prg")
     loadAddress = word(data[0:2])
-```
+----
 
-### `big_word()`
+==== big_word()
 
 Like `word()`, but in big endian format.
 
-### `zeroes(n)`
+==== zeroes(n)
 
 Create an array of _n_ zeroes.
 
-### `bytes(a, b, c, ...)`
+==== bytes(a, b, c, ...)
 
 Create an array containing the given bytes.
 
-### `to_lower(s)`
+==== to_lower(s)
 
 Convert the given string to lower case.
 
-### `to_upper(s)`
+==== to_upper(s)
 
 Convert the given string to upper case.
 
-### `str(n)`
+==== str(n)
 
 Turns a number into a string
 
-### `num(s)`
+==== num(s)
 
 Turns a string into a number.
 
-## Image Functions
+=== Image Functions
 
-### `img = load_png(filename)`
+==== img = load_png(filename)
 
 Load the png image into memory. Returns:
 
 `{ pixels, colors, width, height, bpp }`
 
 ex
-```lua
+
+[source,lua]
+----
    img = load_png("test.png")
    !assert img.width <= 256 && img.height <= 256
 data:
     !fill img.pixels 
-```
+----
 
-### `img2 = image_remap(img, colors)`
+==== img2 = image_remap(img, colors)
 
-### `img2 = image_layout(img, tile_width, tile_height, gap)`
+==== img2 = image_layout(img, tile_width, tile_height, gap)
 
-### `data = pixels_layout(pixels, stride, byte_width, byte_height, gap)`
+==== data = pixels_layout(pixels, stride, byte_width, byte_height, gap)
 
 "Raw" layout function. Takes a byte array and rearranges it into tiles according to sizes in bytes.
 
-### `img2 = image_change_depth(img, new_bpp)`
+==== img2 = image_change_depth(img, new_bpp)
 
 Change depth. Legal values are 1,2,4 and 8.
 
-```asm
+[source,asm]
+----
     load_png("c64_logo.png")
     image_remap(_, [$000000,$ffffff,$cccccc,$666666])
     img = image_change_depth(_, 2)
 mc_logo:
     !fill img.pixels
-```
+----
 
-### `pixels = pixels_change_depth(pixels, old_bpp, new_bpp)`
+==== pixels = pixels_change_depth(pixels, old_bpp, new_bpp)
 
-
-## LUA Functions
+=== LUA Functions
 
 These functions can only be called from LUA.
 
-### `reg_a(), reg_x(), reg_y()`
+==== reg_a(), reg_x(), reg_y()
 
 Return the contents of a 6502 register.
 
-### `val = mem_read(adr)`
-### `mem_write(adr, val)`
+==== val = mem_read(adr)
+
+==== mem_write(adr, val)
 
 Read or write a value from 6502 memory.
 
-### `set_break_fn(brk, fn)`
+==== set_break_fn(brk, fn)
 
 Set a lua function to be called when a `brk #n` opcode is executed.
 Function is called with _n_ as the single argument.
 
-```
+----
 %{
     set_break_fn(5, function(b)
         print("Break executed")
@@ -132,38 +136,38 @@ Function is called with _n_ as the single argument.
 }%
 
     brk #5
-```
+----
 
-### `map_bank_read(hi_adr, len, fn)`
+==== map_bank_read(hi_adr, len, fn)
 
-If the emulator reads memory between `hi_adr<<8` and
-`hi_adr<<8 + len*256), call the given function.
+If the emulator reads memory between `hi_adr&lt;&lt;8` and
+`hi_adr&lt;&lt;8 + len*256), call the given function.
 
-```
+----
 ; Map $f000 - $ffff to funtion that just returns $55
 %{
     map_bank_read(0xf0, 16, function(adr)
         return 0x55
     end)
 }%
-```
+----
 
-### `map_bank_write(hi_adr, len, fn)`
+==== map_bank_write(hi_adr, len, fn)
 
-If the emulator writes memory between `hi_adr<<8` and
-`hi_adr<<8 + len*256`, call the given function.
+If the emulator writes memory between `hi_adr&lt;&lt;8` and
+`hi_adr&lt;&lt;8 + len*256`, call the given function.
 
-### `map_bank_read(hi_adr, len, bank)`
+==== map_bank_read(hi_adr, len, bank)
 
-If the emulator reads memory between `hi_adr<<8` and
-`hi_adr<<8 + len*256`, map the access to the given _bank_.
+If the emulator reads memory between `hi_adr&lt;&lt;8` and
+`hi_adr&lt;&lt;8 + len*256`, map the access to the given _bank_.
 
 A bank is taken as the top byte of a 24-bit address. When this
 function is called, the list of sections is searched for a
-start address of `bank<<16`, and this section is mapped to
-`hi_adr<<8`.
+start address of `bank&lt;&lt;16`, and this section is mapped to
+`hi_adr&lt;&lt;8`.
 
-```
+----
     ; Emulate bank switching. Bank is selected by writing
     ; to address $01. Bank is mapped to $a000
 %{
@@ -181,4 +185,4 @@ start address of `bank<<16`, and this section is mapped to
     lda #3
     sta $01
     jsr $a000
-```
+----
