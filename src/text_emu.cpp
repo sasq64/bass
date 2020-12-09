@@ -98,23 +98,23 @@ void TextEmu::updateRegs()
     colorRam.resize(sz);
 
     auto banks = sz / 256;
-    emu->mapWriteCallback(regs[TextPtr], banks, this,
+    emu->map_write_callback(regs[TextPtr], banks, this,
                           [](uint16_t adr, uint8_t v, void* data) {
                               auto* thiz = static_cast<TextEmu*>(data);
                               thiz->writeChar(adr, v);
                           });
-    emu->mapReadCallback(regs[TextPtr], banks, this,
+    emu->map_read_callback(regs[TextPtr], banks, this,
                          [](uint16_t adr, void* data) {
                              auto* thiz = static_cast<TextEmu*>(data);
                              auto offset = adr - (thiz->regs[TextPtr] * 256);
                              return thiz->textRam[offset];
                          });
-    emu->mapWriteCallback(regs[ColorPtr], banks, this,
+    emu->map_write_callback(regs[ColorPtr], banks, this,
                           [](uint16_t adr, uint8_t v, void* data) {
                               auto* thiz = static_cast<TextEmu*>(data);
                               thiz->writeColor(adr, v);
                           });
-    emu->mapReadCallback(regs[ColorPtr], banks, this,
+    emu->map_read_callback(regs[ColorPtr], banks, this,
                          [](uint16_t adr, void* data) {
                              auto* thiz = static_cast<TextEmu*>(data);
                              auto offset = adr - (thiz->regs[ColorPtr] * 256);
@@ -150,7 +150,7 @@ TextEmu::TextEmu()
 
     emu = std::make_unique<sixfive::Machine<>>();
 
-    emu->mapReadCallback(0xd7, 1, this,
+    emu->map_read_callback(0xd7, 1, this,
                          [](uint16_t adr, void* data) -> uint8_t {
                              auto* thiz = static_cast<TextEmu*>(data);
                              if (adr >= 0xd780) {
@@ -159,7 +159,7 @@ TextEmu::TextEmu()
                              return thiz->readReg(adr & 0xff);
                          });
 
-    emu->mapWriteCallback(0xd7, 1, this,
+    emu->map_write_callback(0xd7, 1, this,
                           [](uint16_t adr, uint8_t v, void* data) {
                               auto* thiz = static_cast<TextEmu*>(data);
                               if (adr < 0xd780) {
@@ -308,7 +308,7 @@ void TextEmu::doUpdate()
 
     if ((~oldR & regs[IrqR]) != 0) {
         if ((regs[IrqR] & regs[IrqE]) != 0) {
-            emu->irq(emu->readMem(0xfffc) | (emu->readMem(0xfffd) << 8));
+            emu->irq(emu->read_mem(0xfffc) | (emu->read_mem(0xfffd) << 8));
         }
     }
 }
@@ -352,7 +352,7 @@ void TextEmu::load(uint16_t start, uint8_t const* ptr, size_t size) const
             fmt::print("Detected basic start at {:04x}", basicStart);
         }
     }
-    emu->writeMemory(start, ptr, size);
+    emu->write_memory(start, ptr, size);
 }
 
 void TextEmu::start(uint16_t pc)

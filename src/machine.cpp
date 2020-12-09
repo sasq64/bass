@@ -74,7 +74,7 @@ Machine::Machine()
 void Machine::setCpu(CPU cpu)
 {
     cpu65C02 = cpu == CPU_65C02;
-    machine->setCPU(cpu65C02);
+    machine->set_cpu(cpu65C02);
 }
 
 Machine::~Machine() = default;
@@ -515,7 +515,7 @@ void Machine::runSetup()
             }
             LOGD("Writing '%s' to %x-%x", section.name, section.start,
                  section.start + section.data.size());
-            machine->writeRam(section.start, section.data.data(),
+            machine->write_ram(section.start, section.data.data(),
                               section.data.size());
         }
     }
@@ -549,7 +549,7 @@ uint32_t Machine::writeChar(uint8_t b)
 
 std::string Machine::disassemble(uint32_t* pc)
 {
-    auto code = machine->readMem(*pc);
+    auto code = machine->read_mem(*pc);
     pc++;
     auto const& instructions = sixfive::Machine<EmuPolicy>::getInstructions();
     sixfive::Machine<EmuPolicy>::Opcode opcode{};
@@ -567,10 +567,10 @@ std::string Machine::disassemble(uint32_t* pc)
     auto sz = opSize(opcode.mode);
     int32_t arg = 0;
     if (sz == 3) {
-        arg = machine->readMem(pc[0]) | (machine->readMem(pc[1]) << 8);
+        arg = machine->read_mem(pc[0]) | (machine->read_mem(pc[1]) << 8);
         pc += 2;
     } else if (sz == 2) {
-        arg = machine->readMem(*pc++);
+        arg = machine->read_mem(*pc++);
     }
 
     if (opcode.mode == sixfive::Mode::REL) {
@@ -684,11 +684,11 @@ AsmResult Machine::assemble(Instruction const& instr)
 
 uint8_t Machine::readRam(uint16_t offset) const
 {
-    return machine->readMem(offset);
+    return machine->read_mem(offset);
 }
 void Machine::writeRam(uint16_t offset, uint8_t val)
 {
-    machine->writeRam(offset, val);
+    machine->write_ram(offset, val);
 }
 
 void Machine::bankWriteFunction(uint16_t adr, uint8_t val, void* data)
@@ -707,14 +707,14 @@ void Machine::setBankWrite(int hi_adr, int len,
                            std::function<void(uint16_t, uint8_t)> const& fn)
 {
     bank_write_functions[hi_adr] = fn;
-    machine->mapWriteCallback(hi_adr, len, this, bankWriteFunction);
+    machine->map_write_callback(hi_adr, len, this, bankWriteFunction);
 }
 
 void Machine::setBankRead(int hi_adr, int len,
                           std::function<uint8_t(uint16_t)> const& fn)
 {
     bank_read_functions[hi_adr] = fn;
-    machine->mapReadCallback(hi_adr, len, this, bankReadFunction);
+    machine->map_read_callback(hi_adr, len, this, bankReadFunction);
 }
 
 void Machine::setBankRead(int hi_adr, int len, int bank)
@@ -728,13 +728,13 @@ void Machine::setBankRead(int hi_adr, int len, int bank)
         }
     }
     Check(bankSection != nullptr, "Could not map bank");
-    machine->mapRom(hi_adr, bankSection->data.data(), len);
+    machine->map_rom(hi_adr, bankSection->data.data(), len);
 }
 
 std::vector<uint8_t> Machine::getRam()
 {
     std::vector<uint8_t> data(0x10000);
-    machine->readRam(0, &data[0], data.size());
+    machine->read_ram(0, &data[0], data.size());
     return data;
 }
 
@@ -749,7 +749,7 @@ void Machine::setRegs(RegState const& regs)
     // machine->set<Reg::SP>(r[4]);
     // machine->set<Reg::PC>(r[5]);
     for (auto const& [adr, val] : regs.ram) {
-        machine->writeRam(adr, val);
+        machine->write_ram(adr, val);
     }
 }
 

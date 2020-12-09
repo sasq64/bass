@@ -82,7 +82,7 @@ struct Machine
     Machine(Machine&& op) noexcept = default;
     Machine& operator=(Machine&& op) noexcept = default;
 
-    Opcode illgalOpcode = {
+    Opcode illgal_opcode = {
         0xff, 0, Mode::IMM, [](Machine& m) {
             fmt::print("** Illegal opcode at {:04x}\n", m.regPC());
             m.realCycles = m.cycles;
@@ -105,16 +105,16 @@ struct Machine
             wcallbacks.at(i) = &write_bank;
             wcbdata.at(i) = this;
         }
-        setCPU(false);
+        set_cpu(false);
         jumpTable = &jumpTable_normal[0];
     }
 
-    void setCPU(bool cpu6502)
+    void set_cpu(bool cpu6502)
     {
 
         for (int i = 0; i < 256; i++) {
-            jumpTable_normal[i] = illgalOpcode;
-            jumpTable_bcd[i] = illgalOpcode;
+            jumpTable_normal[i] = illgal_opcode;
+            jumpTable_bcd[i] = illgal_opcode;
         }
         for (const auto& i : getInstructions<false>(cpu6502)) {
             for (const auto& o : i.opcodes)
@@ -134,42 +134,42 @@ struct Machine
 
     // Access ram directly
 
-    const Word& Stack(const Word& adr) const { return stack[adr]; }
+    const Word& get_stack(const Word& adr) const { return stack[adr]; }
 
-    void writeRam(uint16_t org, const Word data) { ram[org] = data; }
+    void write_ram(uint16_t org, const Word data) { ram[org] = data; }
 
-    void writeRam(uint16_t org, const uint8_t* data, size_t size)
+    void write_ram(uint16_t org, const uint8_t* data, size_t size)
     {
         for (size_t i = 0; i < size; i++)
             ram[org + i] = data[i];
     }
 
-    void writeMemory(uint16_t org, const uint8_t* data, size_t size)
+    void write_memory(uint16_t org, const uint8_t* data, size_t size)
     {
         for (size_t i = 0; i < size; i++)
             Write(org + i, data[i]);
     }
 
-    void readRam(uint16_t org, uint8_t* data, size_t size) const
+    void read_ram(uint16_t org, uint8_t* data, size_t size) const
     {
         for (size_t i = 0; i < size; i++)
             data[i] = ram[org + i];
     }
 
-    uint8_t readRam(uint16_t org) const { return ram[org]; }
+    uint8_t read_ram(uint16_t org) const { return ram[org]; }
 
     // Access memory through bank mapping
 
-    uint8_t readMem(uint16_t org) const { return rbank[org >> 8][org & 0xff]; }
+    uint8_t read_mem(uint16_t org) const { return rbank[org >> 8][org & 0xff]; }
 
-    void readMem(uint16_t org, uint8_t* data, int size) const
+    void read_mem(uint16_t org, uint8_t* data, int size) const
     {
         for (int i = 0; i < size; i++)
-            data[i] = readMem(org + i);
+            data[i] = read_mem(org + i);
     }
 
     // Map ROM to a bank
-    void mapRom(uint8_t bank, const Word* data, int len)
+    void map_rom(uint8_t bank, const Word* data, int len)
     {
         auto const* end = data + len;
         while (data < end) {
@@ -178,7 +178,7 @@ struct Machine
         }
     }
 
-    void mapReadCallback(uint8_t bank, int len, void* data,
+    void map_read_callback(uint8_t bank, int len, void* data,
                          uint8_t (*cb)(uint16_t, void*))
     {
         while (len > 0) {
@@ -187,7 +187,7 @@ struct Machine
             len--;
         }
     }
-    void mapWriteCallback(uint8_t bank, int len, void* data,
+    void map_write_callback(uint8_t bank, int len, void* data,
                           void (*cb)(uint16_t, uint8_t, void*))
     {
         while (len > 0) {
@@ -246,7 +246,7 @@ struct Machine
 
     using BreakFn = void (*)(int, void*);
 
-    void setBreakFunction(BreakFn const& fn, void* data)
+    void set_break_function(BreakFn const& fn, void* data)
     {
         breakData = data;
         breakFunction = fn;
