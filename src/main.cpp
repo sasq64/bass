@@ -163,9 +163,9 @@ int main(int argc, char** argv)
 #ifndef _WIN32
     struct sigaction sh = {};
     sh.sa_handler = [](int) {
-        // Restore cursor
-        //fputs("\x1b[?25h", stdout);
-        //fputs("\x1b[?1049l", stdout);
+        // Restore cursor and exit alt mode
+        fputs("\x1b[?25h", stdout);
+        fputs("\x1b[?1049l", stdout);
         exit(0);
     };
     sigemptyset(&sh.sa_mask);
