@@ -1,4 +1,7 @@
 :toc: left
+
+= bass manual
+
 include::INTRO.adoc[]
 
 include::FEATURES.adoc[]

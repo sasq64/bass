@@ -646,8 +646,8 @@ void Assembler::setupRules()
 
         meta.name = "macro";
         meta.text = sv.token_view();
-        meta.args.push_back(fndef.name);
-        meta.args.push_back(fndef.args);
+        meta.args.emplace_back(fndef.name);
+        meta.args.emplace_back(fndef.args);
         meta.line = sv.line();
 
         return meta;

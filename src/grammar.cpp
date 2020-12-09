@@ -50,7 +50,7 @@ ScriptContents2 <- (!':}' .)*
 AssignLine <- _ ('*' / Assignee) _ '=' _ (String / Lambda / Expression)
 Assignee <- AsmSymbol _
 
-Lambda <- '[' FnArgs '->' DelayedExpression ']'
+Lambda <- '[' FnArgs '->' EndOfLine? DelayedExpression ']'
 
 
 Script <- '%{' ScriptContents '}%'

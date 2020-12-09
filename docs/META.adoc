@@ -1,10 +1,10 @@
-== Meta Commands
+== Meta Reference
 
 All meta commands take the same basic form; An exclamation mark followed by an identifier, then an optional set of arguments, followed by zero, one or two
 blocks enclosed in curly braces.
 
 
-=== `!section`
+=== !section
 
 1. `!section <name>, <start> [,<options>] [ { <statements...> } ]`
 2. `!section <name>, in=<parent> [,<options>] [ { <statements...> } ]`
@@ -54,7 +54,7 @@ Unrecognized options will be passed on to the output module.
 start:
 ----
 
-=== `!rept`
+=== !rept
 
 1. `!rept [<ivar>=]<count> { <statements...> }`
 2. `!rept <array> { <statements...> }`
@@ -75,7 +75,7 @@ xor_data:
         !byte secret[i % len(secret] ^ v
     }
 ----
-=== `!fill`
+=== !fill
 
 1. `!fill <array>`
 2. `!fill <count> [, <value>]`
@@ -96,7 +96,7 @@ Put data into memory, Essentially a shorthand for
     !fill 10, [ i -> sin(i * Math. Pi / 5 ]
 ----
 
-=== `!macro`
+=== !macro
 
 1. `!macro <name>(<args>...) { <statements...> }`
 
@@ -105,32 +105,32 @@ contents will be inserted into the assembly for parsing.
 
 1. Create a macro that will insert `<statements>`.
 
-=== `!byte`
+=== !byte
 
 1. `!byte <expression> [,<expression>]...`
 
 Insert bytes into memory.
 
-=== `!word`
+=== !word
 
 1. `!word <expression> [,<expression>]...`
 
 Insert 16bit words into memory.
 
-=== `!byte3`
+=== !byte3
 
 1. `!byte3 <expression> [,<expression>]...`
 
 Insert 24bit words into memory. Useful for C64 sprites.
 
-=== `!text`
+=== !text
 
 `!text <string> [,<string>]`
 
 Insert characters into memory.Characters are translated using
 current translation table.
 
-=== `!chartrans`
+=== !chartrans
 
 1. `!chartrans <string>, <c0>, <c1>... [<string>, <c0>, <c1>...]`
 2. `!chartrans`
@@ -142,14 +142,14 @@ subsequent number, in order.The number of values should be equal to the
 number of characters in the string.
 2. Reset tranlation to default.
 
-=== `!assert`
+=== !assert
 
 * `!assert <expression> [,<string>]`
 
 Assert that _expression_ is true.Fail compilation otherwise.
 Asserts are only evaluated in the final pass.
 
-=== `!align`
+=== !align
 
 * `!align <bytes>`
 
@@ -162,14 +162,14 @@ Normal use case is `!align 256` to ensure page boundary.
 
 Explicitly set the _Program Counter_ to the given address.
 
-=== `!ds`
+=== !ds
 
 * `!ds <bytes>`
 
 Declare an empty sequence of _size_ bytes.Only increase the _Program Counter_, will not put any data into the current section.
 
 
-=== `!enum`
+=== !enum
 
 `!enum [<name>] { <assignments...> }`
 
@@ -178,7 +178,7 @@ assignments are prefixed with `name.`.
 
 Assignments must take the form `symbol = <number>` or just `symbol`, and must be placed on separate lines.
 
-=== `!if`
+=== !if
 
 1. `!if <expression> { <statements...> } [ else { <statements...>} ]`
 2. `!ifdef <symbol> { <statements...> } [ else { <statements...>} ]`
@@ -188,31 +188,31 @@ Assignments must take the form `symbol = <number>` or just `symbol`, and must be
 
 Conditional parsing of statements.
 
-=== `!include`
+=== !include
 
 * `!include <filename>`
 
 Include another file, relative to this file.
 
-=== `!incbin`
+=== !incbin
 
 * `!incbin <filename>`
 
 Include a binary file, relative to this file.
 
-=== `!script`
+=== !script
 
 * `!script <filename>`
 
 Include a script file, relative to this file.
 
-=== `!cpu`
+=== !cpu
 
 * `!cpu <cpuname>`
 
 Set the CPU to use.Valid arguments are only `"6502"` or `"65c02"`.
 
-=== `!test`
+=== !test
 
 * `!test [<name>] [<registers>]`
 
@@ -223,7 +223,7 @@ Registers take the form: <reg>=<value>, ...
 
 Create a test that starts at _address_.
 
-=== `!log`
+=== !log
 
 * `!log <text>`
 
@@ -238,7 +238,7 @@ arguments between braces ({A}, {X}, {Y} etc).
     !log "We are here, X={X}"
 ----
 
-=== `!check`
+=== !check
 
 * `!check <expression>`
 
@@ -255,7 +255,7 @@ execution of tests.Symbols A,X,Y,SP,SR are available in expressions.
     !check A == 5
 ----
 
-=== `!run`
+=== !run
 
 * `!run {: <lua code> :}`
 

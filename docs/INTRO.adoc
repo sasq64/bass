@@ -1,5 +1,5 @@
 
-== The Bass 6502 Assembler
+== Introduction
 
 * ACME like syntax
 * Aims to be on par with Kickassembler in automation/scriptability,
@@ -29,7 +29,7 @@ use the `--run` option. This will assemble the given file and load all
 it's section into the emulators memory. It will also watch the file
 for changes, and re-assemble and restart on change.
 
-=== Example source
+== Example source
 
 [source,ca65]
 ----
@@ -66,10 +66,7 @@ text:
 end:
     
     ; --- Generate sine table with and without LUA
-
-    !define mysin(x, amp, size) {
-        (sin(x * Math.Pi * 2 / size) * 0.5 + 0.5) * amp
-    }
+    mysin = [ x, amp, size -> sin(x * Math.Pi * 2 / size) * 0.5 + 0.5) * amp ]
 sin:
     !fill 100 { mysin(i, 255, 100) } 
 
