@@ -51,9 +51,8 @@ rendering.
 | $d700 | IO Registers | See below
 | $d780 | Palette | 32 colors, with 3 bytes (RGB) each. First 16 colors is foreground, second half is background.
 
-
-Changing the palette does not change characters on screen like on a C64. This
-can be used to have more than 16 colors on screen at the same time.
+Changing the palette does not change the colors of characters already on screen.
+This can be used to have more than 16 colors on screen at the same time.
 | $d800 | Color RAM | Color indices for corresponding character; low 4 bits is foreground,
 high 4 bits is background.
 
@@ -74,21 +73,20 @@ key is pressed
 | `$05` | `RealH` | R |  | Actual console height
 | `$06` | `TextPtr` | RW | $04 | High address of current text window
 | `$07` | `ColorPtr` | RW | $d8 | High address of current color window
-| `$08` | `FillOut` | W |  | Fill area around current window with color
-| `$09` | `FillIn` | W |  | Fill current window with color
-| `$0A` | `Keys` | R |  | Returns the next read character from the keyboard.
+| `$08` | `Border` | W |  | Fill area around current window with color
+| `$09` | `Keys` | R |  | Returns the next read character from the keyboard.
 `0` means no keys available.
-| `$0B` | `TimerLo` | RW | 1 | Low 8 bits of timer
-| `$0C` | `TimerHi` | RW | 1 | High 8 bits of timer
-| `$0D` | `TimerDiv` | RW | 1 | Timer divider. The millisecond clock is divided
+| `$0A` | `TimerLo` | RW | 1 | Low 8 bits of timer
+| `$0B` | `TimerHi` | RW | 1 | High 8 bits of timer
+| `$0C` | `TimerDiv` | RW | 1 | Timer divider. The millisecond clock is divided
 by this value and written to TimerLo/TimerHi
-| `$0E` | `Control` | W |  | Writing specific bits causes certain effects:
+| `$0D` | `Control` | W |  | Writing specific bits causes certain effects:
 
 * 0: Exit : Writing `1` will cause the emulator to exit
-* 1: Reset : Writing `1` causes the emulator to reset
-* 2: Stop : Writing `1` causes the emulator to sleep until an IRQ occurs
+* 1: Stop : Writing `1` causes the emulator to sleep until an IRQ occurs
+* 2: Reset: Writing `1` clears screen and loads new palette & charset
 
-| `$0F` | `Charset` | RW | 0 | Set the charset to use for translation:
+| `$0E` | `Charset` | RW | 0 | Set the charset to use for translation:
 
 * 0: Screencode upper
 * 1: Screencode lower
@@ -100,8 +98,7 @@ by this value and written to TimerLo/TimerHi
 | `$10` | `IrqEna` | RW | | Interrupt enable
 
 * 0: Screen update enable
-* 1: Timer IRQ enable
-* 2: Key IRQ enable
+* 1: Key IRQ enable
 
 These bits indicate whether and interrupt should cause the CPU
 to jump to $FFFC.
@@ -109,23 +106,15 @@ to jump to $FFFC.
 | `$11` | `IrqReq` | RW | | Interrupt Request
 
 * 0 : Screen update occurred
-* 1 : Timer IRQ occurred
-* 2 : Key IRQ occurred
+* 1 : Key IRQ occurred
 
 Writing a 1 clears the corresponding IRQ
 
 |===
 
-    ; Sleep 10 miliseconds
-    lda #10
-    sta TimerLo
-    lda #SLEEP
-    sta Control
-
-
     ; Frame loop
 loop:
-$   lda #4       ; Both Screen update & sleep bit
+$   lda #2       ; Both Screen update & sleep bit
     sta Control  ; Go to sleep
     and IrqS     ; Check if screen woke us
     beq -

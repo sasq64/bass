@@ -1,7 +1,7 @@
 #include "assembler.h"
+#include "chars.h"
 #include "defines.h"
 #include "machine.h"
-#include "chars.h"
 
 #include <any>
 #include <coreutils/file.h>
@@ -13,7 +13,6 @@
 
 using namespace std::string_literals;
 
-static bool globalCond = true;
 static Section parseArgs(std::vector<std::any> const& args)
 {
     Section result;
@@ -63,6 +62,7 @@ void initMeta(Assembler& assem)
 {
     using std::any_cast;
     using Meta = Assembler::Meta;
+    static bool globalCond = true;
     auto& mach = assem.getMachine();
 
     setTranslation(Translation::ScreencodeUpper);
@@ -143,7 +143,7 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("macro", [&](Meta const& meta) {
-        Check(meta.blocks.size() >= 1, "Expected block");
+        Check(!meta.blocks.empty(), "Expected block");
 
         auto macroName = any_cast<std::string_view>(meta.args[0]);
         auto macroArgs = any_cast<std::vector<std::string_view>>(meta.args[1]);
@@ -164,7 +164,7 @@ void initMeta(Assembler& assem)
         std::u32string text;
         size_t index = 0;
         for (auto const& v : meta.args) {
-            if (auto* s = any_cast<std::string_view>(&v)) {
+            if (auto const* s = any_cast<std::string_view>(&v)) {
                 text = utils::utf8_decode(*s);
                 index = 0;
             } else {
@@ -181,7 +181,7 @@ void initMeta(Assembler& assem)
 
     assem.registerMeta("text", [&](Meta const& meta) {
         for (auto const& v : meta.args) {
-            if (auto* s = any_cast<std::string_view>(&v)) {
+            if (auto const* s = any_cast<std::string_view>(&v)) {
                 auto ws = utils::utf8_decode(*s);
                 for (auto c : ws) {
                     auto b = translateChar(c);
@@ -195,7 +195,7 @@ void initMeta(Assembler& assem)
             auto contents = std::string(block.contents);
             auto parts = utils::split(contents, "\n");
             bool first = true;
-            for (auto part : parts) {
+            for (auto const* part : parts) {
                 std::string_view sv = part;
                 sv = strip_space(sv);
                 auto ws = utils::utf8_decode(sv);
@@ -213,7 +213,7 @@ void initMeta(Assembler& assem)
 
     assem.registerMeta("byte", [&](Meta const& meta) {
         for (auto const& v : meta.args) {
-            if (auto* s = any_cast<std::string_view>(&v)) {
+            if (auto const* s = any_cast<std::string_view>(&v)) {
                 for (auto c : *s) {
                     mach.writeChar(c);
                 }
@@ -280,8 +280,8 @@ void initMeta(Assembler& assem)
     assem.registerMeta("else", [&](Meta const& meta) {
         if (globalCond) return;
 
-        for (size_t i = 0; i < meta.blocks.size(); i++) {
-            assem.evaluateBlock(meta.blocks[i]);
+        for (auto const& block : meta.blocks) {
+            assem.evaluateBlock(block);
         }
         globalCond = true;
     });
@@ -330,7 +330,7 @@ void initMeta(Assembler& assem)
         assem.addRunnable(meta.blocks[0].contents, meta.line);
     });
 
-    assem.registerMeta("rts", [&](Meta const& meta) {
+    assem.registerMeta("rts", [&](Meta const&) {
         mach.addIntercept(mach.getPC(), [](uint32_t) { return true; });
     });
 
@@ -385,13 +385,11 @@ void initMeta(Assembler& assem)
         auto& syms = assem.getSymbols();
         auto data = meta.args[0];
         if (auto* vec = any_cast<std::vector<uint8_t>>(&data)) {
-            for (size_t i = 0; i < vec->size(); i++) {
-                uint8_t d = (*vec)[i];
+            for (auto d : *vec) {
                 mach.writeByte(d);
             }
         } else if (auto* nv = any_cast<std::vector<Number>>(&data)) {
-            for (size_t i = 0; i < vec->size(); i++) {
-                auto d = (*nv)[i];
+            for (auto d : *nv) {
                 if (d > 255 || d < -127) {
                     throw parse_error("Value does not fit");
                 }
@@ -399,8 +397,7 @@ void initMeta(Assembler& assem)
             }
         } else if (auto* sv = any_cast<std::string_view>(&data)) {
             auto utext = utils::utf8_decode(*sv);
-            for (size_t i = 0; i < utext.size(); i++) {
-                auto d = utext[i];
+            for (auto d : utext) {
                 mach.writeByte(translateChar(d));
             }
         } else {
@@ -425,7 +422,7 @@ void initMeta(Assembler& assem)
             // LOGI("Fill %d bytes", size);
             for (size_t i = 0; i < size; i++) {
                 if (macro != nullptr) {
-                    if (call.args.size() > 0) {
+                    if (!call.args.empty()) {
                         call.args[0] = any_num(i);
                     }
                     auto res = assem.applyDefine(*macro, call);

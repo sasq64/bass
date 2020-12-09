@@ -44,10 +44,10 @@ syn match luaComment		"--.*"
 
 syn keyword luaFunction function end for if then return contained
 
-syn region luaScript start="%{" end="}%" contains=luaFunction,decNumber,hexNumber,binNumber,luaComment,luaComment
+syn region luaScript start="%{" end="}%" contains=luaFunction,decNumber,hexNumber,binNumber,luaComment
 
-if !exists("did_asm65_syntax_inits")
-  let did_rgb_asm_syntax_inits = 1
+if !exists("did_bass_syntax_inits")
+  let did_bass_asm_syntax_inits = 1
 
   hi link asm6510Illegal	Debug
   hi link asm6502Mnemonics	Statement
@@ -75,4 +75,4 @@ if !exists("did_asm65_syntax_inits")
 
 endif
 
-let b:current_syntax = "rgbasm"
+let b:current_syntax = "badass"

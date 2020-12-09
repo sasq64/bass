@@ -55,6 +55,9 @@
     ; Write to fill border with given color
     CFillOut
 
+    ScrollX
+    ScrollY
+
     ; Read keyboard fifo. 0 means empty
     Key
 

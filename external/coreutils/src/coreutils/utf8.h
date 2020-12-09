@@ -80,7 +80,7 @@ inline size_t utf8_decode(const std::string& utf8, uint32_t* target)
     return ptr - target;
 }
 
-inline std::u32string utf8_decode(const std::string_view& txt)
+inline std::u32string utf8_decode(std::string_view txt)
 {
     std::u32string result;
     using C = std::u32string::value_type;
@@ -96,7 +96,7 @@ inline std::u32string utf8_decode(const std::string_view& txt)
     return result;
 }
 
-inline std::string utf8_encode(const std::string_view& txt)
+inline std::string utf8_encode(std::string_view txt)
 {
     std::string out;
     const uint8_t* s = (uint8_t*)txt.data();

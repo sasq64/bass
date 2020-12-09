@@ -46,6 +46,7 @@ inline void LogVL(int line, const char* fileName, const char* text, va_list vl)
     log2(fileName, line, Debug, temp);
 }
 
+void setAltMode(bool on);
 void setLevel(Level level);
 void setOutputFile(const std::string& fileName);
 // void setLogSpace(const std::string &sourceFile, const std::string &function,

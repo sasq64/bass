@@ -17,6 +17,10 @@ namespace bbs {
 class Console;
 } // namespace bbs
 
+struct exit_exception : public std::exception
+{};
+
+
 struct TextEmu
 {
     enum Regs
@@ -32,8 +36,10 @@ struct TextEmu
         TextPtr,
         ColorPtr,
 
-        CFillIn,
         CFillOut,
+
+        ScrollX,
+        ScrollY,
 
         Keys,
         Freq,
@@ -51,7 +57,6 @@ struct TextEmu
     std::vector<uint8_t> textRam;
     std::vector<uint8_t> colorRam;
     std::array<uint8_t, 128> palette{};
-    std::deque<int32_t> keys;
 
     mutable int32_t basicStart = -1;
 
@@ -59,11 +64,16 @@ struct TextEmu
     void writeChar(uint16_t adr, uint8_t t);
     void writeColor(uint16_t adr, uint8_t c);
     void updateRegs();
-    void fillInside();
-    void fillOutside();
+    void fillOutside(uint8_t col);
 
     int get_width() const;
     int get_height() const;
+
+    void doUpdate();
+
+    uint8_t readReg(int reg);
+    void writeReg(int reg, uint8_t val);
+    uint16_t get_ticks() const;
 
     TextEmu();
     ~TextEmu();
@@ -79,5 +89,6 @@ struct TextEmu
     bool update();
     using clk = std::chrono::steady_clock;
     clk::time_point start_t;
+    clk::time_point nextUpdate;
 };
 

@@ -197,10 +197,11 @@ struct Machine
         }
     }
 
-    void irq(unsigned adr) {
+    void irq(unsigned adr)
+    {
         stack[sp] = pc >> 8;
-        stack[sp-1] = pc & 0xff;
-        stack[sp-2] = get_SR();
+        stack[sp - 1] = pc & 0xff;
+        stack[sp - 2] = get_SR();
         sp -= 3;
         pc = adr;
     }
@@ -1255,5 +1256,5 @@ public:
             makeInstructionTable<USE_BCD>(false);
         return cpu65c02 ? instructionTable : instructionTable2;
     }
-}; // namespace sixfive
+};
 } // namespace sixfive

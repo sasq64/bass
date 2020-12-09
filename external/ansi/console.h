@@ -132,6 +132,23 @@ public:
         }
     }
 
+    void put_char(int x, int y, Char c)
+    {
+        grid[x + width * y].c = c;
+    }
+
+    void put_color(int x, int y, uint32_t fg, uint32_t bg)
+    {
+        grid[x + width * y].fg = fg;
+        grid[x + width * y].bg = bg;
+    }
+
+    Char get_char(int x, int y)
+    {
+        return grid[x + width * y].c;
+    }
+
+
     auto get_width() const { return width; }
     auto get_height() const { return height; }
 

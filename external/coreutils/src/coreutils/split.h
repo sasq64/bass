@@ -9,12 +9,11 @@
 #include <utility>
 #include <vector>
 
-using namespace std::string_literals;
 
 namespace utils {
 
 template <typename ITERATOR, typename Char = char>
-std::basic_string<Char> join(ITERATOR begin, ITERATOR end, const Char separator)
+std::basic_string<Char> join(ITERATOR begin, ITERATOR end, Char separator)
 {
     std::basic_ostringstream<Char> ss;
 
@@ -191,6 +190,7 @@ struct URL
 
 inline URL parse_url(std::string const& input)
 {
+    using namespace std::string_literals;
     URL url;
     std::vector<std::string> parts = split(input, "://"s);
 

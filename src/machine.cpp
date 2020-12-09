@@ -208,7 +208,7 @@ bool Machine::layoutSections()
 
 Error Machine::checkOverlap()
 {
-    for (auto& a : sections) {
+    for (auto const& a : sections) {
         if (!a.data.empty() && ((a.flags & NoStorage) == 0)) {
             for (auto const& b : sections) {
                 if (&a != &b && !b.data.empty() &&
@@ -468,17 +468,16 @@ void Machine::write(std::string const& name, OutFmt fmt)
         }
 
         auto offset = section.start;
-        auto adr = section.start & 0xffff;
-        auto hi_adr = section.start >> 16;
-
-        if (hi_adr > 0) {
-            offset = section.start & 0xffff;
-            if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) {
-                offset = hi_adr * 8192 + adr;
-            } else {
-                throw machine_error("Illegal address");
-            }
-        }
+        // auto adr = section.start & 0xffff;
+        // auto hi_adr = section.start >> 16;
+        // if (hi_adr > 0) {
+        //     offset = section.start & 0xffff;
+        //     if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) {
+        //         offset = hi_adr * 8192 + adr;
+        //     } else {
+        //         throw machine_error("Illegal address");
+        //     }
+        // }
 
         if (last_end >= 0) {
             // LOGI("Padding %d bytes", offset - last_end);
@@ -601,10 +600,10 @@ AsmResult Machine::assemble(Instruction const& instr)
     }
 
     // Find a matching opcode
-    auto it0 = std::find_if(instructions.begin(), instructions.end(),
-                            [&](auto const& i) { return i.name == opcode; });
+    auto it_ins = utils::find_if(instructions,
+                              [&](auto const& i) { return i.name == opcode; });
 
-    if (it0 == instructions.end()) {
+    if (it_ins == instructions.end()) {
         return AsmResult::NoSuchOpcode;
     }
 
@@ -628,20 +627,17 @@ AsmResult Machine::assemble(Instruction const& instr)
             }
         }
 
-        if (instruction.mode == Mode::ABS && opcode.mode == Mode::REL) {
-            return true;
-        }
-        return false;
+        return (instruction.mode == Mode::ABS && opcode.mode == Mode::REL);
     };
 
     // Find a matching addressing mode
-    auto it1 = std::find_if(it0->opcodes.begin(), it0->opcodes.end(),
+    auto it_op = std::find_if(it_ins->opcodes.begin(), it_ins->opcodes.end(),
                             [&](auto const& o) { return modeMatches(o, arg); });
 
-    if (it1 == it0->opcodes.end()) {
+    if (it_op == it_ins->opcodes.end()) {
         return AsmResult::IllegalAdressingMode;
     }
-    arg.mode = it1->mode;
+    arg.mode = it_op->mode;
 
     if (arg.mode == Mode::REL) {
         arg.val = arg.val - currentSection->pc - 2;
@@ -663,7 +659,7 @@ AsmResult Machine::assemble(Instruction const& instr)
             fputs("\"\n", fp);
         }
         inData = false;
-        fprintf(fp, "%04x : %s ", currentSection->pc, it0->name);
+        fprintf(fp, "%04x : %s ", currentSection->pc, it_ins->name);
         if (arg.mode == sixfive::Mode::REL) {
             v = (static_cast<int8_t>(v)) + 2 + currentSection->pc;
         }
@@ -671,7 +667,7 @@ AsmResult Machine::assemble(Instruction const& instr)
         fputs("\n", fp);
     }
 
-    writeByte(it1->code);
+    writeByte(it_op->code);
     if (sz > 1) {
         writeByte(arg.val & 0xff);
     }

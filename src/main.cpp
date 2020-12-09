@@ -20,6 +20,7 @@
 
 using clk = std::chrono::steady_clock;
 using namespace std::chrono_literals;
+using namespace std::string_literals;
 
 static const char* const banner = R"(
  _               _
@@ -163,8 +164,8 @@ int main(int argc, char** argv)
     struct sigaction sh = {};
     sh.sa_handler = [](int) {
         // Restore cursor
-        fputs("\x1b[?25h", stdout);
-        fputs("\x1b[?1049l", stdout);
+        //fputs("\x1b[?25h", stdout);
+        //fputs("\x1b[?1049l", stdout);
         exit(0);
     };
     sigemptyset(&sh.sa_mask);

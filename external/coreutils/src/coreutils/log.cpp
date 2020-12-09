@@ -34,7 +34,12 @@ namespace logging {
 using namespace std;
 
 Level defaultLevel = Info;
+static bool altMode = false;
 static FILE* logFile = nullptr;
+
+void setAltMode(bool on) {
+    altMode = on;
+}
 
 void log(const std::string& text)
 {
@@ -116,11 +121,19 @@ void log2(const char* fn, int line, Level level, const std::string& text)
 
             cs = (cs % 6) + 1;
 
+
+
             sprintf(temp, "\x1b[%dm[%s:%d]\x1b[%dm ", cs + 30, fn, line, 39);
         } else {
             sprintf(temp, "[%s:%d] ", fn, line);
         }
+        if(altMode) {
+            fputs("\x1b[?1049l", stdout);
+        }
         log(level, std::string(temp).append(text));
+        if(altMode) {
+            fputs("\x1b[?1049h", stdout);
+        }
     }
 }
 

@@ -2,8 +2,8 @@
 
 #include <ansi/console.h>
 #include <ansi/terminal.h>
-#include <coreutils/utf8.h>
 #include <coreutils/algorithm.h>
+#include <coreutils/utf8.h>
 #include <thread>
 
 #include "emulator.h"
@@ -52,11 +52,11 @@ void TextEmu::set_color(uint8_t col)
 
 void TextEmu::writeChar(uint16_t adr, uint8_t t)
 {
-    if(regs[RealW] == 0 || regs[RealH] == 0) {
+    if (regs[RealW] == 0 || regs[RealH] == 0) {
         return;
     }
     auto offset = adr - (regs[TextPtr] * 256);
-    textRam[offset] = t;
+    //textRam[offset] = t;
 
     auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
     auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
@@ -71,7 +71,7 @@ void TextEmu::writeChar(uint16_t adr, uint8_t t)
 
 void TextEmu::writeColor(uint16_t adr, uint8_t c)
 {
-    if(regs[RealW] == 0 || regs[RealH] == 0) {
+    if (regs[RealW] == 0 || regs[RealH] == 0) {
         return;
     }
     auto offset = adr - (regs[ColorPtr] * 256);
@@ -121,31 +121,12 @@ void TextEmu::updateRegs()
                              return thiz->colorRam[offset];
                          });
 }
-void TextEmu::fillInside()
-{
-    auto cw = console->get_width();
-    auto ch = console->get_height();
-    auto v = regs[CFillIn];
-    set_color(v);
-    size_t i = 0;
-    for (size_t y = 0; y < ch; y++) {
-        for (size_t x = 0; x < cw; x++) {
-            if (x >= regs[WinX] && x < (regs[WinX] + regs[WinW]) &&
-                y >= regs[WinY] && y < (regs[WinY] + regs[WinH])) {
-                auto t = textRam[i];
-                colorRam[i++] = v;
-                console->set_xy(x, y);
-                console->put(translate(t));
-            }
-        }
-    }
-}
 
-void TextEmu::fillOutside()
+void TextEmu::fillOutside(uint8_t col)
 {
     auto cw = console->get_width();
     auto ch = console->get_height();
-    set_color(regs[CFillOut]);
+    set_color(col);
     for (size_t y = 0; y < ch; y++) {
         for (size_t x = 0; x < cw; x++) {
             if (x < regs[WinX] || x >= (regs[WinX] + regs[WinW]) ||
@@ -162,8 +143,9 @@ TextEmu::TextEmu()
     auto terminal = bbs::create_local_terminal();
     terminal->open();
     console = std::make_unique<bbs::Console>(std::move(terminal));
+    logging::setAltMode(true);
 
-    uint8_t cw = console->get_width() > 255 ? 0 : (uint8_t)console->get_width();
+    uint8_t cw = console->get_width() > 255 ? 0 : static_cast<uint8_t>(console->get_width());
     uint8_t ch = console->get_height();
 
     emu = std::make_unique<sixfive::Machine<>>();
@@ -174,35 +156,14 @@ TextEmu::TextEmu()
                              if (adr >= 0xd780) {
                                  return thiz->palette[adr - 0xd780];
                              }
-                             auto r = adr & 0xff;
-                             if (r == Keys) {
-                                 if (thiz->keys.empty()) {
-                                     return 0;
-                                 }
-                                 auto k = thiz->keys.front();
-                                 thiz->keys.pop_front();
-                                 return k;
-                             }
-                             return thiz->regs[r];
+                             return thiz->readReg(adr & 0xff);
                          });
 
     emu->mapWriteCallback(0xd7, 1, this,
                           [](uint16_t adr, uint8_t v, void* data) {
                               auto* thiz = static_cast<TextEmu*>(data);
                               if (adr < 0xd780) {
-                                  auto r = adr & 0xff;
-                                  if (r == IrqR) {
-                                      thiz->regs[r] ^= v;
-
-                                  } else {
-                                      thiz->regs[r] = v;
-                                  }
-                                  if (r == CFillOut) {
-                                      thiz->fillOutside();
-                                  } else if (r == CFillIn) {
-                                      thiz->fillInside();
-                                  }
-                                  thiz->updateRegs();
+                                  thiz->writeReg(adr & 0xff, v);
                               } else {
                                   thiz->palette[adr - 0xd780] = v;
                               }
@@ -224,7 +185,7 @@ TextEmu::TextEmu()
     utils::fill(textRam, 0x20);
     utils::fill(colorRam, 0x01);
     utils::copy(c64pal, palette.data());
-    utils::copy(c64pal, palette.data() + 16*3);
+    utils::copy(c64pal, palette.data() + 16 * 3);
 }
 
 void TextEmu::run(uint16_t pc)
@@ -243,17 +204,13 @@ void TextEmu::run(uint16_t pc)
     int32_t cycles = 1000;
     auto t = clk::now();
 
-    auto nextUpdate = t + 20ms;
+    nextUpdate = t + 20ms;
 
     while (true) {
         emu->run(cycles);
         auto tpc = (clk::now() - t).count() / cycles;
 
         if (t >= nextUpdate) {
-            auto key = console->read_key();
-            if (key != 0) {
-                keys.push_back(key);
-            }
             console->flush();
             regs[RealW] = console->get_width();
             regs[RealH] = console->get_height();
@@ -267,39 +224,109 @@ void TextEmu::run(uint16_t pc)
     }
 }
 
-bool TextEmu::update()
+uint16_t TextEmu::get_ticks() const
 {
-    auto cycles = emu->run(10000);
-    auto key = console->read_key();
-    if (key != 0) {
-        keys.push_back(key);
-    }
-
-    std::this_thread::sleep_for(10ms);
-
     auto ms = std::chrono::duration_cast<std::chrono::microseconds>(clk::now() -
                                                                     start_t);
+    return (ms.count() / 100) & 0xffff;
+}
 
-
-    auto t = ms.count() / 100;
-    regs[TimerLo] = t & 0xff;
-    regs[TimerHi] = (t >> 8) & 0xff;
-
-    console->flush();
-    regs[RealW] = console->get_width();
-    regs[RealH] = console->get_height();
-
-    if ((regs[Control] & 1) == 1) {
-        return true;
+uint8_t TextEmu::readReg(int reg)
+{
+    switch (reg) {
+    case WinX:
+    case WinY:
+    case WinW:
+    case WinH:
+    case TextPtr:
+    case ColorPtr:
+    case Charset:
+    case IrqR:
+    case IrqE:
+        return regs[reg];
+    case Keys:
+        if(auto key = console->read_key()) {
+            return key;
+        }
+        return 0;
+    case TimerLo:
+        return get_ticks() & 0xff;
+    case TimerHi:
+        return (get_ticks() >> 8) & 0xff;
+    case RealW:
+        return console->get_width();
+    case RealH:
+        return console->get_height();
+    default:
+        return 0;
     }
+}
+
+void TextEmu::writeReg(int reg, uint8_t val)
+{
+    switch (reg) {
+    case WinX:
+    case WinY:
+    case WinW:
+    case WinH:
+    case TextPtr:
+    case ColorPtr:
+        regs[reg] = val;
+        updateRegs();
+        break;
+    case Charset:
+        regs[reg] = val;
+        break;
+    case CFillOut:
+        fillOutside(val);
+        break;
+    case ScrollX:
+    case ScrollY:
+        break;
+    case Control:
+        if ((val & 1) != 0) {
+            throw exit_exception();
+        } else if((val & 2) != 0) {
+            std::this_thread::sleep_until(nextUpdate);
+            doUpdate();
+        }
+        break;
+    case IrqR:
+        regs[IrqR] ^= val;
+        break;
+    default:
+        break;
+    }
+}
+
+void TextEmu::doUpdate()
+{
+    console->flush();
 
     auto oldR = regs[IrqR];
     regs[IrqR] |= 1;
 
-    if((oldR ^ regs[IrqR]) != 0) {
+    if ((~oldR & regs[IrqR]) != 0) {
         if ((regs[IrqR] & regs[IrqE]) != 0) {
             emu->irq(emu->readMem(0xfffc) | (emu->readMem(0xfffd) << 8));
         }
+    }
+}
+
+bool TextEmu::update()
+{
+    uint32_t cycles = 1;
+    try {
+        cycles = emu->run(10000);
+    } catch (exit_exception&) {
+        return true;
+    }
+
+    if(clk::now() >= nextUpdate) {
+        nextUpdate += 20ms;
+        doUpdate();
+    } else {
+        std::this_thread::sleep_for(1ms);
     }
 
     return cycles != 0;
@@ -334,11 +361,11 @@ void TextEmu::start(uint16_t pc)
         pc = basicStart;
     }
 
-    regs[CFillOut] = 0x01;
-    fillOutside();
+    fillOutside(0x01);
 
     emu->setPC(pc);
     start_t = clk::now();
+    nextUpdate = start_t + 10ms;
 }
 
 int TextEmu::get_width() const

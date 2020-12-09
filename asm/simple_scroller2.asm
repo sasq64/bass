@@ -26,7 +26,7 @@ start:
     sta Line+CONSOLE_WIDTH-1
     inc .x+1
     CheckQuit()
-    Wait(200)
+    Wait(2)
     jmp .loop
 scroll:
     !rept CONSOLE_WIDTH-1 {
