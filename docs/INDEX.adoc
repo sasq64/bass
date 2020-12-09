@@ -1,4 +1,4 @@
-:toc:
+:toc: left
 include::INTRO.adoc[]
 
 include::FEATURES.adoc[]
@@ -6,5 +6,7 @@ include::FEATURES.adoc[]
 include::FUNCTIONS.adoc[]
 
 include::META.adoc[]
+
+include::DETAILS.adoc[]
 
 include::PET100.adoc[]

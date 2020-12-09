@@ -78,7 +78,7 @@ Load the png image into memory. Returns:
 
 ex
 
-[source,lua]
+[source,ca65]
 ----
    img = load_png("test.png")
    !assert img.width <= 256 && img.height <= 256
@@ -86,28 +86,40 @@ data:
     !fill img.pixels 
 ----
 
-==== img2 = image_remap(img, colors)
+==== image_remap(img, colors)
 
-==== img2 = image_layout(img, tile_width, tile_height, gap)
+Remap an image according to the given palette.
 
-==== data = pixels_layout(pixels, stride, byte_width, byte_height, gap)
+==== image_layout(img, tile_width, tile_height, gap)
 
-"Raw" layout function. Takes a byte array and rearranges it into tiles according to sizes in bytes.
+Layout an image. Cuts out tiles from left to right, then from top to
+bottom and creates a new image where all tiles are layed out under each
+other.
 
-==== img2 = image_change_depth(img, new_bpp)
+This is the standard way of converting a tilemap or charset so that all
+tiles are placed after each other in memory and can be used by the target
+machine.
+
+==== image_change_depth(img, new_bpp)
 
 Change depth. Legal values are 1,2,4 and 8.
 
-[source,asm]
+[source,ca65]
 ----
     load_png("c64_logo.png")
-    image_remap(_, [$000000,$ffffff,$cccccc,$666666])
-    img = image_change_depth(_, 2)
+    image_remap($, [$000000,$ffffff,$cccccc,$666666])
+    img = image_change_depth($, 2)
 mc_logo:
     !fill img.pixels
 ----
 
-==== pixels = pixels_change_depth(pixels, old_bpp, new_bpp)
+==== pixels_layout(pixels, stride, byte_width, byte_height, gap)
+
+"Raw" layout function. Takes a byte array and rearranges it into tiles according to sizes in bytes.
+
+==== pixels_change_depth(pixels, old_bpp, new_bpp)
+
+"Raw" depth change function, operates on byte arrays.
 
 === LUA Functions
 
@@ -128,6 +140,7 @@ Read or write a value from 6502 memory.
 Set a lua function to be called when a `brk #n` opcode is executed.
 Function is called with _n_ as the single argument.
 
+[source,ca65]
 ----
 %{
     set_break_fn(5, function(b)
@@ -143,6 +156,7 @@ Function is called with _n_ as the single argument.
 If the emulator reads memory between `hi_adr&lt;&lt;8` and
 `hi_adr&lt;&lt;8 + len*256), call the given function.
 
+[source,ca65]
 ----
 ; Map $f000 - $ffff to funtion that just returns $55
 %{
@@ -167,6 +181,7 @@ function is called, the list of sections is searched for a
 start address of `bank&lt;&lt;16`, and this section is mapped to
 `hi_adr&lt;&lt;8`.
 
+[source,ca65]
 ----
     ; Emulate bank switching. Bank is selected by writing
     ; to address $01. Bank is mapped to $a000

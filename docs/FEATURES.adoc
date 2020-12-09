@@ -1,4 +1,6 @@
 
+== Features
+
 === Unit Tests
 
 You can pop a `!test` line in front of any subroutine
@@ -48,6 +50,7 @@ be sliced. Array literals can be used directly.
 Note that there is a difference between an array of bytes and an
 array of numbers.
 
+[source,ca65]
 ----
 some_bytes = bytes(9,8,7,6,5)
 !assert some_bytes[3:2] == bytes(6,5)
@@ -69,17 +72,32 @@ generate data, or even be called from 6502 code during testing.
 === Functional
 
 A lot of logic can be performed directly in assembly
-expressions
 
 Symbols can take on non numeric values.
 
-load_adress = be_word(load("some.prg")[0:2])
+`load_adress = be_word(load("some.prg")[0:2])`
 
 
 === $-variable
 
+If a function result is not assigned to a return value, it is
+automatically placed in the special variable `$`. It makes it
+easier to chain expressions without using temporary variables.
+
+[source,ca65]
+----
+    load_png("../data/face.png")
+    layout_image($, 8, 8)
+    image = index_tiles($.pixels, 8*8)
+----
 
 
 === Lambdas
 
+[source,ca65]
+----
+my_sin = [x -> sin(x) * 255 ]
 
+sine0:
+    !fill 256, my_sin
+----
