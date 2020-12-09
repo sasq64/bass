@@ -6,27 +6,6 @@
 
 #include <cstring>
 
-#ifdef _WIN32
-
-namespace bbs {
-
-struct LocalTerminal : public Terminal
-{
-    size_t write(std::string_view source) override
-    {
-        return 0;
-    }
-
-    bool read(std::string& target) override
-    {
-        return false;
-    }
-};
-
-}
-
-#else
-
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -92,5 +71,3 @@ private:
 };
 
 } // namespace bbs
-
-#endif
