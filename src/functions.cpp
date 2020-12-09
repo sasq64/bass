@@ -1,7 +1,7 @@
 #include "assembler.h"
+#include "chars.h"
 #include "png.h"
 #include "wrap.h"
-#include "chars.h"
 
 #include <cmath>
 #include <coreutils/algorithm.h>
@@ -12,8 +12,8 @@ template <typename Out, typename In>
 std::vector<Out> convert_vector(std::vector<In> const& in)
 {
     std::vector<Out> out;
-    std::copy(std::cbegin(in), std::cend(in),
-              std::back_inserter(out));
+    std::transform(std::cbegin(in), std::cend(in), std::back_inserter(out),
+                   [](In const& a) { return static_cast<Out>(a); });
     return out;
 }
 
@@ -76,8 +76,8 @@ void initFunctions(Assembler& a)
     a.registerFunction("trunc", [](double a) { return std::trunc(a); });
     a.registerFunction("abs", [](double a) { return std::abs(a); });
 
-    a.registerFunction("random",
-                       []() { return static_cast<double>(std::rand()) / RAND_MAX; });
+    a.registerFunction(
+        "random", []() { return static_cast<double>(std::rand()) / RAND_MAX; });
 
     a.registerFunction("compare",
                        [](std::vector<uint8_t> const& v0,

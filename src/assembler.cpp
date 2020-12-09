@@ -114,7 +114,7 @@ std::any Assembler::slice(std::vector<T> const& v, int64_t a, int64_t b)
         return any_num(0);
     }
 
-    std::vector<uint8_t> nv(v.begin() + a, v.begin() + b);
+    std::vector<T> nv(v.begin() + a, v.begin() + b);
     return std::any(nv);
 }
 
