@@ -75,18 +75,19 @@ xor_data:
         !byte secret[i % len(secret] ^ v
     }
 ----
+
 === !fill
 
 1. `!fill <array>`
 2. `!fill <count> [, <value>]`
-3. `!fill <count>, <lambda>`
+3. `!fill <count>, <function>`
 
 Put data into memory, Essentially a shorthand for
 `!rept <arg> { !byte <expression }`.
 
 1. Put array in memory.
 2. Fill memory with contant value, default is zero.
-3. Call lambda with values 0 through count-1 and put result in memory
+3. Call a function with values 0 through count-1 and put result in memory
 
 ==== Example
 [source,ca65]
@@ -103,8 +104,20 @@ Put data into memory, Essentially a shorthand for
 Create a macro. A macro can be called at a later time, at which point its
 contents will be inserted into the assembly for parsing.
 
+Note that macros do not form a new scope, so symbols assigned in macros
+become global.
+
 1. Create a macro that will insert `<statements>`.
 
+==== Example
+[source,ca65]
+----
+    !macro WaitLine(line) {
+.wait   lda $d012
+        cmp #line
+        bne .wait
+    }
+----
 === !byte
 
 1. `!byte <expression> [,<expression>]...`
@@ -130,17 +143,30 @@ Insert 24bit words into memory. Useful for C64 sprites.
 Insert characters into memory.Characters are translated using
 current translation table.
 
+=== !encoding
+
+`!encoding <name>`
+
+Sets the current text translation. Valid values are
+
+* "ascii"
+* "petscii_upper"
+* "petscii_lower"
+* "screencode_upper" (default)
+* "screencode_lower"
+
+
 === !chartrans
 
 1. `!chartrans <string>, <c0>, <c1>... [<string>, <c0>, <c1>...]`
 2. `!chartrans`
 
-Setup the translation of characters coming from `!text` commands.
+Manual setup of translation of characters coming from `!text` commands.
 
 1. Each character from the provided _string_ should be translated to each
 subsequent number, in order.The number of values should be equal to the
 number of characters in the string.
-2. Reset tranlation to default.
+2. Reset translation to default.
 
 === !assert
 
@@ -156,7 +182,7 @@ Asserts are only evaluated in the final pass.
 Align the _Program Counter_ so it is evenly dividable with _bytes_.
 Normal use case is `!align 256` to ensure page boundary.
 
-===  `!pc`
+===  !pc
 
 * `!pc <address>`
 
@@ -259,5 +285,11 @@ execution of tests.Symbols A,X,Y,SP,SR are available in expressions.
 
 * `!run {: <lua code> :}`
 
-Run lua code during tests.This can be used for more advanced checks and
+Run lua code during tests. This can be used for more advanced checks and
 logging.
+
+=== !print
+
+* `!print <value> [,<value> ...]`
+
+Print values during assembly.

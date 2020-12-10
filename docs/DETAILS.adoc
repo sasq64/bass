@@ -65,7 +65,7 @@ parsing is done.
 
 Macros use normal symbols as arguments. These symbols are only set
 during macro evaluation. If a macro argument "shadows" a global
-symbol a warning is issue.
+symbol a warning is issued.
 
 Macros affect the symbol table, so you can set symbols from macros.
 If you don't want to pollute the symbol table, used "."-symbols, they

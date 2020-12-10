@@ -69,14 +69,25 @@ generate data, or even be called from 6502 code during testing.
 
 
 
-=== Functional
+=== Functional programming
 
-A lot of logic can be performed directly in assembly
+There are no special types of variables, everything is
+stored in the symbol table.
 
-Symbols can take on non numeric values.
+A lot of logic can be performed directly in assembly using
+functions.
 
-`load_adress = be_word(load("some.prg")[0:2])`
+Symbols can take on non numeric values, such as arrays or strings.
 
+[source,ca65]
+----
+load_adress = be_word(load("some.prg")[0:2])
+
+!rept 100 { label[my_fun(i)]:
+              lda #(i + other_fn(i))
+              !fill some_array[i*10:i*10+10]
+           }
+----
 
 === $-variable
 
@@ -93,6 +104,8 @@ easier to chain expressions without using temporary variables.
 
 
 === Lambdas
+
+A lambda is also a value. This can be used to fill memory.
 
 [source,ca65]
 ----

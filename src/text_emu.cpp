@@ -190,16 +190,6 @@ TextEmu::TextEmu()
 
 void TextEmu::run(uint16_t pc)
 {
-    /*
-
-       set start_t
-       run for n cycles
-       calc t/cycle
-
-       if t > nextUpdate
-         update
-
-       */
     start(pc);
     int32_t cycles = 1000;
     auto t = clk::now();
@@ -208,8 +198,6 @@ void TextEmu::run(uint16_t pc)
 
     while (true) {
         emu->run(cycles);
-        auto tpc = (clk::now() - t).count() / cycles;
-
         if (t >= nextUpdate) {
             console->flush();
             regs[RealW] = console->get_width();
@@ -312,7 +300,7 @@ void TextEmu::doUpdate()
 
 bool TextEmu::update()
 {
-    uint32_t cycles = 1;
+    uint32_t cycles;
     try {
         cycles = emu->run(10000);
     } catch (exit_exception&) {

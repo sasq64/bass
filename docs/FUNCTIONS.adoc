@@ -13,6 +13,10 @@ Trigonometric functions.
 
 Other math functions.
 
+=== random()
+
+Returns a random integer between 0 and RAND_MAX (usually 2^31).
+
 === len(v)
 
 Returns the length of the given array.
@@ -20,15 +24,6 @@ Returns the length of the given array.
 === load(file)
 
 Loads the file and returns an array of the content.
-
-=== compare(v0, v1)
-
-Compares two arrays
-
-----
-    !assert compare(data, bytes(0,1,2,3))
-
-----
 
 === word(v)
 
@@ -46,11 +41,11 @@ Like `word()`, but in big endian format.
 
 === zeroes(n)
 
-Create an array of _n_ zeroes.
+Create a byte array of _n_ zeroes.
 
 === bytes(a, b, c, ...)
 
-Create an array containing the given bytes.
+Create a byte array containing the given bytes.
 
 === to_lower(s)
 
@@ -85,6 +80,10 @@ ex
 data:
     !fill img.pixels 
 ----
+
+=== save_png(filename, img)
+
+Save image to disk. Useful for debugging image conversion.
 
 === image_remap(img, colors)
 

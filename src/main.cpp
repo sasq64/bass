@@ -18,7 +18,6 @@
 #include <chrono>
 #include <thread>
 
-using clk = std::chrono::steady_clock;
 using namespace std::chrono_literals;
 using namespace std::string_literals;
 
