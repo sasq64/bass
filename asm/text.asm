@@ -9,7 +9,6 @@ ypos_hi = $05
 dir = $08
 
 
-
 factor1 = $06
 factor2 = $07
 
@@ -32,19 +31,11 @@ start:
     sta Regs.CFillOut
 
 loop:
-    clc
-    lda Regs.TimerLo
-    adc #5
-    sta start_t
     jsr read_joy
-
     jsr move
-
     jsr draw
 
-$   lda Regs.TimerLo
-    cmp start_t
-    bne -
+    Wait(3)
 
     jmp loop
 

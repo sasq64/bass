@@ -287,8 +287,9 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("org", [&](Meta const& meta) {
-        auto org = number<int32_t>(meta.args[0]);
-        mach.getCurrentSection().setPC(org);
+        auto org = number<uint32_t>(meta.args[0]);
+        auto& section = mach.addSection({"", org});
+        mach.setSection(section.name);
     });
 
     assem.registerMeta("cpu", [&](Meta const& meta) {

@@ -1350,5 +1350,6 @@ void Assembler::clear()
 {
     macros.clear();
     definitions.clear();
+    errors.clear();
     passNo = 0;
 }

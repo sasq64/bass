@@ -30,7 +30,7 @@ The parser works by first creating an AST (tree representation) of the
 source, and then using this representation to do all work.
 
 AST:s are cached on disk, so the second time you assemble a file that
-has not been change, assembling will be much faster.
+has not been changed, assembling will be much faster.
 
 AST:s are saved in `$HOME/.basscache`
 

@@ -13,7 +13,6 @@ start:
     sta Regs.WinH
     lda #CONSOLE_WIDTH
     sta Regs.WinW
-    Clear(White, Red)
 
 .res
     lda #<text

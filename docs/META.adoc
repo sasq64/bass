@@ -29,9 +29,6 @@ Only leaf sections may contain data.
 
 * _align_ : Set alignment (in bytes) of this section
 * _file_ : Set output file of this section. Will remove the section from the main output file.
-* _bank_size_ : Makes this section a banked section with given bank size.
-Child sections can not overlap bank boundary.
-
 * _ReadOnly_ : Flag that marks this section (and all children) as read only. Used for ROM areas.
 
 * _NoStore_ : Flag that marks this section as not
@@ -53,6 +50,12 @@ Unrecognized options will be passed on to the output module.
     !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
 start:
 ----
+
+=== !org
+
+1. `!org <start>`
+
+Creates an anonymous section beginning at _start_.
 
 === !rept
 

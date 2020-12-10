@@ -120,8 +120,8 @@ public:
 
     void set_color(uint32_t fg, uint32_t bg)
     {
-        put_fg = bg;
-        put_bg = fg;
+        put_fg = fg;
+        put_bg = bg;
     }
 
     void put(std::string const& text)
