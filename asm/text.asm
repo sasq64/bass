@@ -30,8 +30,6 @@ start:
 
     lda #Grey
     sta Regs.CFillOut
-    lda #Blue
-    sta Regs.CFillIn
 
 loop:
     clc
@@ -56,7 +54,7 @@ read_joy:
 
     cpx #KEY.ESCAPE
     bne +
-    inc Regs.Reset
+    ;inc Regs.Reset
     jmp  *
 
 $   cpx #KEY.LEFT

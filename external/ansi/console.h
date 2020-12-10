@@ -5,6 +5,7 @@
 
 #include <coreutils/log.h>
 #include <coreutils/utf8.h>
+#include <coreutils/algorithm.h>
 
 #include <cstdint>
 #include <memory>
@@ -107,6 +108,8 @@ public:
         height = h;
         grid.resize(w * h);
         old_grid.resize(w * h);
+        utils::fill(grid, Tile{'x', 0, 0, 0});
+        utils::fill(old_grid, Tile{'y', 0, 0, 0});
     }
 
     void set_xy(size_t x, size_t y)
@@ -165,26 +168,33 @@ public:
 
     void flush()
     {
+        int chars = 0;
+        int xy = 0;
+        cur_x = cur_y = -1;
         for (size_t y = 0; y < height; y++) {
             for (size_t x = 0; x < width; x++) {
                 auto& t0 = old_grid[x + y * width];
                 auto& t1 = grid[x + y * width];
                 if (t0 != t1) {
-                    if (cur_y != y || cur_x != x) {
+                    //if (cur_y != y || cur_x != x) {
                         write(protocol.goto_xy(x, y));
+                        xy++;
                         cur_x = x;
                         cur_y = y;
-                    }
+                    //}
                     if (t1.fg != cur_fg || t1.bg != cur_bg) {
                         write(protocol.set_color(t1.fg, t1.bg));
                         cur_fg = t1.fg;
                         cur_bg = t1.bg;
                     }
                     terminal->write(utils::utf8_encode({t1.c}));
+                    //cur_x++;
+                    chars++;
                     t0 = t1;
                 }
             }
         }
+    //    LOGI("Flush %d/%d", xy, chars);
     }
 
 #if 0

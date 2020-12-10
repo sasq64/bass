@@ -48,15 +48,8 @@
     TextPtr
     ColorPtr
 
-    ; Write to fill inside of window with given
-    ; color
-    CFillIn
-    
     ; Write to fill border with given color
     CFillOut
-
-    ScrollX
-    ScrollY
 
     ; Read keyboard fifo. 0 means empty
     Key

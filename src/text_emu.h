@@ -38,9 +38,6 @@ struct TextEmu
 
         CFillOut,
 
-        ScrollX,
-        ScrollY,
-
         Keys,
         Freq,
         TimerLo,

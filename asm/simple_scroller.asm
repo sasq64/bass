@@ -5,7 +5,6 @@
     Line = $0400+24*40
 
     Border(LightBlue)
-    Clear(LightBlue, Blue)
 loop:
     !rept 39 {
         lda Line+i+1
@@ -16,7 +15,7 @@ loop:
     sta Line+39
     inc .x+1
     CheckQuit()
-    Wait(500)
+    Wait(4)
     jmp loop
 
     !align 256

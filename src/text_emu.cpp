@@ -56,7 +56,7 @@ void TextEmu::writeChar(uint16_t adr, uint8_t t)
         return;
     }
     auto offset = adr - (regs[TextPtr] * 256);
-    //textRam[offset] = t;
+    textRam[offset] = t;
 
     auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
     auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
@@ -279,9 +279,6 @@ void TextEmu::writeReg(int reg, uint8_t val)
         break;
     case CFillOut:
         fillOutside(val);
-        break;
-    case ScrollX:
-    case ScrollY:
         break;
     case Control:
         if ((val & 1) != 0) {
