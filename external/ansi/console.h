@@ -3,9 +3,9 @@
 #include "ansi_protocol.h"
 #include "terminal.h"
 
+#include <coreutils/algorithm.h>
 #include <coreutils/log.h>
 #include <coreutils/utf8.h>
-#include <coreutils/algorithm.h>
 
 #include <cstdint>
 #include <memory>
@@ -135,9 +135,12 @@ public:
         }
     }
 
-    void put_char(int x, int y, Char c)
+    void put_char(int x, int y, Char c) { grid[x + width * y].c = c; }
+
+    void put_char(int x, int y, Char c, uint16_t flg)
     {
         grid[x + width * y].c = c;
+        grid[x + width * y].flags = flg;
     }
 
     void put_color(int x, int y, uint32_t fg, uint32_t bg)
@@ -146,11 +149,18 @@ public:
         grid[x + width * y].bg = bg;
     }
 
-    Char get_char(int x, int y)
+    void put_color(int x, int y, uint32_t fg, uint32_t bg, uint16_t flg)
     {
-        return grid[x + width * y].c;
+        grid[x + width * y].fg = fg;
+        grid[x + width * y].bg = bg;
+        grid[x + width * y].flags = flg;
     }
 
+    Tile& at(int x, int y) {
+        return grid[x + width * y];
+    }
+
+    Char get_char(int x, int y) { return grid[x + width * y].c; }
 
     auto get_width() const { return width; }
     auto get_height() const { return height; }
@@ -170,31 +180,36 @@ public:
     {
         int chars = 0;
         int xy = 0;
+        int16_t cur_flags = 0;
         cur_x = cur_y = -1;
         for (size_t y = 0; y < height; y++) {
             for (size_t x = 0; x < width; x++) {
                 auto& t0 = old_grid[x + y * width];
-                auto& t1 = grid[x + y * width];
+                auto const& t1 = grid[x + y * width];
                 if (t0 != t1) {
-                    //if (cur_y != y || cur_x != x) {
-                        write(protocol.goto_xy(x, y));
-                        xy++;
-                        cur_x = x;
-                        cur_y = y;
+                    // if (cur_y != y || cur_x != x) {
+                    write(protocol.goto_xy(x, y));
+                    xy++;
+                    cur_x = x;
+                    cur_y = y;
                     //}
-                    if (t1.fg != cur_fg || t1.bg != cur_bg) {
-                        write(protocol.set_color(t1.fg, t1.bg));
+                    if (t1.fg != cur_fg || t1.bg != cur_bg ||
+                        t1.flags != cur_flags) {
+                        write((t1.flags & 1) == 1
+                                  ? protocol.set_color(t1.fg, t1.bg)
+                                  : protocol.set_color(t1.bg, t1.fg));
                         cur_fg = t1.fg;
                         cur_bg = t1.bg;
+                        cur_flags = t1.flags;
                     }
                     terminal->write(utils::utf8_encode({t1.c}));
-                    //cur_x++;
+                    // cur_x++;
                     chars++;
                     t0 = t1;
                 }
             }
         }
-    //    LOGI("Flush %d/%d", xy, chars);
+        //    LOGI("Flush %d/%d", xy, chars);
     }
 
 #if 0

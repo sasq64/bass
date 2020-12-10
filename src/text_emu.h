@@ -59,7 +59,9 @@ struct TextEmu
 
     void set_color(uint8_t col);
     void writeChar(uint16_t adr, uint8_t t);
+    uint8_t readChar(uint16_t adr);
     void writeColor(uint16_t adr, uint8_t c);
+    uint8_t readColor(uint16_t adr);
     void updateRegs();
     void fillOutside(uint8_t col);
 
