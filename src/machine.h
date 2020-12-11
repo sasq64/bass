@@ -184,7 +184,7 @@ private:
     bool cpu65C02 = true;
 
     std::deque<Section*> savedSections;
-    bool inData = false;
+    //bool inData = false;
     std::unordered_map<uint8_t, std::function<uint8_t(uint16_t)>>
         bank_read_functions;
     std::unordered_map<uint8_t, std::function<void(uint16_t, uint8_t)>>
@@ -194,7 +194,7 @@ private:
     std::deque<Section> sections;
     Section* currentSection = nullptr;
     int anonSection = 0;
-    FILE* fp = nullptr;
+    //FILE* fp = nullptr;
 
     bool layoutOk{false};
 };

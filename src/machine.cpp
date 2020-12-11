@@ -273,9 +273,9 @@ void Machine::setSection(std::string const& name)
 void Machine::clear()
 {
     anonSection = 0;
-    if (fp != nullptr) {
-        rewind(fp);
-    }
+    /* if (fp != nullptr) { */
+    /*     rewind(fp); */
+    /* } */
     for (auto& s : sections) {
         s.data.clear();
         s.pc = s.start;
@@ -523,7 +523,7 @@ void Machine::runSetup()
 
 void Machine::setOutput(FILE* f)
 {
-    fp = f;
+   // fp = f;
 }
 
 uint32_t Machine::writeByte(uint8_t b)
@@ -535,13 +535,13 @@ uint32_t Machine::writeByte(uint8_t b)
 
 uint32_t Machine::writeChar(uint8_t b)
 {
-    if (fp != nullptr) {
-        if (!inData) {
-            fprintf(fp, "%04x : \"", currentSection->pc);
-        }
-        inData = true;
-        fputc(b, fp);
-    }
+    /* if (fp != nullptr) { */
+    /*     if (!inData) { */
+    /*         fprintf(fp, "%04x : \"", currentSection->pc); */
+    /*     } */
+    /*     inData = true; */
+    /*     fputc(b, fp); */
+    /* } */
     currentSection->data.push_back(b);
     currentSection->pc++;
     return currentSection->pc;
@@ -654,18 +654,18 @@ AsmResult Machine::assemble(Instruction const& instr)
 
     auto v = arg.val & (sz == 2 ? 0xff : 0xffff);
 
-    if (fp != nullptr) {
-        if (inData) {
-            fputs("\"\n", fp);
-        }
-        inData = false;
-        fprintf(fp, "%04x : %s ", currentSection->pc, it_ins->name);
-        if (arg.mode == sixfive::Mode::REL) {
-            v = (static_cast<int8_t>(v)) + 2 + currentSection->pc;
-        }
-        fprintf(fp, modeTemplate.at(static_cast<int>(arg.mode)), v);
-        fputs("\n", fp);
-    }
+    /* if (fp != nullptr) { */
+    /*     if (inData) { */
+    /*         fputs("\"\n", fp); */
+    /*     } */
+    /*     inData = false; */
+    /*     fprintf(fp, "%04x : %s ", currentSection->pc, it_ins->name); */
+    /*     if (arg.mode == sixfive::Mode::REL) { */
+    /*         v = (static_cast<int8_t>(v)) + 2 + currentSection->pc; */
+    /*     } */
+    /*     fprintf(fp, modeTemplate.at(static_cast<int>(arg.mode)), v); */
+    /*     fputs("\n", fp); */
+    /* } */
 
     writeByte(it_op->code);
     if (sz > 1) {
