@@ -1,6 +1,7 @@
 == Meta Commands
 
-All meta commands take the same basic form; An exclamation mark followed by an identifier, then an optional set of arguments, followed by zero, one or two
+All meta commands take the same basic form; An exclamation mark followed by an
+identifier, then an optional set of arguments, followed by zero, one or two
 blocks enclosed in curly braces.
 
 
@@ -9,30 +10,31 @@ blocks enclosed in curly braces.
 1. `!section <name>, <start> [,<options>] [ { <statements...> } ]`
 2. `!section <name>, in=<parent> [,<options>] [ { <statements...> } ]`
 
-Create a section. All code and data must be placed into a section.
-The sections are gathered at the end and written to the output file.
+Create a section. All code and data must be placed into a section.  The
+sections are gathered at the end and written to the output file.
 
-If a block is given, it specifies the entire section contents, and the previous section will be restored after.
+If a block is given, it specifies the entire section contents, and the previous
+section will be restored after.
 
 If no block is given, this section is active until the next section directive.
 
-A _root_ section is a a top level section with no parent. It must have a start address.
+A _root_ section is a a top level section with no parent. It must have a start
+address.
 
-A _leaf_ section is a section without children.
-Only leaf sections may contain data.
+A _leaf_ section is a section without children.  Only leaf sections may contain
+data.
 
 * _name_ : Name of the section. Not required for child sections.
 * _start_ : Start in memory. Only required for root sections.
 * _size_ : Fixed size of section. Normally given for root sections.
 * _in_ : Parent of section. Makes this section a child section.
 * _pc_ : Set the initial program counter. Defaults to _start_.
-
 * _align_ : Set alignment (in bytes) of this section
-* _file_ : Set output file of this section. Will remove the section from the main output file.
-* _ReadOnly_ : Flag that marks this section (and all children) as read only. Used for ROM areas.
-
-* _NoStore_ : Flag that marks this section as not
-having data in the output file. This is normally used for the zero page, and other bss sections.
+* _file_ : Set output file of this section. Will remove the section from the
+  main output file.  _ReadOnly_ : Flag that marks this section (and all
+  children) as read only. Used for ROM areas.
+* _NoStore_ : Flag that marks this section as not having data in the output
+  file. This is normally used for the zero page, and other bss sections.
 
 Unrecognized options will be passed on to the output module.
 
@@ -64,9 +66,11 @@ Creates an anonymous section beginning at _start_.
 
 Repeat a block of statements a specific number of times.
 
-1. Evaluate _statements_ _count_ times.For each iteration, set the symbol <ivar> to the iteration number.If <ivar> is not provided, it defaults to `i`.
+1. Evaluate _statements_ _count_ times.For each iteration, set the symbol
+<ivar> to the iteration number.If <ivar> is not provided, it defaults to `i`.
 
-2. Parse statements once for each item in _array_.For each iteration, sets `i` to the iteration number and `v` to the `i`th  value in the array.
+2. Parse statements once for each item in _array_.For each iteration, sets `i`
+to the iteration number and `v` to the `i`th  value in the array.
 
 ==== Example
 [source,ca65]
@@ -84,7 +88,7 @@ xor_data:
 1. `!fill <array>`
 2. `!fill <count> [, <value>]`
 3. `!fill <count>, <function>`
-3. `!fill <array>, <function>`
+4. `!fill <array>, <function>`
 
 Put data into memory, Essentially a shorthand for
 `!rept <arg> { !byte <expression }`.
@@ -109,8 +113,8 @@ Put data into memory, Essentially a shorthand for
 Create a macro. A macro can be called at a later time, at which point its
 contents will be inserted into the assembly for parsing.
 
-Note that macros do not form a new scope, so symbols assigned in macros
-become global.
+Note that macros do not form a new scope, so symbols assigned in macros become
+global.
 
 1. Create a macro that will insert `<statements>`.
 
@@ -169,8 +173,8 @@ Sets the current text translation. Valid values are
 Manual setup of translation of characters coming from `!text` commands.
 
 1. Each character from the provided _string_ should be translated to each
-subsequent number, in order.The number of values should be equal to the
-number of characters in the string.
+   subsequent number, in order.The number of values should be equal to the
+   number of characters in the string.
 2. Reset translation to default.
 
 === !assert
@@ -197,17 +201,19 @@ Explicitly set the _Program Counter_ to the given address.
 
 * `!ds <bytes>`
 
-Declare an empty sequence of _size_ bytes.Only increase the _Program Counter_, will not put any data into the current section.
+Declare an empty sequence of _size_ bytes.Only increase the _Program Counter_,
+will not put any data into the current section.
 
 
 === !enum
 
 `!enum [<name>] { <assignments...> }`
 
-Perform all assignments in the block.If _name_ is given,
-assignments are prefixed with `name.`.
+Perform all assignments in the block.If _name_ is given, assignments are
+prefixed with `name.`.
 
-Assignments must take the form `symbol = <number>` or just `symbol`, and must be placed on separate lines.
+Assignments must take the form `symbol = <number>` or just `symbol`, and must
+be placed on separate lines.
 
 === !if
 
@@ -247,8 +253,8 @@ Set the CPU to use.Valid arguments are only `"6502"` or `"65c02"`.
 
 * `!test [<name>] [<registers>]`
 
-Mark the current position (PC) as the start of a test.
-Registers take the form: <reg>=<value>, ...
+Mark the current position (PC) as the start of a test.  Registers take the
+form: <reg>=<value>, ...
 
 * `!test [<name>] <address> [<registers>]`
 
@@ -258,8 +264,8 @@ Create a test that starts at _address_.
 
 * `!log <text>`
 
-Runtime log function during tests.Registers are available as special
-arguments between braces ({A}, {X}, {Y} etc).
+Runtime log function during tests.Registers are available as special arguments
+between braces ({A}, {X}, {Y} etc).
 
 ==== Example
 [source,ca65]
@@ -273,8 +279,8 @@ arguments between braces ({A}, {X}, {Y} etc).
 
 * `!check <expression>`
 
-This is similar to assert, except it happens _runtime_ during the
-execution of tests.Symbols A,X,Y,SP,SR are available in expressions.
+This is similar to assert, except it happens _runtime_ during the execution of
+tests.Symbols A,X,Y,SP,SR are available in expressions.
 
 ==== Example
 [source,ca65]

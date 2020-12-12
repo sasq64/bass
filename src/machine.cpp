@@ -13,6 +13,8 @@
 #include <map>
 #include <vector>
 
+using namespace std::string_literals;
+
 struct EmuPolicy : public sixfive::DefaultPolicy
 {
     explicit EmuPolicy(sixfive::Machine<EmuPolicy>& m) : machine(m) {}
@@ -39,7 +41,7 @@ struct EmuPolicy : public sixfive::DefaultPolicy
         auto pc = policy.machine.regPC();
 
         if (pc != last_pc) {
-            //fmt::print("{:04x}\n", pc);
+            // fmt::print("{:04x}\n", pc);
             if (auto* ptr = policy.intercepts[pc]) {
                 return ptr->fn(pc);
             }
@@ -273,9 +275,7 @@ void Machine::setSection(std::string const& name)
 void Machine::clear()
 {
     anonSection = 0;
-    /* if (fp != nullptr) { */
-    /*     rewind(fp); */
-    /* } */
+    dis.clear();
     for (auto& s : sections) {
         s.data.clear();
         s.pc = s.start;
@@ -297,21 +297,21 @@ constexpr static std::array modeTemplate = {
         "",
         "A",
 
-        "#$%02x",
-        "$%04x",
+        "#${:02x}",
+        "${:04x}",
 
-        "$%02x",
-        "$%02x,x",
-        "$%02x,y",
-        "($%02x,x)",
-        "($%02x),y",
-        "($%02x)",
+        "${:02x}",
+        "${:02x},x",
+        "${:02x},y",
+        "(${:02x},x)",
+        "(${:02x}),y",
+        "(${:02x})",
 
-        "($%04x)",
-        "$%04x",
-        "$%04x,x",
-        "$%04x,y",
-        "$%x"
+        "(${:04x})",
+        "${:04x}",
+        "${:04x},x",
+        "${:04x},y",
+        "${:x}"
 };
 // clang-format on
 
@@ -401,7 +401,15 @@ void Machine::writeCrt(utils::File const& outFile)
     }
 }
 
-void Machine::write(std::string const& name, OutFmt fmt)
+void Machine::writeListFile(std::string_view name)
+{
+    utils::File f{name, utils::File::Mode::Write};
+    for (auto const& [pc, text] : dis) {
+        f.writeString(fmt::format("{:04x} : {}\n", pc, text));
+    }
+}
+
+void Machine::write(std::string_view name, OutFmt fmt)
 {
     auto non_empty = utils::filter_to(sections, [](auto const& s) {
         return !s.data.empty() && ((s.flags & NoStorage) == 0);
@@ -459,8 +467,8 @@ void Machine::write(std::string const& name, OutFmt fmt)
             continue;
         }
 
-        fmt::print("{} {:04x}->{:04x}\n", section.name, section.start,
-                   section.data.size() + section.start);
+        //fmt::print("{} {:04x}->{:04x}\n", section.name, section.start,
+        //           section.data.size() + section.start);
 
         if (section.start < last_end) {
             throw machine_error(
@@ -489,7 +497,6 @@ void Machine::write(std::string const& name, OutFmt fmt)
 
         last_end = static_cast<uint32_t>(offset + section.data.size());
 
-        // LOGI("Writing %d bytes", section.data.size());
         outFile.write(section.data);
     }
 }
@@ -516,18 +523,14 @@ void Machine::runSetup()
             LOGD("Writing '%s' to %x-%x", section.name, section.start,
                  section.start + section.data.size());
             machine->write_ram(section.start, section.data.data(),
-                              section.data.size());
+                               section.data.size());
         }
     }
 }
 
-void Machine::setOutput(FILE* f)
-{
-   // fp = f;
-}
-
 uint32_t Machine::writeByte(uint8_t b)
 {
+    dis[currentSection->pc] = fmt::format("{:02x}", b);
     currentSection->data.push_back(b);
     currentSection->pc++;
     return currentSection->pc;
@@ -535,13 +538,7 @@ uint32_t Machine::writeByte(uint8_t b)
 
 uint32_t Machine::writeChar(uint8_t b)
 {
-    /* if (fp != nullptr) { */
-    /*     if (!inData) { */
-    /*         fprintf(fp, "%04x : \"", currentSection->pc); */
-    /*     } */
-    /*     inData = true; */
-    /*     fputc(b, fp); */
-    /* } */
+    dis[currentSection->pc] = fmt::format("{:02x}", b);
     currentSection->data.push_back(b);
     currentSection->pc++;
     return currentSection->pc;
@@ -600,8 +597,8 @@ AsmResult Machine::assemble(Instruction const& instr)
     }
 
     // Find a matching opcode
-    auto it_ins = utils::find_if(instructions,
-                              [&](auto const& i) { return i.name == opcode; });
+    auto it_ins = utils::find_if(
+        instructions, [&](auto const& i) { return i.name == opcode; });
 
     if (it_ins == instructions.end()) {
         return AsmResult::NoSuchOpcode;
@@ -631,8 +628,9 @@ AsmResult Machine::assemble(Instruction const& instr)
     };
 
     // Find a matching addressing mode
-    auto it_op = std::find_if(it_ins->opcodes.begin(), it_ins->opcodes.end(),
-                            [&](auto const& o) { return modeMatches(o, arg); });
+    auto it_op =
+        std::find_if(it_ins->opcodes.begin(), it_ins->opcodes.end(),
+                     [&](auto const& o) { return modeMatches(o, arg); });
 
     if (it_op == it_ins->opcodes.end()) {
         return AsmResult::IllegalAdressingMode;
@@ -652,28 +650,23 @@ AsmResult Machine::assemble(Instruction const& instr)
 
     auto sz = opSize(arg.mode);
 
+    auto& cs = *currentSection;
     auto v = arg.val & (sz == 2 ? 0xff : 0xffff);
+    if (arg.mode == sixfive::Mode::REL) {
+        v = (static_cast<int8_t>(v)) + 2 + cs.pc;
+    }
 
-    /* if (fp != nullptr) { */
-    /*     if (inData) { */
-    /*         fputs("\"\n", fp); */
-    /*     } */
-    /*     inData = false; */
-    /*     fprintf(fp, "%04x : %s ", currentSection->pc, it_ins->name); */
-    /*     if (arg.mode == sixfive::Mode::REL) { */
-    /*         v = (static_cast<int8_t>(v)) + 2 + currentSection->pc; */
-    /*     } */
-    /*     fprintf(fp, modeTemplate.at(static_cast<int>(arg.mode)), v); */
-    /*     fputs("\n", fp); */
-    /* } */
+    dis[cs.pc] = fmt::format(
+        "{} "s + modeTemplate.at(static_cast<int>(arg.mode)), it_ins->name, v);
 
-    writeByte(it_op->code);
+    cs.data.push_back(it_op->code);
     if (sz > 1) {
-        writeByte(arg.val & 0xff);
+        cs.data.push_back(arg.val & 0xff);
     }
     if (sz > 2) {
-        writeByte(arg.val >> 8);
+        cs.data.push_back(arg.val >> 8);
     }
+    cs.pc += sz;
 
     if (arg.mode == Mode::REL && (arg.val > 127 || arg.val < -128)) {
         return AsmResult::Truncated;

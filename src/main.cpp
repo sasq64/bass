@@ -27,7 +27,7 @@ static const char* const banner = R"(
 | '_ \ / _` |/ _` |/ _` / __/ __|
 | |_) | (_| | (_| | (_| \__ \__ \
 |_.__/ \__,_|\__,_|\__,_|___/___/
-6502 assembler (beta8)      /sasq
+6502 assembler (1.0rc1)      /sasq
 )";
 
 struct AssemblerState
@@ -43,6 +43,7 @@ struct AssemblerState
     bool quiet = false;
     bool doRun = false;
     int maxPasses = 10;
+    std::string listFile;
     std::string symbolFile;
     OutFmt outFmt = OutFmt::Prg;
 
@@ -66,6 +67,7 @@ struct AssemblerState
                      "Show undefined after each pass");
         app.add_flag("-q,--quiet", quiet, "Less noise");
         app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
+        app.add_option("-l,--list-file", listFile, "Output assembly listing");
         app.add_flag("--65c02", use65c02, "Target 65c02");
         app.add_option("-s,--table", symbolFile,
                        "Write numeric symbols to file");
@@ -110,9 +112,6 @@ struct AssemblerState
         auto& mach = assem.getMachine();
         auto& syms = assem.getSymbols();
         mach.setCpu(use65c02 ? Machine::CPU::CPU_65C02 : Machine::CPU_6502);
-
-        utils::File defFile{"out.def", utils::File::Write};
-        mach.setOutput(defFile.filePointer());
 
         for (auto const& sf : scriptFiles) {
             assem.addScript(fs::path(sf));
@@ -236,6 +235,10 @@ int main(int argc, char** argv)
         fmt::print(stderr, "**Error: Could not write output file {}\n",
                    state.outFile);
         return 1;
+    }
+
+    if (!state.listFile.empty()) {
+        mach.writeListFile(state.listFile);
     }
 
     if (!state.quiet) {

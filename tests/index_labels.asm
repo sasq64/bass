@@ -33,6 +33,7 @@ D011VALUE = 0
     DrawRasterColors(0)
     rts
 
+    !print tests.bad.cycles
     !assert tests.bad.cycles == 23
 
     !test "good"

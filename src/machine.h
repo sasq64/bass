@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -144,8 +145,8 @@ public:
     Section& getCurrentSection();
     std::deque<Section> const& getSections() const { return sections; }
     uint32_t getPC() const;
-    void write(std::string const& name, OutFmt fmt);
-    void setOutput(FILE* f);
+    void write(std::string_view name, OutFmt fmt);
+    void writeListFile(std::string_view name);
 
     uint8_t readRam(uint16_t offset) const;
     void writeRam(uint16_t offset, uint8_t val);
@@ -179,6 +180,8 @@ public:
 
     void setCpu(CPU cpu);
 
+    std::map<uint32_t, std::string> dis;
+
 private:
 
     bool cpu65C02 = true;
@@ -194,7 +197,6 @@ private:
     std::deque<Section> sections;
     Section* currentSection = nullptr;
     int anonSection = 0;
-    //FILE* fp = nullptr;
 
     bool layoutOk{false};
 };

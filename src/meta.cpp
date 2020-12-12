@@ -99,6 +99,7 @@ void initMeta(Assembler& assem)
             count = number<size_t>(data);
         }
         auto ll = assem.getLastLabel();
+        assem.getSymbols().erase(indexVar);
         for (size_t i = 0; i < count; i++) {
             assem.getSymbols().set(indexVar, any_num(i));
             if (vec != nullptr) {
