@@ -160,7 +160,7 @@ public:
                 found = true;
                 len--;
             }
-            if (found && ptr[len - 1] == '\r') {
+            if (found && len > 0 && ptr[len - 1] == '\r') {
                 len--;
             }
             ptr[len] = 0;

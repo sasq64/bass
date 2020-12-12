@@ -100,7 +100,6 @@ void initMeta(Assembler& assem)
         }
         auto ll = assem.getLastLabel();
         for (size_t i = 0; i < count; i++) {
-            assem.getSymbols().erase(indexVar);
             assem.getSymbols().set(indexVar, any_num(i));
             if (vec != nullptr) {
                 assem.getSymbols().erase("v");
@@ -108,6 +107,7 @@ void initMeta(Assembler& assem)
             }
             assem.setLastLabel("__rept" + std::to_string(mach.getPC()));
             assem.evaluateBlock(meta.blocks[0]);
+            assem.getSymbols().erase(indexVar);
         }
         assem.setLastLabel(ll);
     });
@@ -385,52 +385,71 @@ void initMeta(Assembler& assem)
     assem.registerMeta("fill", [&](Meta const& meta) {
         auto& syms = assem.getSymbols();
         auto data = meta.args[0];
+        size_t size;
+        bool firstConst = false;
+
+        // Create source lambda depending on first argument
+        std::function<Number(size_t)> src;
         if (auto* vec = any_cast<std::vector<uint8_t>>(&data)) {
-            for (auto d : *vec) {
-                mach.writeByte(d);
-            }
+            size = vec->size();
+            src = [v = *vec](size_t i) -> Number { return v[i]; };
         } else if (auto* nv = any_cast<std::vector<Number>>(&data)) {
-            for (auto d : *nv) {
+            size = nv->size();
+            src = [v = *nv](size_t i) -> Number {
+                auto d = v[i];
                 if (d > 255 || d < -127) {
                     throw parse_error("Value does not fit");
                 }
-                mach.writeByte(static_cast<uint8_t>(d));
-            }
+                return d;
+            };
         } else if (auto* sv = any_cast<std::string_view>(&data)) {
+            LOGI("Fill string %s", *sv);
             auto utext = utils::utf8_decode(*sv);
-            for (auto d : utext) {
-                mach.writeByte(translateChar(d));
+            size = utext.size();
+            src = [utext](size_t i) -> Number {
+                return translateChar(utext[i]);
+            };
+        } else {
+            size = number<size_t>(data);
+            src = [](size_t i) -> Number { return i; };
+            firstConst = true;
+        }
+
+        std::function<uint8_t(size_t, Number)> tx;
+        Assembler::Macro* macro = nullptr;
+        Assembler::Call call;
+        // Create transform lambda depending on second argument
+        if (meta.args.size() <= 1) {
+            // If first argument was a constant, fill with zeroes
+            if (firstConst) {
+                tx = [](size_t, Number n) -> uint8_t { return 0; };
+            } else {
+                tx = [](size_t, Number n) -> uint8_t { return n; };
             }
         } else {
-            auto size = number<size_t>(data);
-            uint8_t d = 0;
-            Assembler::Macro* macro = nullptr;
-            Assembler::Call call;
-            if (meta.args.size() > 1) {
-                data = meta.args[1];
-                if (auto* val = any_cast<Number>(&data)) {
-                    d = static_cast<uint8_t>(*val);
-                } else {
-                    // LOGI("Found macro");
-                    macro = any_cast<Assembler::Macro>(&data);
-                    for (auto const& i : macro->args) {
-                        // LOGI("Arg %s", i);
+            data = meta.args[1];
+            if (auto* val = any_cast<Number>(&data)) {
+                auto n = static_cast<uint8_t>(*val);
+                tx = [n](size_t, Number) -> uint8_t { return n; };
+            } else {
+                macro = any_cast<Assembler::Macro>(&data);
+                call.args.resize(macro->args.size());
+                tx = [&](size_t i, Number n) -> uint8_t {
+                    if (call.args.size() >= 1) {
+                        call.args[0] = any_num(n);
                     }
-                    call.args.resize(macro->args.size());
-                }
-            }
-
-            // LOGI("Fill %d bytes", size);
-            for (size_t i = 0; i < size; i++) {
-                if (macro != nullptr) {
-                    if (!call.args.empty()) {
-                        call.args[0] = any_num(i);
+                    if (call.args.size() >= 2) {
+                        call.args[1] = any_num(i);
                     }
                     auto res = assem.applyDefine(*macro, call);
-                    d = number<uint8_t>(res);
-                }
-                mach.writeByte(d);
+                    return number<uint8_t>(res);
+                };
             }
+        }
+
+        for (size_t i = 0; i < size; i++) {
+            auto n = src(i);
+            mach.writeByte(tx(i, n));
         }
     });
 

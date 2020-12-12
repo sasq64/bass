@@ -1,4 +1,4 @@
-== Meta Reference
+== Meta Commands
 
 All meta commands take the same basic form; An exclamation mark followed by an identifier, then an optional set of arguments, followed by zero, one or two
 blocks enclosed in curly braces.
@@ -84,6 +84,7 @@ xor_data:
 1. `!fill <array>`
 2. `!fill <count> [, <value>]`
 3. `!fill <count>, <function>`
+3. `!fill <array>, <function>`
 
 Put data into memory, Essentially a shorthand for
 `!rept <arg> { !byte <expression }`.
@@ -91,6 +92,7 @@ Put data into memory, Essentially a shorthand for
 1. Put array in memory.
 2. Fill memory with contant value, default is zero.
 3. Call a function with values 0 through count-1 and put result in memory
+4. Call a function for every value in array and put result in memory
 
 ==== Example
 [source,ca65]
