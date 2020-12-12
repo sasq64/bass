@@ -221,24 +221,9 @@ TextEmu::TextEmu()
 void TextEmu::run(uint16_t pc)
 {
     start(pc);
-    int32_t cycles = 1000;
-    auto t = clk::now();
-
-    nextUpdate = t + 20ms;
-
     while (true) {
-        emu->run(cycles);
-        if (t >= nextUpdate) {
-            console->flush();
-            regs[RealW] = console->get_width();
-            regs[RealH] = console->get_height();
-
-            if ((regs[Control] & 1) == 1) {
-                return;
-            }
-
-            nextUpdate += 20ms;
-        }
+        if(update())
+            return;
     }
 }
 

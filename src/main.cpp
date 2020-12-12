@@ -45,6 +45,7 @@ struct AssemblerState
     int maxPasses = 10;
     std::string listFile;
     std::string symbolFile;
+    std::string programFile;
     OutFmt outFmt = OutFmt::Prg;
 
     void parseArgs(int argc, char** argv)
@@ -72,6 +73,7 @@ struct AssemblerState
         app.add_option("-s,--table", symbolFile,
                        "Write numeric symbols to file");
         app.add_option("-o,--out", outFile, "Output file");
+        app.add_option("-p,--prg", programFile, "Program file");
         app.add_option("-D", definitions, "Add symbol");
         app.add_option("-i", sourceFiles, "Sources to compile");
         app.add_option("-x,--lua", scriptFiles, "LUA scripts to load")
@@ -83,7 +85,8 @@ struct AssemblerState
 
         try {
             app.parse(argc, argv);
-            showHelp = (*help || (sourceFiles.empty() && scriptFiles.empty()));
+            showHelp = (*help || (sourceFiles.empty() && scriptFiles.empty() &&
+                                  programFile.empty()));
             if (showHelp) {
                 if (!quiet) puts(banner + 1);
 
@@ -174,6 +177,18 @@ int main(int argc, char** argv)
     while (state.doRun) {
 
         TextEmu emu;
+
+        if (!state.programFile.empty()) {
+            utils::File f{state.programFile};
+            uint16_t start = f.read<uint8_t>();
+            start |= (f.read<uint8_t>() << 8);
+            std::vector<uint8_t> data(f.getSize() - 2);
+            f.read(&data[0], data.size());
+            emu.load(start, data);
+            emu.run(start);
+            exit(0);
+        }
+
         assem.clear();
         assem.getSymbols().set("CONSOLE_WIDTH",
                                static_cast<Number>(emu.get_width()));
