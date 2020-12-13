@@ -52,17 +52,6 @@ struct SymbolTable
     bool trace = false;
     bool undef_ok = true;
 
-//    std::vector<std::string> get_undefined() const {
-//
-//        std::vector<std::string> result;
-//        for(auto const& [name, symbol] : syms) {
-//            if (!symbol.defined) {
-//                result.push_back(name);
-//            }
-//        }
-//        return result;
-//    }
-
     bool is_constant(std::string_view name) const {
         if(auto sym = get_sym(name)) {
             return sym->final;
@@ -75,12 +64,6 @@ struct SymbolTable
     bool is_defined(std::string_view name) const
     {
         return syms.find(std::string(name)) != syms.end();
-    }
-
-    bool is_defined_now(std::string_view name) const
-    {
-        auto it = syms.find(std::string(name));
-        return it != syms.end() && it->second.defined;
     }
 
     void set_sym(std::string_view name, AnyMap const& symbols)

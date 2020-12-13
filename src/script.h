@@ -27,8 +27,7 @@ public:
     void load(fs::path const& p);
     void add(std::string_view code);
     bool hasFunction(std::string_view name);
-    std::any call(std::string_view name,
-                  std::vector<std::any> const& args);
+    std::any call(std::string_view name, std::vector<std::any> const& args);
 
     sol::state& getState() { return *luap; }
 
@@ -41,5 +40,4 @@ public:
 private:
     std::unique_ptr<sol::state> luap;
     sol::state& lua;
-
 };

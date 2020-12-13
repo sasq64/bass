@@ -1,3 +1,4 @@
+#pragma once
 #include <cstdint>
 
 int32_t pet2uni_up(uint8_t p);

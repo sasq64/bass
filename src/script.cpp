@@ -68,17 +68,14 @@ void Scripting::load(fs::path const& p)
 std::function<void()> Scripting::make_function(std::string_view code)
 {
     sol::load_result fn = lua.load(code);
-    return [code, this]() {
-        lua.script(code);
-    };
-
+    return [code, this]() { lua.script(code); };
 }
 
 void Scripting::add(std::string_view code)
 {
     try {
         auto res = lua.script(code);
-        if(res.status() != sol::call_status::ok) {
+        if (res.status() != sol::call_status::ok) {
             sol::error e = res;
             throw script_error(e.what());
         }
@@ -122,7 +119,7 @@ std::any Scripting::to_any(sol::object const& obj)
                     if (vec.size() < index + 1 - StartIndex) {
                         vec.resize(index + 1 - StartIndex);
                     }
-                    vec[index-StartIndex] = val.as<uint8_t>();
+                    vec[index - StartIndex] = val.as<uint8_t>();
                 }
             } else {
                 auto s = key.as<std::string>();

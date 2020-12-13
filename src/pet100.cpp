@@ -1,4 +1,4 @@
-#include "text_emu.h"
+#include "pet100.h"
 
 #include <ansi/console.h>
 #include <ansi/terminal.h>
@@ -44,7 +44,7 @@ char32_t trans_char(uint8_t c)
     return sc2uni_up(c);
 }
 
-void TextEmu::set_color(uint8_t col)
+void Pet100::set_color(uint8_t col)
 {
     int b = (col & 0xf) * 3;
     int f = ((col >> 4) + 16) * 3;
@@ -55,7 +55,7 @@ void TextEmu::set_color(uint8_t col)
     console->set_color(fg, bg);
 }
 
-void TextEmu::writeChar(uint16_t adr, uint8_t t)
+void Pet100::writeChar(uint16_t adr, uint8_t t)
 {
     if (regs[RealW] == 0 || regs[RealH] == 0) {
         return;
@@ -72,7 +72,7 @@ void TextEmu::writeChar(uint16_t adr, uint8_t t)
     console->put_char(x, y, trans_char(t), flags);
 }
 
-uint8_t TextEmu::readChar(uint16_t adr)
+uint8_t Pet100::readChar(uint16_t adr)
 {
     auto offset = adr - (regs[TextPtr] * 256);
 
@@ -82,7 +82,7 @@ uint8_t TextEmu::readChar(uint16_t adr)
     return textRam[x + regs[RealW] * y];
 }
 
-uint8_t TextEmu::readColor(uint16_t adr)
+uint8_t Pet100::readColor(uint16_t adr)
 {
     auto offset = adr - (regs[ColorPtr] * 256);
 
@@ -92,7 +92,7 @@ uint8_t TextEmu::readColor(uint16_t adr)
     return colorRam[x + regs[RealW] * y];
 }
 
-void TextEmu::writeColor(uint16_t adr, uint8_t c)
+void Pet100::writeColor(uint16_t adr, uint8_t c)
 {
     if (regs[RealW] == 0 || regs[RealH] == 0) {
         return;
@@ -112,7 +112,7 @@ void TextEmu::writeColor(uint16_t adr, uint8_t c)
     console->put_color(x, y, fg, bg);
 }
 
-void TextEmu::updateRegs()
+void Pet100::updateRegs()
 {
 
     auto sz = (regs[WinW] * regs[WinH] + 255) & 0xffff00;
@@ -120,27 +120,27 @@ void TextEmu::updateRegs()
 
     emu->map_write_callback(regs[TextPtr], banks, this,
                             [](uint16_t adr, uint8_t v, void* data) {
-                                auto* thiz = static_cast<TextEmu*>(data);
+                                auto* thiz = static_cast<Pet100*>(data);
                                 thiz->writeChar(adr, v);
                             });
     emu->map_read_callback(regs[TextPtr], banks, this,
                            [](uint16_t adr, void* data) {
-                               auto* thiz = static_cast<TextEmu*>(data);
+                               auto* thiz = static_cast<Pet100*>(data);
                                return thiz->readChar(adr);
                            });
     emu->map_write_callback(regs[ColorPtr], banks, this,
                             [](uint16_t adr, uint8_t v, void* data) {
-                                auto* thiz = static_cast<TextEmu*>(data);
+                                auto* thiz = static_cast<Pet100*>(data);
                                 thiz->writeColor(adr, v);
                             });
     emu->map_read_callback(regs[ColorPtr], banks, this,
                            [](uint16_t adr, void* data) {
-                               auto* thiz = static_cast<TextEmu*>(data);
+                               auto* thiz = static_cast<Pet100*>(data);
                                return thiz->readColor(adr);
                            });
 }
 
-void TextEmu::fillOutside(uint8_t col)
+void Pet100::fillOutside(uint8_t col)
 {
     auto cw = console->get_width();
     auto ch = console->get_height();
@@ -156,7 +156,7 @@ void TextEmu::fillOutside(uint8_t col)
     }
 }
 
-TextEmu::TextEmu()
+Pet100::Pet100()
 {
     auto terminal = bbs::create_local_terminal();
     terminal->open();
@@ -182,7 +182,7 @@ TextEmu::TextEmu()
     // Map IO area
     emu->map_read_callback(0xd7, 1, this,
                            [](uint16_t adr, void* data) -> uint8_t {
-                               auto* thiz = static_cast<TextEmu*>(data);
+                               auto* thiz = static_cast<Pet100*>(data);
                                if (adr >= 0xd780) {
                                    return thiz->palette[adr - 0xd780];
                                }
@@ -191,7 +191,7 @@ TextEmu::TextEmu()
 
     emu->map_write_callback(0xd7, 1, this,
                             [](uint16_t adr, uint8_t v, void* data) {
-                                auto* thiz = static_cast<TextEmu*>(data);
+                                auto* thiz = static_cast<Pet100*>(data);
                                 if (adr < 0xd780) {
                                     thiz->writeReg(adr & 0xff, v);
                                 } else {
@@ -218,7 +218,7 @@ TextEmu::TextEmu()
     utils::copy(c64pal, palette.data() + 16 * 3);
 }
 
-void TextEmu::run(uint16_t pc)
+void Pet100::run(uint16_t pc)
 {
     start(pc);
     while (true) {
@@ -227,14 +227,14 @@ void TextEmu::run(uint16_t pc)
     }
 }
 
-uint16_t TextEmu::get_ticks() const
+uint16_t Pet100::get_ticks() const
 {
     auto ms = std::chrono::duration_cast<std::chrono::microseconds>(clk::now() -
                                                                     start_t);
     return (ms.count() / 100) & 0xffff;
 }
 
-uint8_t TextEmu::readReg(int reg)
+uint8_t Pet100::readReg(int reg)
 {
     switch (reg) {
     case WinX:
@@ -265,7 +265,7 @@ uint8_t TextEmu::readReg(int reg)
     }
 }
 
-void TextEmu::writeReg(int reg, uint8_t val)
+void Pet100::writeReg(int reg, uint8_t val)
 {
     switch (reg) {
     case WinX:
@@ -299,7 +299,7 @@ void TextEmu::writeReg(int reg, uint8_t val)
     }
 }
 
-void TextEmu::doUpdate()
+void Pet100::doUpdate()
 {
     console->flush();
 
@@ -313,7 +313,7 @@ void TextEmu::doUpdate()
     }
 }
 
-bool TextEmu::update()
+bool Pet100::update()
 {
     try {
         auto cycles = emu->run(10000);
@@ -329,7 +329,7 @@ bool TextEmu::update()
     }
 }
 
-void TextEmu::load(uint16_t start, uint8_t const* ptr, size_t size) const
+void Pet100::load(uint16_t start, uint8_t const* ptr, size_t size) const
 {
     constexpr uint8_t Sys_Token = 0x9e;
     constexpr uint8_t Space = 0x20;
@@ -352,7 +352,7 @@ void TextEmu::load(uint16_t start, uint8_t const* ptr, size_t size) const
     emu->write_memory(start, ptr, size);
 }
 
-void TextEmu::start(uint16_t pc)
+void Pet100::start(uint16_t pc)
 {
     if (pc == 0x0801 && basicStart >= 0) {
         pc = basicStart;
@@ -365,13 +365,13 @@ void TextEmu::start(uint16_t pc)
     nextUpdate = start_t + 10ms;
 }
 
-int TextEmu::get_width() const
+int Pet100::get_width() const
 {
     return console->get_width();
 }
-int TextEmu::get_height() const
+int Pet100::get_height() const
 {
     return console->get_height();
 }
 
-TextEmu::~TextEmu() = default;
+Pet100::~Pet100() = default;

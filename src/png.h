@@ -41,7 +41,7 @@ std::unordered_map<int, int> remap_palette(std::vector<T> const& colors,
         for (auto const& col2 : newColors) {
             auto new24 = static_cast<uint32_t>(col2) & 0xff'ff'ff;
             auto delta = dist(col24, new24);
-            //LOGI("DELTA: %06x - %06x = %d", col24, new24, delta);
+            // LOGI("DELTA: %06x - %06x = %d", col24, new24, delta);
             if (delta < minDelta) {
                 bestColor = j;
                 minDelta = delta;
@@ -49,7 +49,7 @@ std::unordered_map<int, int> remap_palette(std::vector<T> const& colors,
             j++;
         }
         auto new24 = static_cast<uint32_t>(newColors[bestColor]) & 0xff'ff'ff;
-        //LOGI("%d : %06x -> %d : %06x", i, col24, bestColor, new24);
+        // LOGI("%d : %06x -> %d : %06x", i, col24, bestColor, new24);
         convert[i] = bestColor;
 
         i++;
@@ -57,7 +57,8 @@ std::unordered_map<int, int> remap_palette(std::vector<T> const& colors,
     return convert;
 }
 
-std::vector<uint8_t> change_bpp(std::vector<uint8_t> const& pixels, int old_bpp, int new_bpp);
+std::vector<uint8_t> change_bpp(std::vector<uint8_t> const& pixels, int old_bpp,
+                                int new_bpp);
 
 void changeImageBpp(Image& img, int bpp);
 void remap_image(Image& image, std::vector<uint32_t> const& colors);
@@ -68,12 +69,12 @@ void for_all_pixels(std::vector<uint8_t>& pixels, int bpp, FN fn)
     int bits = 8 - bpp;
     uint8_t m = 0xff >> bits;
 
-    for (auto &b : pixels) {
+    for (auto& b : pixels) {
         int n = bits;
         while (n >= 0) {
             uint8_t x = (b >> n) & m;
             fn(x);
-            b = (b & ~(m<<n)) | (x << n);
+            b = (b & ~(m << n)) | (x << n);
             n -= bpp;
         }
     }
@@ -92,7 +93,6 @@ void for_all_pixels(std::vector<uint8_t> const& pixels, int bpp, FN fn)
         }
     }
 }
-
 
 void remap_pixels(std::vector<uint8_t>& pixels, int bpp,
                   std::unordered_map<int, int> const& convert);

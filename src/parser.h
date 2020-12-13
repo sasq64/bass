@@ -11,8 +11,9 @@
 #include <unordered_map>
 #include <vector>
 
-extern "C" {
-    #include <sha512.h>
+extern "C"
+{
+#include <sha512.h>
 }
 
 namespace peg {
@@ -32,7 +33,7 @@ inline std::string hex_encode(C const& c, int len = 0)
     for (uint8_t b : c) {
         result += hex[b >> 4];
         result += hex[b & 0xf];
-        if(len-- == 0) {
+        if (len-- == 0) {
             break;
         }
     }
@@ -113,12 +114,11 @@ public:
     explicit Parser(const char* grammar);
     void setError(std::string const& what, std::string_view file, size_t line);
 
-
     void use_cache(bool on) { useCache = on; }
 
-
     void packrat() const;
-    void before(const char* name, std::function<bool(SemanticValues const&)> const& fn);
+    void before(const char* name,
+                std::function<bool(SemanticValues const&)> const& fn);
     void after(const char* name,
                std::function<std::any(SemanticValues const&)> const& fn);
 

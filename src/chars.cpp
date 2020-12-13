@@ -1,7 +1,7 @@
 #include "chars.h"
 #include "defines.h"
+#include "parser.h"
 #include "petscii.h"
-#include "wrap.h"
 
 #include <coreutils/utf8.h>
 

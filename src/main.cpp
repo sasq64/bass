@@ -2,7 +2,7 @@
 #include "assembler.h"
 #include "defines.h"
 #include "machine.h"
-#include "text_emu.h"
+#include "pet100.h"
 
 #include <coreutils/file.h>
 #include <coreutils/log.h>
@@ -176,7 +176,7 @@ int main(int argc, char** argv)
 
     while (state.doRun) {
 
-        TextEmu emu;
+        Pet100 emu;
 
         if (!state.programFile.empty()) {
             utils::File f{state.programFile};

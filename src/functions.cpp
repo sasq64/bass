@@ -1,7 +1,7 @@
 #include "assembler.h"
 #include "chars.h"
+#include "parser.h"
 #include "png.h"
-#include "wrap.h"
 
 #include <cmath>
 #include <coreutils/algorithm.h>

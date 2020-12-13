@@ -1,4 +1,4 @@
-#include "wrap.h"
+#include "parser.h"
 
 #include "defines.h"
 #include <peglib.h>
@@ -60,8 +60,7 @@ Parser::Parser(const char* s) : p(std::make_unique<peg::parser>(s))
         exit(0);
     }
     p->enable_ast<peg::AstBase<BassNode>>();
-    p->log = [&](size_t line, size_t col, std::string const& msg) {
-        //LOGI("ERROR %d/%d %s", line, col, msg);
+    p->log = [&](size_t line, size_t, std::string const& msg) {
         if (!haveError) {
             LOGI("Msg %s", msg);
             setError(msg, "", line);
@@ -170,7 +169,7 @@ AstNode Parser::loadAst(utils::File& f)
 
 AstNode Parser::parse(std::string_view source, std::string_view file)
 {
-    std::array<uint8_t, SHA512_DIGEST_LENGTH> sha;
+    std::array<uint8_t, SHA512_DIGEST_LENGTH> sha; // NOLINT
     SHA512(reinterpret_cast<const uint8_t*>(source.data()), source.size(),
            sha.data());
     auto shaName = hex_encode(sha, 32);

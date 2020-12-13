@@ -21,7 +21,7 @@ struct exit_exception : public std::exception
 {};
 
 
-struct TextEmu
+struct Pet100
 {
     enum Regs
     {
@@ -74,8 +74,8 @@ struct TextEmu
     void writeReg(int reg, uint8_t val);
     uint16_t get_ticks() const;
 
-    TextEmu();
-    ~TextEmu();
+    Pet100();
+    ~Pet100();
 
     void run(uint16_t start);
     void load(uint16_t start, uint8_t const* ptr, size_t size) const;

@@ -2,7 +2,7 @@
 #include "chars.h"
 #include "defines.h"
 #include "machine.h"
-#include "wrap.h"
+#include "parser.h"
 
 #ifndef _WIN32
 #    include <cxxabi.h>
@@ -178,17 +178,7 @@ Assembler::Block Assembler::includeFile(std::string_view name)
 
 void Assembler::evaluateBlock(Block const& block)
 {
-    LOGD("EVAL BLOCK %s", block.contents);
     parser.evaluate(block.node);
-}
-
-void Assembler::evaluateBlock(std::string_view block, std::string_view file)
-{
-    auto ast = parser.parse(block, file);
-    if (!ast) {
-        throw parse_error("block");
-    }
-    parser.evaluate(ast);
 }
 
 int Assembler::checkUndefined()
@@ -751,6 +741,7 @@ void Assembler::setupRules()
     parser.after("Dollar", [&](SV& sv) { return sv.token_view(); });
     parser.after("FnArgs", [&](SV& sv) {
         std::vector<std::string_view> parts;
+        parts.reserve(sv.size());
         for (size_t i = 0; i < sv.size(); i++) {
             parts.emplace_back(any_cast<std::string_view>(sv[i]));
         }
@@ -1129,10 +1120,10 @@ void Assembler::setupRules()
         } else {
 
             std::vector<std::string_view> parts;
+            parts.reserve(sv.size());
             for (size_t i = 0; i < sv.size(); i++) {
                 parts.emplace_back(any_cast<std::string_view>(sv[i]));
             }
-            // auto parts = sv.transform<std::string_view>();
             full = utils::join(parts.begin(), parts.end(), ".");
         }
 

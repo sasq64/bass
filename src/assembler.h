@@ -1,8 +1,8 @@
 #pragma once
 
 #include "defines.h"
+#include "parser.h"
 #include "script.h"
-#include "wrap.h"
 
 #include "any_callable.h"
 #include "symbol_table.h"
@@ -119,7 +119,6 @@ public:
                    std::string_view contents);
 
     void evaluateBlock(Block const& block);
-    void evaluateBlock(std::string_view block, std::string_view fileName);
 
     void runTest(Test const& test);
     void addTest(std::string name, uint32_t start, RegState const& state);

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(bass VERSION 0.5)
+project(bass VERSION 1.0)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 set(CMAKE_CXX_STANDARD 17)
@@ -61,7 +61,7 @@ add_library(sha512 STATIC src/sha512.c)
 
 add_library(badlib STATIC
     src/assembler.cpp src/grammar.cpp src/functions.cpp src/chars.cpp
-    src/machine.cpp src/wrap.cpp src/meta.cpp src/petscii.cpp
+    src/machine.cpp src/parser.cpp src/meta.cpp src/petscii.cpp
     src/png.cpp src/script.cpp src/script_functions.cpp)
 
 target_compile_definitions(badlib PUBLIC SOL_USING_CXX_LUA USE_FMT)
@@ -74,7 +74,7 @@ if(FUZZ)
     add_executable(bazz src/fuzz.cpp)
     target_link_libraries(bazz PRIVATE badlib)
 else()
-    add_executable(bass src/main.cpp src/text_emu.cpp)
+    add_executable(bass src/main.cpp src/pet100.cpp)
     target_link_options(bass PRIVATE ${THREAD_OPTIONS})
     target_link_libraries(bass PRIVATE badlib CLI11::CLI11 ansi)
 
@@ -84,7 +84,8 @@ else()
     target_link_libraries(gtest PRIVATE coreutils CLI11::CLI11 ${THREAD_LIB})
 
 
-    add_executable(sectiontest EXCLUDE_FROM_ALL src/testmain.cpp src/sectiontest.cpp src/machine.cpp)
+    add_executable(sectiontest EXCLUDE_FROM_ALL src/testmain.cpp
+        src/sectiontest.cpp src/machine.cpp)
     target_include_directories(sectiontest PRIVATE src)
     target_link_libraries(sectiontest PRIVATE catch coreutils fmt)
 

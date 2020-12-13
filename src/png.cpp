@@ -77,39 +77,38 @@ int savePng(std::string const& name, Image const& img)
         dump.push_back(0xff000000 | img.colors[px]);
     });
 
-  auto data = (const unsigned char*)img.pixels.data();
+    const auto* data = (const unsigned char*)img.pixels.data();
 
-  unsigned error;
-  LodePNGState state;
-  lodepng_state_init(&state);
+    unsigned error{};
+    LodePNGState state;
+    lodepng_state_init(&state);
 
-  auto colors = img.colors;
-  for(auto& c : colors) {
-      c |= 0xff000000;
-  }
-  state.info_raw.colortype = LCT_PALETTE;
-  state.info_raw.bitdepth = img.bpp;
-  state.info_raw.palette = (unsigned char*)colors.data();
-  state.info_raw.palettesize = img.colors.size();
+    auto colors = img.colors;
+    for (auto& c : colors) {
+        c |= 0xff000000;
+    }
+    state.info_raw.colortype = LCT_PALETTE;
+    state.info_raw.bitdepth = img.bpp;
+    state.info_raw.palette = (unsigned char*)colors.data();
+    state.info_raw.palettesize = img.colors.size();
 
-  state.info_png.color.colortype = LCT_PALETTE;
-  state.info_png.color.bitdepth = img.bpp;
-  state.info_png.color.palettesize = img.colors.size();
-  state.info_png.color.palette = (unsigned char*)colors.data();
+    state.info_png.color.colortype = LCT_PALETTE;
+    state.info_png.color.bitdepth = img.bpp;
+    state.info_png.color.palettesize = img.colors.size();
+    state.info_png.color.palette = (unsigned char*)colors.data();
 
-  state.encoder.auto_convert = 0;
-  state.encoder.force_palette = 1;
+    state.encoder.auto_convert = 0;
+    state.encoder.force_palette = 1;
 
-  unsigned char* buffer;
-  size_t buffersize;
-  lodepng_encode(&buffer, &buffersize, data, img.width, img.height, &state);
-  error = state.error;
+    unsigned char* buffer;
+    size_t buffersize{};
+    lodepng_encode(&buffer, &buffersize, data, img.width, img.height, &state);
+    error = state.error;
 
-  if(!error) error = lodepng_save_file(buffer, buffersize, name.c_str());
-  free(buffer);
+    if (!error) error = lodepng_save_file(buffer, buffersize, name.c_str());
+    free(buffer);
 
-  return error;
-
+    return error;
 }
 
 std::vector<uint8_t> convertPalette(std::vector<uint32_t> const& colors32)
@@ -161,7 +160,7 @@ Image loadPng(std::string_view name)
     auto numColors = state.info_png.color.palettesize;
     auto* pal = state.info_png.color.palette;
 
-    if(state.info_png.color.colortype == LCT_GREY) {
+    if (state.info_png.color.colortype == LCT_GREY) {
         numColors = 1 << static_cast<size_t>(state.info_png.color.bitdepth);
         pal = nullptr;
     }
@@ -173,9 +172,9 @@ Image loadPng(std::string_view name)
     result.colors.resize(numColors);
     result.pixels.resize(w * h * result.bpp / 8);
     memcpy(result.pixels.data(), out.get(), result.pixels.size());
-    if(pal == nullptr) {
-        for(size_t i=0; i<numColors; i++) {
-            unsigned c = 255 * i / (numColors-1);
+    if (pal == nullptr) {
+        for (size_t i = 0; i < numColors; i++) {
+            unsigned c = 255 * i / (numColors - 1);
             result.colors[i] = (c << 16) | (c << 8) | c;
         }
 
