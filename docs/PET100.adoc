@@ -34,8 +34,9 @@ A single register is used for reading keys. The register returns the next
 character in the keyboard input buffer. If the buffer is empty, zero is
 returned.
 
-The timer counts down every `TimerDiv` milliseconds. When it reaches 0 it stops
-and signals the timer IRQ.
+The timer counts up every `TimerDiv` micro seconds. The timer is _frozen_ when
+reading the higher bits (it keeps counting but the register is not updated) in
+order to read the multi byte value consistently.
 
 The Screen Update IRQ is signalled after the text buffer has been copied to the
 terminal. It can be used as a "Vblank", you can wait for it and then start
@@ -76,25 +77,25 @@ key is pressed
 | `$08` | `Border` | W |  | Fill area around current window with color
 | `$09` | `Keys` | R |  | Returns the next read character from the keyboard.
 `0` means no keys available.
-| `$0A` | `TimerLo` | RW | 1 | Low 8 bits of timer
-| `$0B` | `TimerHi` | RW | 1 | High 8 bits of timer
-| `$0C` | `TimerDiv` | RW | 1 | Timer divider. The millisecond clock is divided
-by this value and written to TimerLo/TimerHi
-| `$0D` | `Control` | W |  | Writing specific bits causes certain effects:
+| `$0A` | `Control` | W |  | Writing specific bits causes certain effects:
 
 * 0: Exit : Writing `1` will cause the emulator to exit
 * 1: Stop : Writing `1` causes the emulator to sleep until an IRQ occurs
-* 2: Reset: Writing `1` clears screen and loads new palette & charset
 
-| `$0E` | `Charset` | RW | 0 | Set the charset to use for translation:
+| `$0B` | `Charset` | RW | 0 | Set the charset to use for translation:
 
 * 0: Screencode upper
-* 1: Screencode lower
-* 2: Petscii upper
-* 3: Petscii lower
-* 4: Ascii
+* 1: Screencode lower (TBD)
+* 2: Petscii upper (TBD)
+* 3: Petscii lower (TBD)
+* 4: Ascii (TBD)
 * 5: Extended Petscii (TBD)
 
+| `$0C` | `TimerLo` | RW | 1 | Low 8 bits of timer. Reading this register will cause the timer to unfreeze.
+| `$0D` | `TimerMid` | RW | 1 | Middle 8 bits of timer. Reading this register will cause the timer to freeze.
+| `$0E` | `TimerHi` | RW | 1 | High 8 bits of timer. Reading this register will cause the timer to freeze.
+| `$0F` | `TimerDiv` | RW | 1 | Timer divider. The microsecond clock is divided
+by this value and written to the timer registers.
 | `$10` | `IrqEna` | RW | | Interrupt enable
 
 * 0: Screen update enable

@@ -25,14 +25,10 @@
 !macro Border(col)
 {
     lda #col<<4
-    sta Regs.CFillOut
+    sta Regs.Border
 }
 
-!macro Clear(fg, bg)
-{
-    lda #(bg << 4) | fg
-    sta Regs.CFillIn
-}
+Palette = $d780
 
 !enum Regs
 {
@@ -44,24 +40,21 @@
 
     RealW
     RealH
-
     TextPtr
     ColorPtr
 
     ; Write to fill border with given color
-    CFillOut
-
+    Border
     ; Read keyboard fifo. 0 means empty
     Key
-
-    Freq
-
-    ; Timer ticks 1000 / TimerDiv per second
-    TimerLo
-    TimerHi
-
     Control
     Charset
+
+    TimerLo
+    TimerMid
+    TimerHi
+    TimerDiv
+
 
     IrqEna
     IrqReq

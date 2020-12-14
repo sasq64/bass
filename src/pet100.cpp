@@ -61,7 +61,7 @@ void Pet100::writeChar(uint16_t adr, uint8_t t)
         return;
     }
     auto offset = adr - (regs[TextPtr] * 256);
-    //textRam[offset] = t;
+    // textRam[offset] = t;
 
     auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
     auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
@@ -166,14 +166,14 @@ Pet100::Pet100()
     auto cw = console->get_width();
     auto ch = console->get_height();
 
-    textRam.resize(cw*ch);
-    colorRam.resize(cw*ch);
+    textRam.resize(cw * ch);
+    colorRam.resize(cw * ch);
 
     for (size_t y = 0; y < ch; y++) {
         for (size_t x = 0; x < cw; x++) {
-            //colorRam[x + cw * y] = 0x01;
-            //textRam[x + cw * y] = ' ';
-            console->at(x,y) = { ' ', 0x000000, 0xffffffff, 0 };
+            // colorRam[x + cw * y] = 0x01;
+            // textRam[x + cw * y] = ' ';
+            console->at(x, y) = {' ', 0x000000, 0xffffffff, 0};
         }
     }
 
@@ -207,7 +207,7 @@ Pet100::Pet100()
 
     regs[TextPtr] = 0x04;
     regs[ColorPtr] = 0xd8;
-    regs[Freq] = 20;
+    regs[TimerDiv] = 10;
     regs[IrqE] = 0;
     regs[IrqR] = 0;
 
@@ -222,16 +222,26 @@ void Pet100::run(uint16_t pc)
 {
     start(pc);
     while (true) {
-        if(update())
-            return;
+        if (update()) return;
     }
 }
 
 uint16_t Pet100::get_ticks() const
 {
-    auto ms = std::chrono::duration_cast<std::chrono::microseconds>(clk::now() -
-                                                                    start_t);
-    return (ms.count() / 100) & 0xffff;
+    auto us = frozenTimer
+                  ? frozenTime
+                  : std::chrono::duration_cast<std::chrono::microseconds>(
+                        clk::now() - start_t);
+    return (us.count() / regs[TimerDiv]) & 0xffff;
+}
+
+void Pet100::freeze_timer(bool freeze)
+{
+    if (freeze && !frozenTimer) {
+        frozenTime = std::chrono::duration_cast<std::chrono::microseconds>(
+            clk::now() - start_t);
+    }
+    frozenTimer = freeze;
 }
 
 uint8_t Pet100::readReg(int reg)
@@ -252,10 +262,17 @@ uint8_t Pet100::readReg(int reg)
             return key;
         }
         return 0;
-    case TimerLo:
-        return get_ticks() & 0xff;
-    case TimerHi:
+    case TimerLo: {
+        uint8_t r = get_ticks() & 0xff;
+        freeze_timer(false);
+        return r;
+    }
+    case TimerMid:
+        freeze_timer(true);
         return (get_ticks() >> 8) & 0xff;
+    case TimerHi:
+        freeze_timer(true);
+        return (get_ticks() >> 16) & 0xff;
     case RealW:
         return console->get_width();
     case RealH:
@@ -280,7 +297,7 @@ void Pet100::writeReg(int reg, uint8_t val)
     case Charset:
         regs[reg] = val;
         break;
-    case CFillOut:
+    case Border:
         fillOutside(val);
         break;
     case Control:

@@ -32,18 +32,19 @@ struct Pet100
 
         RealW,
         RealH,
-
         TextPtr,
         ColorPtr,
 
-        CFillOut,
-
+        Border,
         Keys,
-        Freq,
-        TimerLo,
-        TimerHi,
         Control,
         Charset,
+
+        TimerLo,
+        TimerMid,
+        TimerHi,
+        TimerDiv,
+
         IrqE,
         IrqR
 
@@ -56,6 +57,8 @@ struct Pet100
     std::array<uint8_t, 128> palette{};
 
     mutable int32_t basicStart = -1;
+
+    void freeze_timer(bool freeze);
 
     void set_color(uint8_t col);
     void writeChar(uint16_t adr, uint8_t t);
@@ -86,7 +89,12 @@ struct Pet100
     }
     void start(uint16_t pc);
     bool update();
+    bool frozenTimer = false;
+
     using clk = std::chrono::steady_clock;
+    
+    clk::duration frozenTime;
+
     clk::time_point start_t;
     clk::time_point nextUpdate;
 };

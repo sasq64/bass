@@ -1,5 +1,5 @@
 
-    !include "text.inc"
+    !include "pet100.inc"
 
     !section "main", $8000
 

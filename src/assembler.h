@@ -114,9 +114,6 @@ public:
     void defineMacro(std::string_view name,
                      std::vector<std::string_view> const& args,
                      Block const& block);
-    void addDefine(std::string_view name,
-                   std::vector<std::string_view> const& args, size_t line,
-                   std::string_view contents);
 
     void evaluateBlock(Block const& block);
 

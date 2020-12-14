@@ -1,4 +1,4 @@
-    !include "text.inc"
+    !include "pet100.inc"
 
     !section "main", $8000
 
@@ -27,8 +27,8 @@ text_screen = $400
 start:
     jsr init
 
-    lda #Grey
-    sta Regs.CFillOut
+    lda #Grey<<4
+    sta Regs.Border
 
 loop:
     jsr read_joy

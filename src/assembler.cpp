@@ -319,7 +319,6 @@ void Assembler::applyMacro(Call const& call)
         syms.set(m.args[i], call.args[i]);
     }
 
-    // LOGI("Parsing '%s'", m.contents);
     auto ll = lastLabel;
     auto pc = mach->getPC();
     std::string macroLabel = "__macro_"s + std::to_string(pc);
@@ -327,7 +326,7 @@ void Assembler::applyMacro(Call const& call)
     inMacro++;
     parser.evaluate(m.contents.node);
     inMacro--;
-    // LOGI("Parsing done");
+
     for (unsigned i = 0; i < call.args.size(); i++) {
         syms.erase(m.args[i]);
     }
@@ -341,12 +340,6 @@ void Assembler::defineMacro(std::string_view name,
                             Block const& block)
 {
     macros[name] = {name, args, block};
-}
-void Assembler::addDefine(std::string_view name,
-                          std::vector<std::string_view> const& args,
-                          size_t line, std::string_view contents)
-{
-    //    definitions[name] = {name, args, contents, line};
 }
 
 void initMeta(Assembler& assem);
