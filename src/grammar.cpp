@@ -69,7 +69,7 @@ StringContents <- (!["] .)*
 
 Label <- (_ AsmSymbol ':') / AsmSymbol
 
-Arg <- _ (ZRel / Acc / Imm / IndY / IndX / Ind / AbsX / AbsY / Abs)
+Arg <- _ (ZPRel / Acc / Imm / IndY / IndX / IndZ / IndZFlat / Ind / AbsX / AbsY / Abs)
 
 IndX <- '(' Expression (TailX0 / TailX1)
 TailX0 <- ')' _? ',' _? 'X'i
@@ -85,7 +85,10 @@ Abs <- LabelRef / Expression
 AbsX <- Expression ',' _? 'X'i
 AbsY <- Expression ',' _? 'Y'i
 
-ZRel <- Expression ':' _? Expression ',' _? (LabelRef / Expression)
+IndZ <- '(' Expression '),' _ 'Z'i
+IndZFlat <- '[' Expression '],' _ 'Z'i
+
+ZPRel <- Expression ':' _? Expression ',' _? (LabelRef / Expression)
 
 Imm <- '#' Expression
 

@@ -34,7 +34,6 @@ Number operator"" _N(unsigned long long a)
 }
 Number to_number(std::string_view txt)
 {
-    double result{};
     std::string t{txt};
     return static_cast<Number>(std::stod(t));
 }
@@ -352,6 +351,7 @@ void Assembler::setRegSymbols()
     syms.erase("A");
     syms.erase("X");
     syms.erase("Y");
+    syms.erase("Z");
     syms.erase("SR");
     syms.erase("SP");
     syms.erase("PC");
@@ -359,6 +359,7 @@ void Assembler::setRegSymbols()
     syms.set("A", num(mach->getReg(Reg::A)));
     syms.set("X", num(mach->getReg(Reg::X)));
     syms.set("Y", num(mach->getReg(Reg::Y)));
+    syms.set("Z", num(mach->getReg(Reg::Z)));
     syms.set("SR", num(mach->getReg(Reg::SR)));
     syms.set("SP", num(mach->getReg(Reg::SP)));
     syms.set("PC", num(mach->getReg(Reg::PC)));
@@ -368,9 +369,10 @@ void Assembler::setRegSymbols()
 void Assembler::machineLog(std::string_view text)
 {
     fmt::dynamic_format_arg_store<fmt::format_context> store;
+    store.push_back(fmt::arg("A", mach->getReg(sixfive::Reg::A)));
     store.push_back(fmt::arg("X", mach->getReg(sixfive::Reg::X)));
     store.push_back(fmt::arg("Y", mach->getReg(sixfive::Reg::Y)));
-    store.push_back(fmt::arg("A", mach->getReg(sixfive::Reg::A)));
+    store.push_back(fmt::arg("Z", mach->getReg(sixfive::Reg::Z)));
     store.push_back(fmt::arg("SP", mach->getReg(sixfive::Reg::SP)));
     store.push_back(fmt::arg("SR", mach->getReg(sixfive::Reg::SR)));
     fmt::vprint(std::string(text) + "\n", store);
@@ -854,10 +856,13 @@ void Assembler::setupRules()
     static const std::unordered_map<std::string, Mode> modeMap = {
         {"Abs", Mode::ABS}, {"AbsX", Mode::ABSX}, {"AbsY", Mode::ABSY},
         {"Ind", Mode::IND}, {"IndX", Mode::INDX}, {"IndY", Mode::INDY},
-        {"Acc", Mode::ACC}, {"Imm", Mode::IMM},
+        {"Acc", Mode::ACC}, {"Imm", Mode::IMM}, {"IndZ", Mode::INDZ},
+        {"IndZFlat", Mode::INDZF}
     };
     auto buildArg = [](SV& sv) -> std::any {
         auto mode = modeMap.at(std::string(sv.name()));
+        // TODO: If sv[0] is an _array_, put it into memory and set value
+        // to the address of the array
         return Instruction{"", mode,
                            mode == Mode::ACC ? 0 : any_cast<Number>(sv[0])};
     };
@@ -865,7 +870,7 @@ void Assembler::setupRules()
         parser.after(name.c_str(), buildArg);
     }
 
-    parser.after("ZRel", [&](SV& sv) -> Instruction {
+    parser.after("ZPRel", [&](SV& sv) -> Instruction {
         int32_t v = (number<int32_t>(sv[1]) << 24) |
                     (number<int32_t>(sv[0]) << 16) | number<int32_t>(sv[2]);
         return {"", Mode::ZP_REL, static_cast<Number>(v)};

@@ -172,19 +172,15 @@ public:
                      std::function<uint8_t(uint16_t)> const& fn);
     void setBankRead(int hi_adr, int len, int bank);
 
-    enum CPU
-    {
-        CPU_6502,
-        CPU_65C02
-    };
 
-    void setCpu(CPU cpu);
+    void setCpu(sixfive::CPU cpu);
 
     std::map<uint32_t, std::string> dis;
 
 private:
+    
+    sixfive::CPU currentCPU;
 
-    bool cpu65C02 = true;
 
     std::deque<Section*> savedSections;
     //bool inData = false;

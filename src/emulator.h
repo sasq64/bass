@@ -60,10 +60,10 @@ struct Machine
     struct Opcode
     {
         Opcode() = default;
-        Opcode(uint8_t code, int cycles, Mode mode, OpFunc op)
+        Opcode(uint32_t code, int cycles, Mode mode, OpFunc op)
             : code(code), cycles(cycles), mode(mode), op(op)
         {}
-        uint8_t code = 0;
+        uint32_t code = 0;
         uint8_t cycles = 0;
         Mode mode = Mode::NONE;
         OpFunc op = nullptr;
@@ -95,7 +95,7 @@ struct Machine
         pc = 0;
         ram.fill(0);
         stack = &ram[0x100];
-        a = x = y = 0;
+        a = x = y = z = 0;
         sr = 0x30;
         result = 0;
         for (int i = 0; i < 256; i++) {
@@ -105,24 +105,24 @@ struct Machine
             wcallbacks.at(i) = &write_bank;
             wcbdata.at(i) = this;
         }
-        set_cpu(false);
+        set_cpu(CPU::Cpu6502);
         jumpTable = &jumpTable_normal[0];
     }
 
-    void set_cpu(bool cpu6502)
+    void set_cpu(CPU cpu)
     {
 
         for (int i = 0; i < 256; i++) {
             jumpTable_normal[i] = illgal_opcode;
             jumpTable_bcd[i] = illgal_opcode;
         }
-        for (const auto& i : getInstructions<false>(cpu6502)) {
+        for (const auto& i : getInstructions<false>(cpu)) {
             for (const auto& o : i.opcodes)
-                jumpTable_normal[o.code] = o;
+                if (o.code < 0x100) jumpTable_normal[o.code] = o;
         }
-        for (const auto& i : getInstructions<true>(cpu6502)) {
+        for (const auto& i : getInstructions<true>(cpu)) {
             for (const auto& o : i.opcodes)
-                jumpTable_bcd[o.code] = o;
+                if (o.code < 0x100) jumpTable_bcd[o.code] = o;
         }
     }
 
@@ -179,7 +179,7 @@ struct Machine
     }
 
     void map_read_callback(uint8_t bank, int len, void* data,
-                         uint8_t (*cb)(uint16_t, void*))
+                           uint8_t (*cb)(uint16_t, void*))
     {
         while (len > 0) {
             rcallbacks[bank] = cb;  // NOLINT
@@ -188,7 +188,7 @@ struct Machine
         }
     }
     void map_write_callback(uint8_t bank, int len, void* data,
-                          void (*cb)(uint16_t, uint8_t, void*))
+                            void (*cb)(uint16_t, uint8_t, void*))
     {
         while (len > 0) {
             wcallbacks[bank] = cb;  // NOLINT
@@ -225,12 +225,14 @@ struct Machine
         auto& p = policy();
         cycles = 0;
         realCycles = 0;
+        unsigned lastCode;
         while (cycles < toCycles) {
             if (POLICY::eachOp(p)) break;
             auto code = ReadPC();
             auto& op = jumpTable[code];
             op.op(*this);
             cycles += op.cycles;
+            lastCode = code;
         }
         if (realCycles != 0) {
             cycles = realCycles;
@@ -258,6 +260,7 @@ private:
     unsigned a;
     unsigned x;
     unsigned y;
+    unsigned z;
 
     // Status Register _except_for S and Z flags
     unsigned sr;
@@ -313,6 +316,7 @@ private:
         if constexpr (REG == Reg::A) return a;
         if constexpr (REG == Reg::X) return x;
         if constexpr (REG == Reg::Y) return y;
+        if constexpr (REG == Reg::Z) return z;
         if constexpr (REG == Reg::SR) return sr;
         if constexpr (REG == Reg::SP) return sp;
         if constexpr (REG == Reg::PC) return pc;
@@ -324,6 +328,7 @@ private:
         if constexpr (REG == Reg::A) return a;
         if constexpr (REG == Reg::X) return x;
         if constexpr (REG == Reg::Y) return y;
+        if constexpr (REG == Reg::Z) return z;
         if constexpr (REG == Reg::SR) return sr;
         if constexpr (REG == Reg::SP) return sp;
         if constexpr (REG == Reg::PC) return pc;
@@ -488,7 +493,7 @@ private:
         if constexpr (MODE == Mode::INDX) return Read16(ReadPC8(x));
         if constexpr (MODE == Mode::INDY) return Read16(ReadPC8(), y);
         if constexpr (MODE == Mode::IND) return Read16(ReadPC16());
-        if constexpr (MODE == Mode::INDZ) return Read16(ReadPC8());
+        if constexpr (MODE == Mode::INDZP) return Read16(ReadPC8());
     }
 
     template <enum Mode MODE>
@@ -539,21 +544,34 @@ private:
     template <int FLAG, bool ON>
     static constexpr void Branch(Machine& m)
     {
-        auto pc = m.pc;
-        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++);
+        int8_t diff = m.LoadEA<Mode::IMM>();
         if (m.check<FLAG, ON>()) {
-            pc += diff;
+            m.pc += diff;
             m.cycles++;
         }
-        m.pc = pc;
     }
+
+    template <int FLAG, bool ON>
+    static constexpr void Branch16(Machine& m)
+    {
+        int16_t diff = m.Read16(m.pc);
+        m.pc += 2;
+        if (m.check<FLAG, ON>()) {
+            m.pc += diff;
+            m.cycles++;
+        }
+    }
+
     static constexpr void Branch(Machine& m)
     {
-        auto pc = m.pc;
-        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++);
-        pc += diff;
-        m.cycles++;
-        m.pc = pc;
+        int8_t diff = m.LoadEA<Mode::IMM>();
+        m.pc += diff;
+    }
+
+    static constexpr void Branch16(Machine& m)
+    {
+        int16_t diff = m.Read16(m.pc);
+        m.pc += (diff + 2);
     }
 
     template <enum Mode MODE, int INC>
@@ -727,26 +745,22 @@ private:
     static constexpr void Bbr(Machine& m)
     {
         auto val = m.LoadEA<Mode::ZP>();
-        auto pc = m.pc;
-        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++) - 1;
+        int8_t diff = m.LoadEA<Mode::IMM>();
         if (!(val & 1 << BIT)) {
-            pc += diff;
+            m.pc += diff;
             m.cycles++;
         }
-        m.pc = pc;
     }
 
     template <int BIT>
     static constexpr void Bbs(Machine& m)
     {
         auto val = m.LoadEA<Mode::ZP>();
-        auto pc = m.pc;
-        int8_t diff = m.Read<POLICY::PC_AccessMode>(pc++) - 1;
+        int8_t diff = m.LoadEA<Mode::IMM>();
         if (val & 1 << BIT) {
-            pc += diff;
+            m.pc += diff;
             m.cycles++;
         }
-        m.pc = pc;
     }
 
     template <int BIT>
@@ -799,6 +813,28 @@ private:
         m.set<SZ>(m.a);
     }
 
+    template <enum Mode MODE>
+    static constexpr void Ldq(Machine& m)
+    {
+        auto adr = m.ReadEA<MODE>();
+        m.a = m.Read(adr);
+        m.x = m.Read(adr + 1);
+        m.y = m.Read(adr + 2);
+        m.z = m.Read(adr + 3);
+        m.set<SZ>(m.a);
+    }
+
+    template <enum Mode MODE>
+    static constexpr void Stq(Machine& m)
+    {
+        auto adr = m.ReadEA<MODE>();
+        m.Write(adr, m.a);
+        m.Write(adr + 1, m.x);
+        m.Write(adr + 2, m.y);
+        m.Write(adr + 3, m.z);
+        m.set<SZ>(m.a);
+    }
+
     /////////////////////////////////////////////////////////////////////////
     ///
     ///   INSTRUCTION TABLE
@@ -806,7 +842,7 @@ private:
     /////////////////////////////////////////////////////////////////////////
 
     template <bool USE_BCD = false>
-    static std::vector<Instruction> makeInstructionTable(bool cpu65c02 = false)
+    static std::vector<Instruction> makeInstructionTable(CPU cpu = CPU::Cpu6502)
     {
         std::vector<Instruction> instructionTable = {
 
@@ -920,7 +956,7 @@ private:
                 { 0x79, 4, Mode::ABSY, Adc<Mode::ABSY, USE_BCD>},
                 { 0x61, 6, Mode::INDX, Adc<Mode::INDX, USE_BCD>},
                 { 0x71, 5, Mode::INDY, Adc<Mode::INDY, USE_BCD>},
-                { 0x72, 5, Mode::INDZ, Adc<Mode::INDZ, USE_BCD>},
+                { 0x72, 5, Mode::INDZP, Adc<Mode::INDZP, USE_BCD>},
             } },
 
             { "sbc", {
@@ -1119,17 +1155,17 @@ private:
             }
         };
 
-        if (cpu65c02) {
+        if (cpu == CPU::Cpu65C02 || cpu == CPU::Cpu4510) {
 
             std::vector<Instruction> instructions65c02 = {
-                {"adc", {{0x72, 5, Mode::INDZ, Adc<Mode::INDZ, USE_BCD>}}},
-                {"and", {{0x32, 5, Mode::INDZ, And<Mode::INDZ>}}},
-                {"cmp", {{0xd2, 5, Mode::INDZ, Cmp<Reg::A, Mode::INDZ>}}},
-                {"eor", {{0x52, 5, Mode::INDZ, Eor<Mode::INDZ>}}},
-                {"lda", {{0xb2, 5, Mode::INDZ, Load<Reg::A, Mode::INDZ>}}},
-                {"ora", {{0x12, 5, Mode::INDZ, Ora<Mode::INDZ>}}},
-                {"sbc", {{0xf2, 5, Mode::INDZ, Sbc<Mode::INDZ, USE_BCD>}}},
-                {"sta", {{0x92, 5, Mode::INDZ, Store<Reg::A, Mode::INDZ>}}},
+                {"adc", {{0x72, 5, Mode::INDZP, Adc<Mode::INDZP, USE_BCD>}}},
+                {"and", {{0x32, 5, Mode::INDZP, And<Mode::INDZP>}}},
+                {"cmp", {{0xd2, 5, Mode::INDZP, Cmp<Reg::A, Mode::INDZP>}}},
+                {"eor", {{0x52, 5, Mode::INDZP, Eor<Mode::INDZP>}}},
+                {"lda", {{0xb2, 5, Mode::INDZP, Load<Reg::A, Mode::INDZP>}}},
+                {"ora", {{0x12, 5, Mode::INDZP, Ora<Mode::INDZP>}}},
+                {"sbc", {{0xf2, 5, Mode::INDZP, Sbc<Mode::INDZP, USE_BCD>}}},
+                {"sta", {{0x92, 5, Mode::INDZP, Store<Reg::A, Mode::INDZP>}}},
                 {"phx",
                  {{0xda, 3, Mode::NONE,
                    [](Machine& m) { m.stack[m.sp--] = m.x; }}}},
@@ -1192,9 +1228,9 @@ private:
                 {"smb7", {{0xf7, 5, Mode::ZP, Smb<7>}}},
 
             };
-
             mergeInstructions(instructions65c02);
-        } else {
+
+        } else /* 6502 */ {
 
             std::vector<Instruction> instructionsIllegal = {
                 {"lax",
@@ -1235,6 +1271,80 @@ private:
             mergeInstructions(instructionsIllegal);
         }
 
+        if (cpu == CPU::Cpu4510) {
+            std::vector<Instruction> instructions4510 = {
+                {"adc", {{0x72'ea, 5, Mode::INDZF, Adc<Mode::INDZP, USE_BCD>}}},
+                {"and", {{0x32'ea, 5, Mode::INDZF, And<Mode::INDZP>}}},
+                {"cmp", {{0xd2'ea, 5, Mode::INDZF, Cmp<Reg::A, Mode::INDZP>}}},
+                {"eor", {{0x52'ea, 5, Mode::INDZF, Eor<Mode::INDZP>}}},
+                {"lda", {{0xb2'ea, 5, Mode::INDZF, Load<Reg::A, Mode::INDZP>}}},
+                {"ora", {{0x12'ea, 5, Mode::INDZF, Ora<Mode::INDZP>}}},
+                {"sbc", {{0xf2'ea, 5, Mode::INDZF, Sbc<Mode::INDZP, USE_BCD>}}},
+                {"sta",
+                 {{0x92'ea, 5, Mode::INDZF, Store<Reg::A, Mode::INDZP>}}},
+
+                {"ldz",
+                 {{0xa3, 5, Mode::IMM, Load<Reg::Z, Mode::IMM>},
+                  {0xab, 5, Mode::ABS, Load<Reg::Z, Mode::ABS>},
+                  {0xbb, 5, Mode::ABSX, Load<Reg::Z, Mode::ABSX>}}},
+
+                {"neg",
+                 {{0x42'ea, 1, Mode::NONE, [](Machine& m) { m.a = -m.a; }}}},
+                {
+                    "ldq",
+                    {{0xa5'42'42, 8, Mode::ZP, Ldq<Mode::ZP>},
+                     {0xad'42'42, 9, Mode::ABS, Ldq<Mode::ABS>}},
+                },
+                {
+                    "stq",
+                    {{0x85'42'42, 8, Mode::ZP, Stq<Mode::ZP>},
+                     {0x8d'42'42, 9, Mode::ABS, Stq<Mode::ABS>}},
+                },
+                {"alr",
+                 {{0x4b, 1, Mode::IMM,
+                   [](Machine& m) {
+                       auto v = m.LoadEA<Mode::IMM>();
+                       m.sr = (m.sr & 0xfe) | (m.a & 1);
+                       m.a = (m.a & v) >> 1;
+                       m.set<SZ>(m.a);
+                   }}}},
+                {"bcc",
+                 {
+                     {0x93, 2, Mode::REL16, Branch16<CARRY, CLEAR>},
+                 }},
+                {"bcs",
+                 {
+                     {0xb3, 2, Mode::REL16, Branch16<CARRY, SET>},
+                 }},
+                {"bne",
+                 {
+                     {0xd3, 2, Mode::REL16, Branch16<ZERO, CLEAR>},
+                 }},
+                {"beq",
+                 {
+                     {0xf3, 2, Mode::REL16, Branch16<ZERO, SET>},
+                 }},
+                {"bpl",
+                 {
+                     {0x13, 2, Mode::REL16, Branch16<SIGN, CLEAR>},
+                 }},
+                {"bmi",
+                 {
+                     {0x33, 2, Mode::REL16, Branch16<SIGN, SET>},
+                 }},
+                {"bvc",
+                 {
+                     {0x53, 2, Mode::REL16, Branch16<OVER, CLEAR>},
+                 }},
+                {"bvs",
+                 {
+                     {0x73, 2, Mode::REL16, Branch16<OVER, SET>},
+                 }},
+                {"bra", {{0x83, 2, Mode::REL16, Branch16}}},
+            };
+            mergeInstructions(instructions4510);
+        }
+
         return instructionTable;
     }
 
@@ -1248,13 +1358,13 @@ public:
     }
 
     template <bool USE_BCD = false>
-    static const auto& getInstructions(bool cpu65c02)
+    static const auto& getInstructions(CPU cpu)
     {
-        static const std::vector<Instruction> instructionTable =
-            makeInstructionTable<USE_BCD>(true);
-        static const std::vector<Instruction> instructionTable2 =
-            makeInstructionTable<USE_BCD>(false);
-        return cpu65c02 ? instructionTable : instructionTable2;
+        static const std::array instructions{
+            makeInstructionTable<USE_BCD>(CPU::Cpu6502),
+            makeInstructionTable<USE_BCD>(CPU::Cpu65C02),
+            makeInstructionTable<USE_BCD>(CPU::Cpu4510)};
+        return instructions[static_cast<int>(cpu)];
     }
 };
 } // namespace sixfive

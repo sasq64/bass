@@ -39,9 +39,8 @@ struct EmuPolicy : public sixfive::DefaultPolicy
     {
         static unsigned last_pc = 0xffffffff;
         auto pc = policy.machine.regPC();
-
         if (pc != last_pc) {
-            // fmt::print("{:04x}\n", pc);
+            //fmt::print("{:04x} : {:02x}\n", pc, policy.machine.read_mem(pc));
             if (auto* ptr = policy.intercepts[pc]) {
                 return ptr->fn(pc);
             }
@@ -73,10 +72,10 @@ Machine::Machine()
     setSection("default");
 }
 
-void Machine::setCpu(CPU cpu)
+void Machine::setCpu(sixfive::CPU cpu)
 {
-    cpu65C02 = cpu == CPU_65C02;
-    machine->set_cpu(cpu65C02);
+    currentCPU = cpu;
+    machine->set_cpu(cpu);
 }
 
 Machine::~Machine() = default;
@@ -305,13 +304,17 @@ constexpr static std::array modeTemplate = {
         "${:02x},y",
         "(${:02x},x)",
         "(${:02x}),y",
+        "(${:02x}),z",
+        "[${:02x}],z",
         "(${:02x})",
 
         "(${:04x})",
+        "#${:02x})",
         "${:04x}",
         "${:04x},x",
         "${:04x},y",
-        "${:x}"
+        "${:x}",
+        "${:04x}"
 };
 // clang-format on
 
@@ -467,7 +470,7 @@ void Machine::write(std::string_view name, OutFmt fmt)
             continue;
         }
 
-        //fmt::print("{} {:04x}->{:04x}\n", section.name, section.start,
+        // fmt::print("{} {:04x}->{:04x}\n", section.name, section.start,
         //           section.data.size() + section.start);
 
         if (section.start < last_end) {
@@ -580,6 +583,53 @@ std::string Machine::disassemble(uint32_t* pc)
     return fmt::format("{} {}", name, argstr.data());
 }
 
+static sixfive::Machine<EmuPolicy>::Opcode
+findOpcode(Instruction const& input, int32_t pc,
+           sixfive::Machine<EmuPolicy>::Instruction const& instruction)
+{
+    using sixfive::Mode;
+    static std::unordered_map<Mode, Mode> conv{{Mode::IND, Mode::INDZP},
+                                               {Mode::ABSX, Mode::ZPX},
+                                               {Mode::ABSY, Mode::ZPY},
+                                               {Mode::ABS, Mode::ZP},
+                                               {Mode::INDZ, Mode::INDZP},
+    };
+
+    auto it = conv.find(input.mode);
+    auto shorterMode = it != conv.end() && (input.val < 256 && input.val >= 0)
+                           ? it->second
+                           : input.mode;
+    int32_t diff = input.val - pc - 2;
+    sixfive::Machine<EmuPolicy>::Opcode bestOp;
+    bestOp.code = 0xffffffff;
+    int score = 0;
+    for (auto const& op : instruction.opcodes) {
+        if (shorterMode == op.mode) {
+            return op;
+        }
+
+        if (input.mode == op.mode) {
+            bestOp = op;
+            score = 4;
+        } else if (input.mode == Mode::ABS) {
+            if (op.mode == Mode::REL) {
+                int fits = (diff >= -128 && diff < 128) ? 2 : 0;
+                if (score < 3 + fits) {
+                    bestOp = op;
+                    score = 3 + fits;
+                }
+            } else if (op.mode == Mode::REL16) {
+                int fits = (diff >= -32768 && diff < 32768) ? 2 : 0;
+                if (score < 2 + fits) {
+                    bestOp = op;
+                    score = 2 + fits;
+                }
+            }
+        }
+    }
+    return bestOp;
+}
+
 AsmResult Machine::assemble(Instruction const& instr)
 {
     using sixfive::Mode;
@@ -588,15 +638,16 @@ AsmResult Machine::assemble(Instruction const& instr)
     std::string opcode = utils::toLower(std::string(instr.opcode));
 
     auto const& instructions =
-        sixfive::Machine<EmuPolicy>::getInstructions(cpu65C02);
+        sixfive::Machine<EmuPolicy>::getInstructions(currentCPU);
 
     if (arg.mode == Mode::ZP_REL) {
+        // Handle 65c02 weird xxx<n> opcodes
         auto bit = arg.val >> 24;
         arg.val &= 0xffffff;
         opcode = persist(std::string(opcode) + std::to_string(bit));
     }
 
-    // Find a matching opcode
+    // Find a matching instruction
     auto it_ins = utils::find_if(
         instructions, [&](auto const& i) { return i.name == opcode; });
 
@@ -604,69 +655,58 @@ AsmResult Machine::assemble(Instruction const& instr)
         return AsmResult::NoSuchOpcode;
     }
 
-    auto modeMatches = [&](auto const& opcode, auto const& instruction) {
-        if (instruction.mode == opcode.mode) {
-            return true;
-        }
+    // Find actual opcode
+    auto bestOp = findOpcode(arg, currentSection->pc, *it_ins);
+    
+    //LOGI("%s %d -> %d", opcode, arg.mode, bestOp.mode);
 
-        // Addressing mode did not match directly. See if we can
-        // 'optimize it' depending on the instruction value
-
-        static std::unordered_map<Mode, Mode> conv{{Mode::INDZ, Mode::IND},
-                                                   {Mode::ZPX, Mode::ABSX},
-                                                   {Mode::ZPY, Mode::ABSY},
-                                                   {Mode::ZP, Mode::ABS}};
-
-        if (instruction.val >= 0 && instruction.val <= 0xff) {
-            auto it = conv.find(opcode.mode);
-            if (it != conv.end() && it->second == instruction.mode) {
-                return true;
-            }
-        }
-
-        return (instruction.mode == Mode::ABS && opcode.mode == Mode::REL);
-    };
-
-    // Find a matching addressing mode
-    auto it_op =
-        std::find_if(it_ins->opcodes.begin(), it_ins->opcodes.end(),
-                     [&](auto const& o) { return modeMatches(o, arg); });
-
-    if (it_op == it_ins->opcodes.end()) {
+    if (bestOp.code == 0xffffffff) {
         return AsmResult::IllegalAdressingMode;
     }
-    arg.mode = it_op->mode;
 
-    if (arg.mode == Mode::REL) {
-        arg.val = arg.val - currentSection->pc - 2;
+    arg.mode = bestOp.mode;
+    auto sz = opSize(arg.mode);
+
+    if (arg.mode == Mode::REL || arg.mode == Mode::REL16) {
+        arg.val = arg.val - currentSection->pc - sz;
     }
 
     if (arg.mode == Mode::ZP_REL) {
         auto adr = arg.val & 0xffff;
         auto val = (arg.val >> 16) & 0xff;
-        auto diff = adr - currentSection->pc - 2;
+        auto diff = adr - currentSection->pc - sz;
         arg.val = diff << 8 | val;
     }
 
-    auto sz = opSize(arg.mode);
 
     auto& cs = *currentSection;
     auto v = arg.val & (sz == 2 ? 0xff : 0xffff);
-    if (arg.mode == sixfive::Mode::REL) {
-        v = (static_cast<int8_t>(v)) + 2 + cs.pc;
+    if (arg.mode == Mode::REL || arg.mode == Mode::REL16) {
+        v = v + sz + cs.pc;
     }
 
     dis[cs.pc] = fmt::format(
         "{} "s + modeTemplate.at(static_cast<int>(arg.mode)), it_ins->name, v);
 
-    cs.data.push_back(it_op->code);
+    auto code = bestOp.code; // it_op->code;
+    int extra = 0;
+    if (code > 0xff) {
+        extra = -1;
+        while (code != 0) {
+            cs.data.push_back(code & 0xff);
+            code >>= 8;
+            extra++;
+        }
+    } else {
+        cs.data.push_back(code);
+    }
     if (sz > 1) {
         cs.data.push_back(arg.val & 0xff);
     }
     if (sz > 2) {
         cs.data.push_back(arg.val >> 8);
     }
-    cs.pc += sz;
+    cs.pc += (sz + extra);
 
     if (arg.mode == Mode::REL && (arg.val > 127 || arg.val < -128)) {
         return AsmResult::Truncated;
@@ -756,6 +796,8 @@ void Machine::setReg(sixfive::Reg reg, unsigned v)
         return machine->set<Reg::X>(v);
     case Reg::Y:
         return machine->set<Reg::Y>(v);
+    case Reg::Z:
+        return machine->set<Reg::Z>(v);
     case Reg::SR:
         return machine->set<Reg::SR>(v);
     case Reg::SP:
@@ -775,6 +817,8 @@ unsigned Machine::getReg(sixfive::Reg reg)
         return machine->get<Reg::X>();
     case Reg::Y:
         return machine->get<Reg::Y>();
+    case Reg::Z:
+        return machine->get<Reg::Z>();
     case Reg::SR:
         return machine->get<Reg::SR>();
     case Reg::SP:

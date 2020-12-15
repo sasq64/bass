@@ -35,7 +35,6 @@ struct AssemblerState
     std::vector<std::string> sourceFiles;
     std::vector<std::string> scriptFiles;
     std::vector<std::string> definitions;
-    bool use65c02 = false;
     std::string outFile;
     bool dumpSyms = false;
     bool showUndef = false;
@@ -47,10 +46,18 @@ struct AssemblerState
     std::string symbolFile;
     std::string programFile;
     OutFmt outFmt = OutFmt::Prg;
+    sixfive::CPU cpu = sixfive::CPU::Cpu6502;
 
     void parseArgs(int argc, char** argv)
     {
-        static const std::map<std::string, OutFmt> tr{
+        bool use65c02 = false;
+        static const std::map<std::string, sixfive::CPU> cpuTR{
+            {"6502"s, sixfive::CPU::Cpu6502},
+            {"65c02"s, sixfive::CPU::Cpu65C02},
+            {"4510"s, sixfive::CPU::Cpu4510},
+        };
+
+        static const std::map<std::string, OutFmt> formatTR{
             {"raw"s, OutFmt::Raw},
             {"prg"s, OutFmt::Prg},
             {"crt"s, OutFmt::Crt},
@@ -60,7 +67,7 @@ struct AssemblerState
         app.set_help_flag();
         auto* help = app.add_flag("-h,--help", "Request help");
         app.add_option("-f,--format", outFmt, "Output format")
-            ->transform(CLI::CheckedTransformer(tr, CLI::ignore_case));
+            ->transform(CLI::CheckedTransformer(formatTR, CLI::ignore_case));
         app.add_flag("--trace", showTrace, "Trace rule invocations");
         app.add_flag("--run", doRun, "Run program");
         app.add_option("--max-passes", maxPasses, "Max assembler passes");
@@ -69,6 +76,8 @@ struct AssemblerState
         app.add_flag("-q,--quiet", quiet, "Less noise");
         app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
         app.add_option("-l,--list-file", listFile, "Output assembly listing");
+        app.add_option("--cpu", cpu, "CPU")
+            ->transform(CLI::CheckedTransformer(cpuTR, CLI::ignore_case));
         app.add_flag("--65c02", use65c02, "Target 65c02");
         app.add_option("-s,--table", symbolFile,
                        "Write numeric symbols to file");
@@ -96,6 +105,10 @@ struct AssemblerState
             app.exit(e);
         }
         if (showHelp) exit(0);
+
+        if (use65c02) {
+            cpu = sixfive::CPU::Cpu65C02;
+        }
     }
 
     void setupAssembler(Assembler& assem)
@@ -114,7 +127,7 @@ struct AssemblerState
         }
         auto& mach = assem.getMachine();
         auto& syms = assem.getSymbols();
-        mach.setCpu(use65c02 ? Machine::CPU::CPU_65C02 : Machine::CPU_6502);
+        mach.setCpu(cpu);
 
         for (auto const& sf : scriptFiles) {
             assem.addScript(fs::path(sf));

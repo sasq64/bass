@@ -238,7 +238,17 @@ void initMeta(Assembler& assem)
         for (auto const& v : meta.args) {
             auto w = number<int32_t>(v);
             mach.writeByte(w & 0xff);
-            mach.writeByte(w >> 8);
+            mach.writeByte((w >> 8) & 0xff);
+        }
+    });
+
+    assem.registerMeta("long", [&](Meta const& meta) {
+        for (auto const& v : meta.args) {
+            auto w = number<int64_t>(v);
+            mach.writeByte(w & 0xff);
+            mach.writeByte((w >> 8) & 0xff);
+            mach.writeByte((w >> 16) & 0xff);
+            mach.writeByte((w >> 24) & 0xff);
         }
     });
 
@@ -296,9 +306,11 @@ void initMeta(Assembler& assem)
     assem.registerMeta("cpu", [&](Meta const& meta) {
         auto text = any_cast<std::string_view>(meta.args[0]);
         if (text == "6502") {
-            mach.setCpu(Machine::CPU_6502);
+            mach.setCpu(sixfive::CPU::Cpu6502);
         } else if (text == "65C02") {
-            mach.setCpu(Machine::CPU_65C02);
+            mach.setCpu(sixfive::CPU::Cpu65C02);
+        } else if (text == "4510") {
+            mach.setCpu(sixfive::CPU::Cpu4510);
         } else {
             throw parse_error("Unknown CPU");
         }
