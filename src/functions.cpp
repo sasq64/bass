@@ -96,10 +96,21 @@ void initFunctions(Assembler& a)
         }
     });
 
+    a.registerFunction("to_array", [&](int n, Assembler::Macro const& m) {
+            std::vector<Number> v(n);
+            Assembler::Call call;
+            for(int i=0; i<n; i++) {
+                call.args = { any_num(i) }; 
+                v[i] = number(a.applyDefine(m, call));
+            }
+            return v;
+    });
+
     a.registerFunction("word", [](std::vector<uint8_t> const& data) {
         Check(data.size() >= 2, "Need at least 2 bytes");
         return data[0] | (data[1] << 8);
     });
+
     a.registerFunction("big_word", [](std::vector<uint8_t> const& data) {
         Check(data.size() >= 2, "Need at least 2 bytes");
         return data[1] | (data[0] << 8);

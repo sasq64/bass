@@ -529,7 +529,7 @@ int32_t Assembler::addArray(std::vector<uint8_t> const& v)
         }
     }
     savedArrays.emplace_back(v);
-    return 0;
+    return -1;
 }
 
 void Assembler::placeArrays()
@@ -904,17 +904,24 @@ void Assembler::setupRules()
                 v.push_back(translateChar(u));
             }
             arg = addArray(v);
+            if (arg == -1) {
+                arg = 0x1000;
+            }
         } else if (auto const* vn = any_cast<std::vector<Number>>(&val)) {
             std::vector<uint8_t> v;
             for (auto const& n : *vn) {
                 v.push_back(static_cast<int32_t>(n) & 0xff);
             }
             arg = addArray(v);
+            if (arg == -1) {
+                arg = 0x1000;
+            }
 
         } else if (auto const* v8 = any_cast<std::vector<uint8_t>>(&val)) {
-            // create label -> contents
-            // at "!data" or section end, put contents
             arg = addArray(*v8);
+            if (arg == -1) {
+                arg = 0x1000;
+            }
         } else {
             arg = any_cast<Number>(sv[0]);
         }
