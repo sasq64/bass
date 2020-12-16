@@ -95,7 +95,7 @@ public:
         std::string_view name;
         std::vector<std::any> args;
         std::vector<Block> blocks;
-        size_t line;
+        size_t line = 0;
     };
 
     using MetaFn = std::function<void(Meta const&)>;
@@ -118,7 +118,7 @@ public:
     void evaluateBlock(Block const& block);
 
     void runTest(Test const& test);
-    void addTest(std::string name, uint32_t start, RegState const& state);
+    void addTest(std::string name, uint32_t start, RegState const& regs);
 
     enum DebugFlags
     {
@@ -142,6 +142,12 @@ public:
     void clear();
 
     void useCache(bool on);
+
+    int32_t addArray(std::vector<uint8_t> const& v);
+
+    // Place all non placed, used arrays. If offset changes, set allPlaced = false
+    void placeArrays();
+
 
 private:
     template <typename T>
@@ -182,6 +188,21 @@ private:
     {
         std::tie(macros, syms, lastLabel) = t;
     }
+
+    struct SavedArray
+    {
+        explicit SavedArray(std::vector<uint8_t> v) : vec(std::move(v)) {}
+        std::vector<uint8_t> vec;
+        uint32_t offset = 0;
+        bool placed = false;
+        bool used = true;
+    };
+
+    std::vector<SavedArray> savedArrays;
+    bool allPlaced = true;
+
+    // Set placed = false, used = false for all, and allPlaced = true
+    void clearArrays();
 
     struct Check
     {

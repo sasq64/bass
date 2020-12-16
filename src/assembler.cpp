@@ -520,6 +520,43 @@ std::variant<A, bool> operation(std::string_view ope, A const& a, B const& b)
                                   typeid(B).name()));
 }
 
+int32_t Assembler::addArray(std::vector<uint8_t> const& v)
+{
+    for (auto& a : savedArrays) {
+        if (a.vec == v) {
+            a.used = true;
+            return a.offset;
+        }
+    }
+    savedArrays.emplace_back(v);
+    return 0;
+}
+
+void Assembler::placeArrays()
+{
+    for (auto& a : savedArrays) {
+        if (!a.placed) {
+            auto pc = mach->getPC();
+            if (pc != a.offset) {
+                allPlaced = false;
+            }
+            a.offset = pc;
+            for (auto const& v : a.vec) {
+                mach->writeByte(v);
+            }
+        }
+    }
+}
+
+void Assembler::clearArrays()
+{
+    for (auto& a : savedArrays) {
+        a.placed = false;
+        a.used = false;
+    }
+    allPlaced = true;
+}
+
 void Assembler::setupRules()
 {
     using std::any_cast;
@@ -856,10 +893,32 @@ void Assembler::setupRules()
         {"Ind", Mode::IND}, {"IndX", Mode::INDX}, {"IndY", Mode::INDY},
         {"Acc", Mode::ACC}, {"Imm", Mode::IMM},
     };
-    auto buildArg = [](SV& sv) -> std::any {
+    auto buildArg = [this](SV& sv) -> std::any {
         auto mode = modeMap.at(std::string(sv.name()));
-        return Instruction{"", mode,
-                           mode == Mode::ACC ? 0 : any_cast<Number>(sv[0])};
+        auto val = sv[0];
+        int32_t arg = 0;
+        if (auto const* stv = any_cast<std::string_view>(&val)) {
+            std::vector<uint8_t> v;
+            auto utext = utils::utf8_decode(*stv);
+            for (auto u : utext) {
+                v.push_back(translateChar(u));
+            }
+            arg = addArray(v);
+        } else if (auto const* vn = any_cast<std::vector<Number>>(&val)) {
+            std::vector<uint8_t> v;
+            for (auto const& n : *vn) {
+                v.push_back(static_cast<int32_t>(n) & 0xff);
+            }
+            arg = addArray(v);
+
+        } else if (auto const* v8 = any_cast<std::vector<uint8_t>>(&val)) {
+            // create label -> contents
+            // at "!data" or section end, put contents
+            arg = addArray(*v8);
+        } else {
+            arg = any_cast<Number>(sv[0]);
+        }
+        return Instruction{"", mode, mode == Mode::ACC ? 0 : arg};
     };
     for (auto const& [name, _] : modeMap) {
         parser.after(name.c_str(), buildArg);
@@ -868,7 +927,7 @@ void Assembler::setupRules()
     parser.after("ZRel", [&](SV& sv) -> Instruction {
         int32_t v = (number<int32_t>(sv[1]) << 24) |
                     (number<int32_t>(sv[0]) << 16) | number<int32_t>(sv[2]);
-        return {"", Mode::ZP_REL, static_cast<Number>(v)};
+        return {"", Mode::ZP_REL, v};
     });
 
     parser.after("LabelRef", [&](SV& sv) {
@@ -1143,6 +1202,7 @@ bool Assembler::pass(AstNode const& ast)
     errors.clear();
     tests.clear();
     actions.clear();
+    clearArrays();
     needsFinalPass = false;
     try {
         parser.evaluate(ast);
@@ -1228,6 +1288,10 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
 
         passNo++;
         auto rc = checkUndefined();
+
+        if (!allPlaced) {
+            continue;
+        }
 
         if (rc == PASS) {
             continue;

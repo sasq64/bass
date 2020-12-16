@@ -493,4 +493,8 @@ void initMeta(Assembler& assem)
         assem.evaluateBlock(meta.blocks[0]);
         assem.popScope();
     });
+
+    assem.registerMeta("place", [&](Meta const&) {
+        assem.placeArrays();
+    });
 }

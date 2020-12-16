@@ -71,19 +71,19 @@ Label <- (_ AsmSymbol ':') / AsmSymbol
 
 Arg <- _ (ZRel / Acc / Imm / IndY / IndX / Ind / AbsX / AbsY / Abs)
 
-IndX <- '(' Expression (TailX0 / TailX1)
+IndX <- '(' StringExp (TailX0 / TailX1)
 TailX0 <- ')' _? ',' _? 'X'i
 TailX1 <- ',' _? 'X'i _? ')'
 
-IndY <- '(' Expression (TailY0 / TailY1)
+IndY <- '(' StringExp (TailY0 / TailY1)
 TailY0 <- ')' _? ',' _? 'Y'i
 TailY1 <- ',' _? 'Y'i _? ')'
 
-Ind <- '(' Expression ')' &(!Operator)
+Ind <- '(' StringExp ')' &(!Operator)
 Acc <- 'a'i &(![a-zA-Z0-9])
-Abs <- LabelRef / Expression
-AbsX <- Expression ',' _? 'X'i
-AbsY <- Expression ',' _? 'Y'i
+Abs <- LabelRef / StringExp
+AbsX <- StringExp ',' _? 'X'i
+AbsY <- StringExp ',' _? 'Y'i
 
 ZRel <- Expression ':' _? Expression ',' _? (LabelRef / Expression)
 
@@ -117,6 +117,9 @@ LabelChar <- '-' / '+' / '$'
 Comment <- ';' (!EOL .)*
 EOL <- '\r\n' / '\r' / '\n'
 EOT <- !.
+
+
+StringExp <- String / Expression
 
 Expression  <- Atom (Operator Atom)* {
                          precedence

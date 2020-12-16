@@ -161,8 +161,8 @@ private:
 
 struct Instruction
 {
-    Instruction(std::string_view op, sixfive::Mode m, double v)
-        : opcode(op), mode(m), val(static_cast<int32_t>(v))
+    Instruction(std::string_view op, sixfive::Mode m, int32_t v)
+        : opcode(op), mode(m), val(v)
     {}
     std::string_view opcode;
     sixfive::Mode mode;
