@@ -47,7 +47,7 @@ BlockProgram <- Program
 ScriptBlock <- '{:' ScriptContents2 ':}'
 ScriptContents2 <- (!':}' .)* 
 
-AssignLine <- _ ('*' / Assignee) _ '=' _ (String / Lambda / Expression)
+AssignLine <- _ ('*' / Assignee) _ '=' _ Expression
 Assignee <- AsmSymbol _
 
 Lambda <- '[' FnArgs '->' EndOfLine? DelayedExpression ']'
@@ -71,19 +71,19 @@ Label <- (_ AsmSymbol ':') / AsmSymbol
 
 Arg <- _ (ZRel / Acc / Imm / IndY / IndX / Ind / AbsX / AbsY / Abs)
 
-IndX <- '(' StringExp (TailX0 / TailX1)
+IndX <- '(' Expression (TailX0 / TailX1)
 TailX0 <- ')' _? ',' _? 'X'i
 TailX1 <- ',' _? 'X'i _? ')'
 
-IndY <- '(' StringExp (TailY0 / TailY1)
+IndY <- '(' Expression (TailY0 / TailY1)
 TailY0 <- ')' _? ',' _? 'Y'i
 TailY1 <- ',' _? 'Y'i _? ')'
 
-Ind <- '(' StringExp ')' &(!Operator)
+Ind <- '(' Expression ')' &(!Operator)
 Acc <- 'a'i &(![a-zA-Z0-9])
-Abs <- LabelRef / StringExp
-AbsX <- StringExp ',' _? 'X'i
-AbsY <- StringExp ',' _? 'Y'i
+Abs <- LabelRef / Expression
+AbsX <- Expression ',' _? 'X'i
+AbsY <- Expression ',' _? 'Y'i
 
 ZRel <- Expression ':' _? Expression ',' _? (LabelRef / Expression)
 
@@ -118,10 +118,9 @@ Comment <- ';' (!EOL .)*
 EOL <- '\r\n' / '\r' / '\n'
 EOT <- !.
 
+Expression <- Expression2 Tern?
 
-StringExp <- String / Expression
-
-Expression  <- Atom (Operator Atom)* {
+Expression2  <- Atom (Operator Atom)* {
                          precedence
                            L :
                            L &&
@@ -137,9 +136,10 @@ Expression  <- Atom (Operator Atom)* {
                            L / * % \
                        }
 
+Tern <- '?' DelayedExpression ':' DelayedExpression
 
-Atom <- _? (Star / Unary / Unary2 / Number /
-        Index / ArrayLiteral / FnCall / Variable / '(' Expression ')') _?
+Atom <- _? (Star / Unary / Unary2 / Number / String /
+        Index / Lambda / ArrayLiteral / FnCall / Variable / '(' Expression ')') _?
 
 Star <- '*'
 
@@ -147,7 +147,7 @@ ArrayLiteral <- '[' Expression (',' Expression)* ']'
 
 Index <- Indexable '[' Expression? (IndexSep Expression?)? ']'
 
-Indexable <- FnCall / Variable
+Indexable <- FnCall / Variable / Lambda
 
 IndexSep <- ':'
 
@@ -159,7 +159,7 @@ FnCall <- Call
 Call <- CallName '(' CallArgs ')'
 CallName <- Symbol
 CallArgs <- (_ CallArg (',' _ CallArg)*)?
-CallArg <- (Symbol _? '=' !'=')? (String / Lambda / Expression)
+CallArg <- (Symbol _? '=' !'=')? Expression
 Operator <-  
         '&&' / '||' / '<<' / '>>' / '==' / '!=' /
         '>=' / '<=' /

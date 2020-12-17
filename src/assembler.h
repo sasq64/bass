@@ -34,7 +34,7 @@ public:
         RegState regs;
     };
 
-    struct Block
+    struct Block //NOLINT
     {
         std::string_view contents;
         size_t line;
@@ -54,7 +54,7 @@ public:
         std::vector<std::any> args;
     };
 
-    void handleLabel(std::any const& label);
+    void handleLabel(std::any const& lbl);
 
     void pushScope(std::string_view name);
     void popScope();
@@ -227,7 +227,6 @@ private:
     std::deque<std::string> stored_includes;
     std::shared_ptr<Machine> mach;
     std::unordered_map<std::string_view, Macro> macros;
-    std::unordered_map<std::string_view, Macro> definitions;
     SymbolTable syms;
     std::string_view lastLabel;
     bool finalPass{false};

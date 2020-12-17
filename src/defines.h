@@ -106,8 +106,7 @@ inline std::string_view operator+(std::string_view sv, Num n)
     return persist(std::string(sv) + std::to_string(n.i()));
 }
 
-inline std::string_view operator+(std::string_view sv,
-                                  std::string_view n)
+inline std::string_view operator+(std::string_view sv, std::string_view n)
 {
     return persist(std::string(sv) + std::string(n));
 }
@@ -208,6 +207,10 @@ inline void printArg(std::any const& arg)
     } else if (auto const* v = std::any_cast<std::vector<uint8_t>>(&arg)) {
         for (auto const& item : *v) {
             fmt::print("{:02x} ", item);
+        }
+    } else if (auto const* nv = std::any_cast<std::vector<Number>>(&arg)) {
+        for (auto const& item : *nv) {
+            fmt::print("{} ", item);
         }
     }
 }

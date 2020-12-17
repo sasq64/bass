@@ -572,16 +572,9 @@ void Assembler::setupRules()
             }
             if (!scopes.empty()) {
                 sym = std::string(scopes.back()) + "." + sym;
-                LOGI("Prefixed to %s", sym);
+                //LOGI("Prefixed to %s", sym);
             }
-            auto value = sv[1];
-            if (auto* macro = any_cast<Macro>(&value)) {
-                auto view = persist(sym);
-                definitions[view] = *macro;
-
-            } else {
-                syms.set(sym, value);
-            }
+            syms.set(sym, sv[1]);
         } else if (sv.size() == 1) {
             mach->getCurrentSection().pc = number<uint16_t>(sv[0]);
         }
@@ -713,10 +706,13 @@ void Assembler::setupRules()
     parser.after("FnCall", [&](SV& sv) {
         auto call = any_cast<Call>(sv[0]);
         auto name = std::string(call.name);
+        bool found = false;
 
-        auto it0 = definitions.find(name);
-        if (it0 != definitions.end()) {
-            return applyDefine(it0->second, call);
+        if (auto sym = syms.get_sym(name)) {
+            if (auto const* macro = std::any_cast<Macro>(&sym->value)) {
+                return applyDefine(*macro, call);
+            }
+            found = true;
         }
 
         auto it = functions.find(name);
@@ -730,6 +726,10 @@ void Assembler::setupRules()
 
         if (scripting.hasFunction(call.name)) {
             return scripting.call(call.name, call.args);
+        }
+
+        if(found) {
+            throw parse_error(fmt::format("'{}' is not callable", name));
         }
 
         throw parse_error(fmt::format("Unknown function '{}'", name));
@@ -1034,6 +1034,22 @@ void Assembler::setupRules()
     parser.after("Star", [&](SV&) -> Number { return mach->getPC(); });
 
     parser.after("Expression", [&](SV& sv) {
+        if(sv.size() == 2) {
+            // Tern
+            auto p = any_cast<std::pair<Block, Block>>(sv[1]);
+            if(number(sv[0]) != 0) {
+                return parser.evaluate(p.first.node);
+            }
+            return parser.evaluate(p.second.node);
+        }
+        return sv[0];
+    });
+
+    parser.after("Tern", [&](SV& sv) -> std::any {
+        return std::make_pair(std::any_cast<Block>(sv[0]), std::any_cast<Block>(sv[1]));
+    });
+
+    parser.after("Expression2", [&](SV& sv) {
         if (sv.size() == 1) {
             return sv[0];
         }
@@ -1089,7 +1105,7 @@ void Assembler::setupRules()
         return sv[0];
     });
 
-    parser.after("Index", [&](SV& sv) {
+    parser.after("Index", [&](SV& sv) -> std::any {
         if (sv.size() == 1) {
             return sv[0];
         }
@@ -1116,6 +1132,19 @@ void Assembler::setupRules()
             if (auto const* vn = any_cast<std::vector<Number>>(&vec)) {
                 return slice(*vn, a, b);
             }
+
+            if (auto const* macro = any_cast<Macro>(&vec)) {
+                std::vector<Number> result(b-a);
+                Call call;
+                call.args.resize(1);
+                for(int64_t i = a; i<b; i++) {
+                    call.args[0] = any_num(i);
+                    auto res = applyDefine(*macro, call);
+                    result[i-a] = number<uint8_t>(res);
+                }
+                return std::any(result);
+            }
+
             throw parse_error("Can not slice non-array");
         }
 
@@ -1404,7 +1433,6 @@ void Assembler::popScope()
 void Assembler::clear()
 {
     macros.clear();
-    definitions.clear();
     errors.clear();
     passNo = 0;
 }
