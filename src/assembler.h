@@ -206,7 +206,6 @@ private:
     std::deque<std::string> stored_includes;
     std::shared_ptr<Machine> mach;
     std::unordered_map<std::string_view, Macro> macros;
-    std::unordered_map<std::string_view, Macro> definitions;
     SymbolTable syms;
     std::string_view lastLabel;
     bool finalPass{false};

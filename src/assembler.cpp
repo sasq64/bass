@@ -535,16 +535,9 @@ void Assembler::setupRules()
             }
             if (!scopes.empty()) {
                 sym = std::string(scopes.back()) + "." + sym;
-                LOGI("Prefixed to %s", sym);
+                //LOGI("Prefixed to %s", sym);
             }
-            auto value = sv[1];
-            if (auto* macro = any_cast<Macro>(&value)) {
-                auto view = persist(sym);
-                definitions[view] = *macro;
-
-            } else {
-                syms.set(sym, value);
-            }
+            syms.set(sym, sv[1]);
         } else if (sv.size() == 1) {
             mach->getCurrentSection().pc = number<uint16_t>(sv[0]);
         }
@@ -676,10 +669,13 @@ void Assembler::setupRules()
     parser.after("FnCall", [&](SV& sv) {
         auto call = any_cast<Call>(sv[0]);
         auto name = std::string(call.name);
+        bool found = false;
 
-        auto it0 = definitions.find(name);
-        if (it0 != definitions.end()) {
-            return applyDefine(it0->second, call);
+        if (auto sym = syms.get_sym(name)) {
+            if (auto const* macro = std::any_cast<Macro>(&sym->value)) {
+                return applyDefine(*macro, call);
+            }
+            found = true;
         }
 
         auto it = functions.find(name);
@@ -693,6 +689,10 @@ void Assembler::setupRules()
 
         if (scripting.hasFunction(call.name)) {
             return scripting.call(call.name, call.args);
+        }
+
+        if(found) {
+            throw parse_error(fmt::format("'{}' is not callable", name));
         }
 
         throw parse_error(fmt::format("Unknown function '{}'", name));
@@ -1333,7 +1333,6 @@ void Assembler::popScope()
 void Assembler::clear()
 {
     macros.clear();
-    definitions.clear();
     errors.clear();
     passNo = 0;
 }

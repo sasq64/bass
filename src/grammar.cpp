@@ -47,7 +47,7 @@ BlockProgram <- Program
 ScriptBlock <- '{:' ScriptContents2 ':}'
 ScriptContents2 <- (!':}' .)* 
 
-AssignLine <- _ ('*' / Assignee) _ '=' _ (String / Lambda / Expression)
+AssignLine <- _ ('*' / Assignee) _ '=' _ Expression
 Assignee <- AsmSymbol _
 
 Lambda <- '[' FnArgs '->' EndOfLine? DelayedExpression ']'
@@ -135,7 +135,7 @@ Expression  <- Atom (Operator Atom)* {
                        }
 
 
-Atom <- _? (Star / Unary / Unary2 / Number /
+Atom <- _? (Star / Unary / Unary2 / Number / Lambda / String /
         Index / ArrayLiteral / FnCall / Variable / '(' Expression ')') _?
 
 Star <- '*'
@@ -156,7 +156,7 @@ FnCall <- Call
 Call <- CallName '(' CallArgs ')'
 CallName <- Symbol
 CallArgs <- (_ CallArg (',' _ CallArg)*)?
-CallArg <- (Symbol _? '=' !'=')? (String / Lambda / Expression)
+CallArg <- (Symbol _? '=' !'=')? Expression
 Operator <-  
         '&&' / '||' / '<<' / '>>' / '==' / '!=' /
         '>=' / '<=' /
