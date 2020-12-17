@@ -34,7 +34,7 @@ public:
         RegState regs;
     };
 
-    struct Block
+    struct Block //NOLINT
     {
         std::string_view contents;
         size_t line;
@@ -54,7 +54,7 @@ public:
         std::vector<std::any> args;
     };
 
-    void handleLabel(std::any const& label);
+    void handleLabel(std::any const& lbl);
 
     void pushScope(std::string_view name);
     void popScope();
@@ -95,7 +95,7 @@ public:
         std::string_view name;
         std::vector<std::any> args;
         std::vector<Block> blocks;
-        size_t line;
+        size_t line = 0;
     };
 
     using MetaFn = std::function<void(Meta const&)>;
@@ -118,7 +118,7 @@ public:
     void evaluateBlock(Block const& block);
 
     void runTest(Test const& test);
-    void addTest(std::string name, uint32_t start, RegState const& state);
+    void addTest(std::string name, uint32_t start, RegState const& regs);
 
     enum DebugFlags
     {

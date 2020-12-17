@@ -138,8 +138,8 @@ Expression2  <- Atom (Operator Atom)* {
 
 Tern <- '?' DelayedExpression ':' DelayedExpression
 
-Atom <- _? (Star / Unary / Unary2 / Number / Lambda / String /
-        Index / ArrayLiteral / FnCall / Variable / '(' Expression ')') _?
+Atom <- _? (Star / Unary / Unary2 / Number / String /
+        Index / Lambda / ArrayLiteral / FnCall / Variable / '(' Expression ')') _?
 
 Star <- '*'
 
@@ -147,7 +147,7 @@ ArrayLiteral <- '[' Expression (',' Expression)* ']'
 
 Index <- Indexable '[' Expression? (IndexSep Expression?)? ']'
 
-Indexable <- FnCall / Variable
+Indexable <- FnCall / Variable / Lambda
 
 IndexSep <- ':'
 

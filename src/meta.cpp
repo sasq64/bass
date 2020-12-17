@@ -355,7 +355,6 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("section", [&](Meta const& meta) {
-        auto& syms = assem.getSymbols();
 
         if (meta.args.empty()) {
             throw parse_error("Too few arguments");
@@ -369,6 +368,7 @@ void initMeta(Assembler& assem)
         auto& section = mach.addSection(sectionArgs);
 
         if (!meta.blocks.empty()) {
+            auto& syms = assem.getSymbols();
             mach.pushSection(section.name);
             auto sz = section.data.size();
             assem.evaluateBlock(meta.blocks[0]);
@@ -384,9 +384,8 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("fill", [&](Meta const& meta) {
-        auto& syms = assem.getSymbols();
         auto data = meta.args[0];
-        size_t size;
+        size_t size = 0;
         bool firstConst = false;
 
         // Create source lambda depending on first argument
@@ -423,7 +422,7 @@ void initMeta(Assembler& assem)
         if (meta.args.size() <= 1) {
             // If first argument was a constant, fill with zeroes
             if (firstConst) {
-                tx = [](size_t, Number n) -> uint8_t { return 0; };
+                tx = [](size_t, Number) -> uint8_t { return 0; };
             } else {
                 tx = [](size_t, Number n) -> uint8_t { return n; };
             }

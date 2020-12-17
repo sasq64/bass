@@ -1039,7 +1039,7 @@ void Assembler::setupRules()
         return sv[0];
     });
 
-    parser.after("Index", [&](SV& sv) {
+    parser.after("Index", [&](SV& sv) -> std::any {
         if (sv.size() == 1) {
             return sv[0];
         }
@@ -1066,6 +1066,19 @@ void Assembler::setupRules()
             if (auto const* vn = any_cast<std::vector<Number>>(&vec)) {
                 return slice(*vn, a, b);
             }
+
+            if (auto const* macro = any_cast<Macro>(&vec)) {
+                std::vector<Number> result(b-a);
+                Call call;
+                call.args.resize(1);
+                for(int64_t i = a; i<b; i++) {
+                    call.args[0] = any_num(i);
+                    auto res = applyDefine(*macro, call);
+                    result[i-a] = number<uint8_t>(res);
+                }
+                return std::any(result);
+            }
+
             throw parse_error("Can not slice non-array");
         }
 
