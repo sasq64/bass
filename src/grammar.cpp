@@ -118,7 +118,9 @@ Comment <- ';' (!EOL .)*
 EOL <- '\r\n' / '\r' / '\n'
 EOT <- !.
 
-Expression  <- Atom (Operator Atom)* {
+Expression <- Expression2 Tern?
+
+Expression2  <- Atom (Operator Atom)* {
                          precedence
                            L :
                            L &&
@@ -134,6 +136,7 @@ Expression  <- Atom (Operator Atom)* {
                            L / * % \
                        }
 
+Tern <- '?' DelayedExpression ':' DelayedExpression
 
 Atom <- _? (Star / Unary / Unary2 / Number / Lambda / String /
         Index / ArrayLiteral / FnCall / Variable / '(' Expression ')') _?

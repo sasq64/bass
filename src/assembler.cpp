@@ -968,6 +968,22 @@ void Assembler::setupRules()
     parser.after("Star", [&](SV&) -> Number { return mach->getPC(); });
 
     parser.after("Expression", [&](SV& sv) {
+        if(sv.size() == 2) {
+            // Tern
+            auto p = any_cast<std::pair<Block, Block>>(sv[1]);
+            if(number(sv[0]) != 0) {
+                return parser.evaluate(p.first.node);
+            }
+            return parser.evaluate(p.second.node);
+        }
+        return sv[0];
+    });
+
+    parser.after("Tern", [&](SV& sv) -> std::any {
+        return std::make_pair(std::any_cast<Block>(sv[0]), std::any_cast<Block>(sv[1]));
+    });
+
+    parser.after("Expression2", [&](SV& sv) {
         if (sv.size() == 1) {
             return sv[0];
         }
