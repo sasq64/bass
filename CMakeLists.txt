@@ -89,6 +89,11 @@ else()
     target_include_directories(sectiontest PRIVATE src)
     target_link_libraries(sectiontest PRIVATE catch coreutils fmt)
 
+    add_executable(value_test EXCLUDE_FROM_ALL src/testmain.cpp src/value_test.cpp)
+    target_compile_definitions(value_test PUBLIC USE_FMT)
+    target_include_directories(value_test PRIVATE src)
+    target_link_libraries(value_test PRIVATE catch fmt coreutils)
+
     add_executable(symtest EXCLUDE_FROM_ALL src/testmain.cpp src/symtest.cpp)
     target_compile_definitions(symtest PUBLIC USE_FMT)
     target_include_directories(symtest PRIVATE src)

@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "machine.h"
 #include "parser.h"
+#include "value.h"
 
 #ifndef _WIN32
 #    include <cxxabi.h>
@@ -34,7 +35,6 @@ Number operator"" _N(unsigned long long a)
 }
 Number to_number(std::string_view txt)
 {
-    double result{};
     std::string t{txt};
     return static_cast<Number>(std::stod(t));
 }
@@ -535,7 +535,7 @@ void Assembler::setupRules()
             }
             if (!scopes.empty()) {
                 sym = std::string(scopes.back()) + "." + sym;
-                //LOGI("Prefixed to %s", sym);
+                // LOGI("Prefixed to %s", sym);
             }
             syms.set(sym, sv[1]);
         } else if (sv.size() == 1) {
@@ -691,7 +691,7 @@ void Assembler::setupRules()
             return scripting.call(call.name, call.args);
         }
 
-        if(found) {
+        if (found) {
             throw parse_error(fmt::format("'{}' is not callable", name));
         }
 
@@ -968,10 +968,10 @@ void Assembler::setupRules()
     parser.after("Star", [&](SV&) -> Number { return mach->getPC(); });
 
     parser.after("Expression", [&](SV& sv) {
-        if(sv.size() == 2) {
+        if (sv.size() == 2) {
             // Tern
             auto p = any_cast<std::pair<Block, Block>>(sv[1]);
-            if(number(sv[0]) != 0) {
+            if (number(sv[0]) != 0) {
                 return parser.evaluate(p.first.node);
             }
             return parser.evaluate(p.second.node);
@@ -980,7 +980,8 @@ void Assembler::setupRules()
     });
 
     parser.after("Tern", [&](SV& sv) -> std::any {
-        return std::make_pair(std::any_cast<Block>(sv[0]), std::any_cast<Block>(sv[1]));
+        return std::make_pair(std::any_cast<Block>(sv[0]),
+                              std::any_cast<Block>(sv[1]));
     });
 
     parser.after("Expression2", [&](SV& sv) {
@@ -1043,9 +1044,9 @@ void Assembler::setupRules()
         if (sv.size() == 1) {
             return sv[0];
         }
-        std::any vec = sv[0];
-        if (any_cast<Number>(&vec) != nullptr) {
-            // Slicing undefined symbol, return 0
+
+        Value val{sv[0]};
+        if (val.is_numeric()) {
             return any_num(0);
         }
 
@@ -1060,21 +1061,19 @@ void Assembler::setupRules()
             if (sv.size() > 3 && sv[3].has_value()) {
                 b = number<int64_t>(sv[3]);
             }
-            if (auto const* v8 = any_cast<std::vector<uint8_t>>(&vec)) {
-                return slice(*v8, a, b);
-            }
-            if (auto const* vn = any_cast<std::vector<Number>>(&vec)) {
-                return slice(*vn, a, b);
+
+            if (val.is_array()) {
+                return val.slice(a, b).val;
             }
 
-            if (auto const* macro = any_cast<Macro>(&vec)) {
-                std::vector<Number> result(b-a);
+            if (auto const* macro = val.getp<Macro>()) {
+                std::vector<Number> result(b - a);
                 Call call;
                 call.args.resize(1);
-                for(int64_t i = a; i<b; i++) {
+                for (int64_t i = a; i < b; i++) {
                     call.args[0] = any_num(i);
                     auto res = applyDefine(*macro, call);
-                    result[i-a] = number<uint8_t>(res);
+                    result[i - a] = number<uint8_t>(res);
                 }
                 return std::any(result);
             }
@@ -1083,13 +1082,8 @@ void Assembler::setupRules()
         }
 
         auto i = number<size_t>(sv[1]);
-        if (auto const* v8 = any_cast<std::vector<uint8_t>>(&vec)) {
-            return index(*v8, i);
-        }
-        if (auto const* vn = any_cast<std::vector<Number>>(&vec)) {
-            return index(*vn, i);
-        }
-        throw parse_error("Can not index non-array");
+        return val[i];
+        //throw parse_error("Can not index non-array");
     });
 
     parser.after("UnOp", [&](SV& sv) { return sv.token_view()[0]; });
