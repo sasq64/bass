@@ -8,3 +8,11 @@ script:
   - export PATH=$MSBUILD_PATH:$PATH
   - cmake -Bbuild -G"Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=ReleaseWithDebInfo
   - cmake --build build --config RelWithDebInfo
+deploy:
+  provider: releases
+  skip_cleanup: true
+  api_key: $GH_TOKEN
+  file_glob: true
+  file: "build/RelWithDebInfo/bass.exe"
+  tags: true
+
