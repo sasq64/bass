@@ -411,7 +411,7 @@ void initMeta(Assembler& assem)
             };
         } else {
             size = number<size_t>(data);
-            src = [](size_t i) -> Number { return i; };
+            src = [](size_t i) { return static_cast<Number>(i); };
             firstConst = true;
         }
 
@@ -424,7 +424,7 @@ void initMeta(Assembler& assem)
             if (firstConst) {
                 tx = [](size_t, Number) -> uint8_t { return 0; };
             } else {
-                tx = [](size_t, Number n) -> uint8_t { return n; };
+                tx = [](size_t, Number n) { return static_cast<uint8_t>(n); };
             }
         } else {
             data = meta.args[1];

@@ -75,7 +75,7 @@ struct Pet100
 
     uint8_t readReg(int reg);
     void writeReg(int reg, uint8_t val);
-    uint16_t get_ticks() const;
+    uint32_t get_ticks() const;
 
     Pet100();
     ~Pet100();

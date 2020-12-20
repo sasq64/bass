@@ -7,4 +7,4 @@ install:
 script:
   - export PATH=$MSBUILD_PATH:$PATH
   - cmake -Bbuild -G"Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=ReleaseWithDebInfo
-  - cmake --build build
+  - cmake --build build --config RelWithDebInfo

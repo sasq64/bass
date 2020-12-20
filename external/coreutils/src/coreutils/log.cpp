@@ -8,6 +8,10 @@
 #include <thread>
 #include <unordered_map>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 static std::string logSource = "ECP-NATIVE";
 
 #ifdef ANDROID
@@ -99,6 +103,21 @@ void log2(const char* fn, int line, Level level, const std::string& text)
 {
     using namespace std;
     static int termType = 0;
+    static bool winInit = false;
+#ifdef _WIN32
+    if(!winInit) {
+        auto hStdin = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hStdin == INVALID_HANDLE_VALUE) {
+            exit(-1);
+        }
+        DWORD oldMode;
+        if (!GetConsoleMode(hStdin, &oldMode)) {
+            exit(-1);
+        }
+        SetConsoleMode(hStdin, oldMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        winInit = true;
+    }
+#endif;
     // const auto &space = LogSpace::spaces[fn];
     if (true) { // space.second || space.first == "") {
         char temp[2048];
