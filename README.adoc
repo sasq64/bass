@@ -1,4 +1,6 @@
 
+image:https://www.travis-ci.com/sasq64/bass.svg?branch=dev["Build (dev)", link="https://www.travis-ci.com/sasq64/bass"]
+
 = The Bass 6502 Assembler
 
 * ACME like syntax
