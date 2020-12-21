@@ -88,14 +88,14 @@ TEST_CASE("png.remap", "[assembler]")
 TEST_CASE("png.layout", "[assembler]")
 {
     auto get = [&](auto const& vec, int n) -> uint16_t {
-        return vec[n * 2] | (vec[n * 2 + 1] << 8);
+        return vec[n * 3] | (vec[n * 3 + 1] << 8) |(vec[n * 3 + 2] << 16) ;
     };
 
     Image image = loadPng((projDir() / "data" / "test.png").string());
 
-    REQUIRE(get(image.colors, 0) == 0);
-    REQUIRE(get(image.colors, 1) == 0x000a);
-    REQUIRE(get(image.colors, 2) == 0x00f0);
+    REQUIRE(image.colors[0] == 0xff'000000);
+    REQUIRE(image.colors[1] == 0xff'a80000);
+    REQUIRE(image.colors[2] == 0xff'00ff00);
 
     auto pixels = std::any_cast<std::vector<uint8_t>>(image.pixels);
     auto tiles = layoutTiles(pixels, 32, 8, 8, 0);
@@ -192,7 +192,7 @@ TEST_CASE("assembler.sections", "[assembler]")
         start:
             !section "x",in="text" {
             hello:
-                !text "hello peope"
+                !text "HELLO PEOPLE"
             }
             nop
             lda hello,x
