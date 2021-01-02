@@ -1,10 +1,19 @@
     !include "pet100.inc"
 
-    !section "main", $8000
+    !section "main", $c000
 
     Line = $0400+24*40
 
-    Border(LightBlue)
+    ;Border(LightBlue)
+   jmp $fce2
+
+    lda #32 + 128
+    sta $400
+
+    lda #32
+    sta $400
+    jmp *
+
 loop:
     !rept 39 {
         lda Line+i+1

@@ -84,7 +84,11 @@ struct Machine
 
     Opcode illgal_opcode = {
         0xff, 0, Mode::IMM, [](Machine& m) {
+            fputs("\x1b[?25h", stdout);
+            fputs("\x1b[?1049l", stdout);
             fmt::print("** Illegal opcode at {:04x}\n", m.regPC());
+            // LOGE("** Illegal opcode at {:04x}\n", m.regPC());
+            exit(0);
             m.realCycles = m.cycles;
             m.cycles = std::numeric_limits<uint32_t>::max() - 32;
         }};
@@ -96,7 +100,7 @@ struct Machine
         ram.fill(0);
         stack = &ram[0x100];
         a = x = y = 0;
-        sr = 0x30;
+        sr = 0x22;
         result = 0;
         for (int i = 0; i < 256; i++) {
             rbank.at(i) = wbank.at(i) = &ram[(i * 256) % POLICY::MemSize];
@@ -173,13 +177,18 @@ struct Machine
     {
         auto const* end = data + len;
         while (data < end) {
-            rbank[bank++] = const_cast<Word*>(data); // NOLINT
+            rbank[bank] = const_cast<Word*>(data);
+            rcbdata[bank] = const_cast<uint8_t*>(data - (bank << 8));
+            rcallbacks[bank] = [](uint16_t adr, void* data) {
+                return static_cast<const uint8_t*>(data)[adr];
+            };
+            bank++;
             data += 256;
         }
     }
 
     void map_read_callback(uint8_t bank, int len, void* data,
-                         uint8_t (*cb)(uint16_t, void*))
+                           uint8_t (*cb)(uint16_t, void*))
     {
         while (len > 0) {
             rcallbacks[bank] = cb;  // NOLINT
@@ -188,7 +197,7 @@ struct Machine
         }
     }
     void map_write_callback(uint8_t bank, int len, void* data,
-                          void (*cb)(uint16_t, uint8_t, void*))
+                            void (*cb)(uint16_t, uint8_t, void*))
     {
         while (len > 0) {
             wcallbacks[bank] = cb;  // NOLINT
@@ -199,10 +208,10 @@ struct Machine
 
     void irq(unsigned adr)
     {
-        stack[sp] = pc >> 8;
-        stack[sp - 1] = pc & 0xff;
-        stack[sp - 2] = get_SR();
-        sp -= 3;
+        stack[sp--] = pc >> 8;
+        stack[sp--] = pc & 0xff;
+        stack[sp--] = get_SR();
+        Set<IRQ, true>(*this);
         pc = adr;
     }
 
@@ -227,8 +236,7 @@ struct Machine
         realCycles = 0;
         while (cycles < toCycles) {
             if (POLICY::eachOp(p)) break;
-            auto code = ReadPC();
-            auto& op = jumpTable[code];
+            auto& op = jumpTable[ReadPC()];
             op.op(*this);
             cycles += op.cycles;
         }
@@ -254,7 +262,7 @@ struct Machine
 
 private:
     // The 6502 registers
-    unsigned pc;
+    uint16_t pc;
     unsigned a;
     unsigned x;
     unsigned y;
@@ -359,6 +367,7 @@ private:
     };
 
     static constexpr auto SZ = S | Z;
+    static constexpr auto SZb = S | Z | 0x10;
     static constexpr auto SZC = S | Z | C;
     static constexpr auto SZCV = S | Z | C | V;
 
@@ -386,7 +395,7 @@ private:
             }
         }
         result = ((s << 2) & 0x200) | !(s & Z);
-        sr = (s & ~SZ) | 0x30;
+        sr = (s & ~SZb) | 0x20;
     }
 
     template <int BITS>
@@ -893,10 +902,11 @@ private:
 
             { "pla", { { 0x68, 4, Mode::NONE, [](Machine& m) {
                 m.a = m.stack[++m.sp];
+                m.set<SZ>(m.a);
             } } } },
 
             { "php", { { 0x08, 3, Mode::NONE, [](Machine& m) {
-                m.stack[m.sp--] = m.get_SR();
+                m.stack[m.sp--] = (m.get_SR() | (1<<BRK));
             } } } },
 
             { "plp", { { 0x28, 4, Mode::NONE, [](Machine& m) {
@@ -1041,19 +1051,18 @@ private:
 
             { "rti", {
                 { 0x40, 6, Mode::NONE, [](Machine& m) {
-                    m.set_SR(m.stack[m.sp+1]);
-                    m.pc = (m.stack[m.sp+2] | (m.stack[m.sp+3]<<8));
-                    m.sp += 3;
+                    m.set_SR(m.stack[++m.sp]);
+                    m.pc = m.stack[++m.sp];
+                    m.pc |= (m.stack[++m.sp]<<8);
                 } }
             } },
 
             { "brk", {
                 { 0x00, 7, Mode::NONE, [](Machine& m) {
                     m.ReadPC();
-                    m.stack[m.sp] = m.pc >> 8;
-                    m.stack[m.sp-1] = m.pc & 0xff;
-                    m.stack[m.sp-2] = m.get_SR();
-                    m.sp -= 3;
+                    m.stack[m.sp--] = m.pc >> 8;
+                    m.stack[m.sp--] = m.pc & 0xff;
+                    m.stack[m.sp--] = m.get_SR() | (1<<BRK);
                     m.pc = m.Read16(m.to_adr(0xfe, 0xff));
                 } },
                 { 0x00, 7, Mode::IMM, [](Machine& m) {
@@ -1062,9 +1071,9 @@ private:
                         m.breakFunction(what, m.breakData);
                     } else {
                         m.stack[m.sp] = m.pc >> 8;
-                        m.stack[m.sp-1] = m.pc & 0xff;
-                        m.stack[m.sp-2] = m.get_SR();
-                        m.sp -= 3;
+                        m.stack[m.sp--] = m.pc >> 8;
+                        m.stack[m.sp--] = m.pc & 0xff;
+                        m.stack[m.sp--] = m.get_SR() | (1<<BRK);
                         m.pc = m.Read16(m.to_adr(0xfe, 0xff));
                     }
                 } }
@@ -1079,8 +1088,9 @@ private:
                             return;
                         }
                     }
-                    m.pc = (m.stack[m.sp+1] | (m.stack[m.sp+2]<<8))+1;
-                    m.sp += 2;
+                    m.pc = m.stack[++m.sp];
+                    m.pc |= (m.stack[++m.sp]<<8);
+                    m.pc++;
                 } }
             } },
 
@@ -1095,9 +1105,8 @@ private:
 
             { "jsr", {
                 { 0x20, 6, Mode::ABS, [](Machine& m) {
-                    m.stack[m.sp] = (m.pc+1) >> 8;
-                    m.stack[m.sp-1] = (m.pc+1) & 0xff;
-                    m.sp -= 2;
+                    m.stack[m.sp--] = (m.pc+1) >> 8;
+                    m.stack[m.sp--] = (m.pc+1) & 0xff;
                     m.pc = m.ReadPC16();
                 } }
             } },
@@ -1135,13 +1144,20 @@ private:
                    [](Machine& m) { m.stack[m.sp--] = m.x; }}}},
                 {"phy",
                  {{0x5a, 3, Mode::NONE,
+
                    [](Machine& m) { m.stack[m.sp--] = m.y; }}}},
                 {"plx",
                  {{0xfa, 4, Mode::NONE,
-                   [](Machine& m) { m.x = m.stack[++m.sp]; }}}},
+                   [](Machine& m) {
+                       m.x = m.stack[++m.sp];
+                       m.set<SZ>(m.x);
+                   }}}},
                 {"ply",
                  {{0x7a, 4, Mode::NONE,
-                   [](Machine& m) { m.y = m.stack[++m.sp]; }}}},
+                   [](Machine& m) {
+                       m.y = m.stack[++m.sp];
+                       m.set<SZ>(m.y);
+                   }}}},
                 {"stz",
                  {{0x64, 3, Mode::ZP, Store0<Mode::ZP>},
                   {0x74, 4, Mode::ZPX, Store0<Mode::ZPX>},

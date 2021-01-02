@@ -2,10 +2,13 @@
 
 #include <ansi/console.h>
 #include <ansi/terminal.h>
+#include <cctype>
 #include <coreutils/algorithm.h>
+#include <coreutils/file.h>
 #include <coreutils/utf8.h>
 #include <thread>
 
+#include "emu_policy.h"
 #include "emulator.h"
 #include "petscii.h"
 
@@ -42,17 +45,6 @@ std::string translate(uint8_t c)
 char32_t trans_char(uint8_t c)
 {
     return sc2uni_up(c);
-}
-
-void Pet100::set_color(uint8_t col)
-{
-    int b = (col & 0xf) * 3;
-    int f = ((col >> 4) + 16) * 3;
-    uint32_t fg =
-        (palette[f] << 24) | (palette[f + 1] << 16) | (palette[f + 2] << 8);
-    uint32_t bg =
-        (palette[b] << 24) | (palette[b + 1] << 16) | (palette[b + 2] << 8);
-    console->set_color(fg, bg);
 }
 
 void Pet100::writeChar(uint16_t adr, uint8_t t)
@@ -103,13 +95,13 @@ void Pet100::writeColor(uint16_t adr, uint8_t c)
 
     colorRam[x + regs[RealW] * y] = c;
 
-    int b = (c & 0xf) * 3;
-    int f = ((c >> 4) + 16) * 3;
+    int f = (c & 0xf) * 3;
+    int b = ((c >> 4) + 16) * 3;
     uint32_t fg =
         (palette[f] << 24) | (palette[f + 1] << 16) | (palette[f + 2] << 8);
     uint32_t bg =
         (palette[b] << 24) | (palette[b + 1] << 16) | (palette[b + 2] << 8);
-    console->put_color(x, y, fg, bg);
+    console->put_color(x, y, fg, 0);
 }
 
 void Pet100::updateRegs()
@@ -121,6 +113,7 @@ void Pet100::updateRegs()
     emu->map_write_callback(regs[TextPtr], banks, this,
                             [](uint16_t adr, uint8_t v, void* data) {
                                 auto* thiz = static_cast<Pet100*>(data);
+                                // LOGE("%02x -> %04x", v, adr);
                                 thiz->writeChar(adr, v);
                             });
     emu->map_read_callback(regs[TextPtr], banks, this,
@@ -131,6 +124,7 @@ void Pet100::updateRegs()
     emu->map_write_callback(regs[ColorPtr], banks, this,
                             [](uint16_t adr, uint8_t v, void* data) {
                                 auto* thiz = static_cast<Pet100*>(data);
+                                // LOGE("%02x -> %04x", v, adr);
                                 thiz->writeColor(adr, v);
                             });
     emu->map_read_callback(regs[ColorPtr], banks, this,
@@ -142,26 +136,37 @@ void Pet100::updateRegs()
 
 void Pet100::fillOutside(uint8_t col)
 {
+    return;
     auto cw = console->get_width();
     auto ch = console->get_height();
-    set_color(col);
     for (size_t y = 0; y < ch; y++) {
         for (size_t x = 0; x < cw; x++) {
             if (x < regs[WinX] || x >= (regs[WinX] + regs[WinW]) ||
                 y < regs[WinY] || y >= (regs[WinY] + regs[WinH])) {
-                console->set_xy(x, y);
-                console->put(" ");
+                console->put_char(x, y, ' ');
+                console->put_color(x, y, col, col);
             }
         }
     }
 }
 
+struct NullTerminal : public bbs::Terminal
+{
+    size_t write(std::string_view source) override { return source.size(); }
+
+    bool read(std::string& target) override { return false; }
+    int width() const override { return 40; }
+    int height() const override { return 25; }
+};
+
 Pet100::Pet100()
 {
     auto terminal = bbs::create_local_terminal();
+    // auto terminal = std::make_unique<NullTerminal>();
     terminal->open();
     console = std::make_unique<bbs::Console>(std::move(terminal));
     logging::setAltMode(true);
+    logging::setLevel(logging::Level::Error);
 
     auto cw = console->get_width();
     auto ch = console->get_height();
@@ -177,8 +182,92 @@ Pet100::Pet100()
         }
     }
 
-    emu = std::make_unique<sixfive::Machine<>>();
+    emu = std::make_unique<sixfive::Machine<EmuPolicy>>();
 
+    static Intercept i;
+    i.fn = [&](uint16_t a) {
+        LOGE("%04x: A=%x X=%x Y=%x", emu->regPC(), emu->get<sixfive::Reg::A>(),
+             emu->get<sixfive::Reg::X>(), emu->get<sixfive::Reg::Y>());
+        return false;
+    };
+
+    /* emu->policy().intercepts[0xa31] = &i; */
+    /* emu->policy().intercepts[0xa87] = &i; */
+    /* emu->policy().intercepts[0xa96] = &i; */
+    /* emu->policy().intercepts[0xab3] = &i; */
+    /* emu->policy().intercepts[0xab9] = &i; */
+
+    utils::File bf{"basic"};
+    basic = bf.readAll();
+    utils::File kf{"kernal"};
+    kernal = kf.readAll();
+
+    // kernal[0x1ff2] = 0x00;
+
+    emu->map_rom(0xa0, basic.data(), 0x2000);
+    emu->map_rom(0xe0, kernal.data(), 0x2000);
+    //static auto cia_start = clk::now();
+    static int counter = 0;
+
+    emu->map_read_callback(0xd0, 0xc, this,
+                           [](uint16_t adr, void* data) -> uint8_t {
+                               auto* thiz = static_cast<Pet100*>(data);
+                               LOGI("Read %x", adr);
+                               if (adr == 0xd012) {
+                                   return counter;
+                               }
+                               return 0;
+                           });
+    emu->map_write_callback(0xd0, 0xc, this,
+                            [](uint16_t adr, uint8_t v, void* data) {
+                                auto* thiz = static_cast<Pet100*>(data);
+                                if (adr == 0xd020) {
+                                    thiz->writeReg(8, v << 4);
+                                }
+                                LOGI("Write %x -> %x", v, adr);
+                            });
+
+    emu->map_read_callback(0xdc, 1, this,
+                           [](uint16_t adr, void* data) -> uint8_t {
+                               auto* thiz = static_cast<Pet100*>(data);
+                               LOGI("CIA A Read %x", adr);
+                               if (adr == 0xdc01) {
+                                   // Return the column
+                                   uint8_t res = 0;
+                                   // LOGE("Mask %x", thiz->ciaa[0]);
+                                   for (int i = 0; i < 8; i++) {
+                                       if ((1 << i) & ~(thiz->ciaa[0x00])) {
+                                           // We want to return column i
+                                           // LOGE("%d -> %x", i,
+                                           // thiz->pressed[i]);
+                                           res |= thiz->pressed[i];
+                                       }
+                                   }
+                                   return ~res;
+                               }
+                               return 0;
+                           });
+    emu->map_write_callback(0xdc, 1, this,
+                            [](uint16_t adr, uint8_t v, void* data) {
+                                auto* thiz = static_cast<Pet100*>(data);
+                                LOGI("CIA A Write %x -> %x", v, adr);
+                                thiz->ciaa[adr - 0xdc00] = v;
+                            });
+
+    emu->map_read_callback(0xdd, 2, this,
+                           [](uint16_t adr, void* data) -> uint8_t {
+                               auto* thiz = static_cast<Pet100*>(data);
+                               if (adr == 0xdd00 || adr == 0xdd01) {
+                                   return 0xff;
+                               }
+                               LOGI("CIA B Read %x", adr);
+                               return 0;
+                           });
+    emu->map_write_callback(0xdd, 2, this,
+                            [](uint16_t adr, uint8_t v, void* data) {
+                                auto* thiz = static_cast<Pet100*>(data);
+                                LOGI("CIA B Write %x -> %x", v, adr);
+                            });
     // Map IO area
     emu->map_read_callback(0xd7, 1, this,
                            [](uint16_t adr, void* data) -> uint8_t {
@@ -316,18 +405,109 @@ void Pet100::writeReg(int reg, uint8_t val)
     }
 }
 
+// clang-format off
+enum KeysC64 {
+    DOWN, F5, F3, F1, F7, RIGHT, RETURN, DELETE, // COL0
+    LSHIFT, E, S, Z, FOUR, A, W, THREE, // COL1
+    X, T, F, C, SIX, D, R, FIVE,
+    V, U, H, B, EIGHT, G, Y, SEVEN,
+    N, O, K, M, ZERO, J, I, NINE,
+    COMMA, AT, COLON, DOT, DASH, L, P, PLUS,
+    SLASH, UARROW, EQ, RSHIFT, HOME, SEMI, STAR, POUND,
+    STOP, Q, COM, SPACE, TWO, CTRL, LARROW, ONE,
+//  ROW7 .................................. ROW0
+};
+// clang-format on
+
+static std::unordered_map<int32_t, int32_t> setup()
+{
+    std::unordered_map<int32_t, int32_t> m;
+    std::vector<int> letters = {A, B, C, D, E, F, G, H, I, J, K, L, M,
+                                N, O, P, Q, R, S, T, U, V, W, X, Y, Z};
+    std::vector<int> numbers = {ZERO, ONE, TWO,   THREE, FOUR,
+                                FIVE, SIX, SEVEN, EIGHT, NINE};
+
+    char c = 'a';
+    for (auto const& l : letters) {
+        m.emplace(c, l);
+        m.emplace(toupper(c), l | LSHIFT << 8);
+        c++;
+    }
+    c = '0';
+    for (auto const& l : numbers) {
+        m.emplace(c, l);
+        c++;
+    }
+    const char* x = "0!\"#$%&'()";
+    int i = 0;
+    for (auto const& l : numbers) {
+        m.emplace(x[i], l | (LSHIFT << 8));
+        i++;
+    }
+
+    m.emplace(KEY_LEFT, (RSHIFT << 8) | RIGHT);
+    m.emplace(KEY_RIGHT, RIGHT);
+
+    m.emplace(KEY_UP, (RSHIFT << 8) | DOWN);
+    m.emplace(KEY_DOWN, DOWN);
+
+    // m.emplace(':', (LSHIFT<<8) | COLON);
+    m.emplace(':', COLON);
+
+    m.emplace(']', (LSHIFT << 8) | SEMI);
+    m.emplace('[', (LSHIFT << 8) | COLON);
+    m.emplace(';', SEMI);
+    m.emplace('=', EQ);
+    m.emplace('+', PLUS);
+    m.emplace('-', DASH);
+    m.emplace('*', STAR);
+    m.emplace('@', AT);
+    m.emplace('/', SLASH);
+    m.emplace('?', (LSHIFT << 8) | SLASH);
+    // m.emplace(']', SEMI);
+
+    m.emplace(KEY_ENTER, RETURN);
+    m.emplace(KEY_BACKSPACE, DELETE);
+    m.emplace(' ', SPACE);
+    m.emplace(KEY_ESCAPE, STOP);
+    return m;
+}
+
+static auto conv = setup();
+
+// Column selected via write,
+// Return column
+
+std::array<uint8_t, 64> pressed{};
+
+void translateKey(int32_t key) {}
+
 void Pet100::doUpdate()
 {
-    console->flush();
-
-    auto oldR = regs[IrqR];
-    regs[IrqR] |= 1;
-
-    if ((~oldR & regs[IrqR]) != 0) {
-        if ((regs[IrqR] & regs[IrqE]) != 0) {
-            emu->irq(emu->read_mem(0xfffc) | (emu->read_mem(0xfffd) << 8));
-        }
+    //    console->flush();
+    //
+    pressed = {0, 0, 0, 0, 0, 0, 0, 0};
+    auto key = console->read_key();
+    if (key != 0) {
+        auto c64 = conv[key];
+        do {
+            pressed[(c64 & 0xff) / 8] |= (0x80 >> ((c64 & 0xff) % 8));
+            c64 >>= 8;
+        } while (c64 != 0);
+        // currentKey = key;
     }
+
+    // auto oldR = regs[IrqR];
+    // regs[IrqR] |= 1;
+
+    // if ((~oldR & regs[IrqR]) != 0) {
+    // if ((regs[IrqR] & regs[IrqE]) != 0) {
+    if ((emu->get<sixfive::Reg::SR>() & 0x4) == 0) {
+        // logging::setLevel(logging::Level::Warning);
+        emu->irq(emu->read_mem(0xfffe) | (emu->read_mem(0xffff) << 8));
+    }
+    // }
+    //}
 }
 
 bool Pet100::update()
@@ -335,11 +515,16 @@ bool Pet100::update()
     try {
         auto cycles = emu->run(10000);
         if (clk::now() >= nextUpdate) {
+            console->flush();
             nextUpdate += 20ms;
             doUpdate();
         } else {
             std::this_thread::sleep_for(1ms);
         }
+        return false;
+        // if(cycles != 0) {
+        //    LOGE("Cycles %d", cycles);
+        //}
         return cycles != 0;
     } catch (exit_exception&) {
         return true;
@@ -379,7 +564,7 @@ void Pet100::start(uint16_t pc)
 
     emu->setPC(pc);
     start_t = clk::now();
-    nextUpdate = start_t + 10ms;
+    nextUpdate = start_t + 1ms;
 }
 
 int Pet100::get_width() const

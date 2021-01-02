@@ -13,6 +13,8 @@ template <class POLICY>
 struct Machine;
 } // namespace sixfive
 
+struct EmuPolicy;
+
 namespace bbs {
 class Console;
 } // namespace bbs
@@ -49,14 +51,21 @@ struct Pet100
         IrqR
 
     };
-    std::unique_ptr<sixfive::Machine<sixfive::DefaultPolicy>> emu;
+    std::unique_ptr<sixfive::Machine<EmuPolicy>> emu;
     std::array<uint8_t, 128> regs{};
     std::unique_ptr<bbs::Console> console;
     std::vector<uint8_t> textRam;
     std::vector<uint8_t> colorRam;
     std::array<uint8_t, 128> palette{};
 
+    std::vector<uint8_t> basic;
+    std::vector<uint8_t> kernal;
+    std::array<uint8_t, 256> ciaa;
+    std::array<uint8_t, 8> pressed{};
+
     mutable int32_t basicStart = -1;
+
+    bool console_enabled = false;
 
     void freeze_timer(bool freeze);
 

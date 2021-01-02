@@ -219,7 +219,6 @@ private:
     int labelNum = 0;
     int inMacro = 0;
 
-    int inTest = 0;
     int maxPasses = 10;
 
     std::function<bool(uint32_t)> logFunction;

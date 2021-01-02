@@ -90,13 +90,10 @@ std::string any_to_string(std::any const& val)
 
 std::string_view rstrip(std::string_view text)
 {
-    auto sz = static_cast<int64_t>(text.size());
-    auto p = sz - 1;
+    auto p = static_cast<int64_t>(text.size()) - 1;
     while (p >= 0 && (text[p] == ' ' || text[p] == '\t')) {
+        text.remove_suffix(1);
         p--;
-    }
-    if (sz > p) {
-        text.remove_suffix(text.size() - 1 - p);
     }
     return text;
 }
@@ -218,8 +215,6 @@ void Assembler::runTest(Test const& test)
 
     auto start = test.start;
 
-    inTest++;
-
     mach->setRegs(test.regs);
 
     auto cycles = mach->run(start);
@@ -296,7 +291,8 @@ void Assembler::applyMacro(Call const& call)
         throw parse_error(fmt::format("Undefined macro {}", call.name));
     }
 
-    auto const& m = macros[call.name];
+    auto const& m = it->second;
+    ;
 
     if (m.args.size() != call.args.size()) {
         throw parse_error("Wrong number of arguments");
@@ -304,19 +300,19 @@ void Assembler::applyMacro(Call const& call)
 
     std::unordered_map<std::string_view, Symbol> shadowed;
 
-    for (unsigned i = 0; i < call.args.size(); i++) {
+    size_t i = 0;
+    for (auto& arg : m.args) {
 
-        if (auto sym = syms.get_sym(m.args[i])) {
-            // if (sym != nullptr) {
+        if (auto sym = syms.get_sym(arg)) {
             errors.emplace_back(
                 0, 0,
                 fmt::format("Macro '{}' shadows global symbol {}", call.name,
-                            m.args[i]),
+                            arg),
                 ErrLevel::Warning);
-            shadowed[m.args[i]] = *sym;
-            syms.erase(m.args[i]);
+            shadowed[arg] = *sym;
+            syms.erase(arg);
         }
-        syms.set(m.args[i], call.args[i]);
+        syms.set(arg, call.args[i++]);
     }
 
     auto ll = lastLabel;
@@ -327,14 +323,15 @@ void Assembler::applyMacro(Call const& call)
     parser.evaluate(m.contents.node);
     inMacro--;
 
-    for (unsigned i = 0; i < call.args.size(); i++) {
-        syms.erase(m.args[i]);
+    for (auto& arg : m.args) {
+        syms.erase(arg);
     }
     for (auto const& shadow : shadowed) {
         syms.set_sym(shadow.first, shadow.second);
     }
     lastLabel = ll;
 }
+
 void Assembler::defineMacro(std::string_view name,
                             std::vector<std::string_view> const& args,
                             Block const& block)
@@ -535,7 +532,7 @@ void Assembler::setupRules()
             }
             if (!scopes.empty()) {
                 sym = std::string(scopes.back()) + "." + sym;
-                //LOGI("Prefixed to %s", sym);
+                // LOGI("Prefixed to %s", sym);
             }
             syms.set(sym, sv[1]);
         } else if (sv.size() == 1) {
@@ -691,7 +688,7 @@ void Assembler::setupRules()
             return scripting.call(call.name, call.args);
         }
 
-        if(found) {
+        if (found) {
             throw parse_error(fmt::format("'{}' is not callable", name));
         }
 
@@ -968,10 +965,10 @@ void Assembler::setupRules()
     parser.after("Star", [&](SV&) -> Number { return mach->getPC(); });
 
     parser.after("Expression", [&](SV& sv) {
-        if(sv.size() == 2) {
+        if (sv.size() == 2) {
             // Tern
             auto p = any_cast<std::pair<Block, Block>>(sv[1]);
-            if(number(sv[0]) != 0) {
+            if (number(sv[0]) != 0) {
                 return parser.evaluate(p.first.node);
             }
             return parser.evaluate(p.second.node);
@@ -980,7 +977,8 @@ void Assembler::setupRules()
     });
 
     parser.after("Tern", [&](SV& sv) -> std::any {
-        return std::make_pair(std::any_cast<Block>(sv[0]), std::any_cast<Block>(sv[1]));
+        return std::make_pair(std::any_cast<Block>(sv[0]),
+                              std::any_cast<Block>(sv[1]));
     });
 
     parser.after("Expression2", [&](SV& sv) {
@@ -1068,13 +1066,13 @@ void Assembler::setupRules()
             }
 
             if (auto const* macro = any_cast<Macro>(&vec)) {
-                std::vector<Number> result(b-a);
+                std::vector<Number> result(b - a);
                 Call call;
                 call.args.resize(1);
-                for(int64_t i = a; i<b; i++) {
+                for (int64_t i = a; i < b; i++) {
                     call.args[0] = any_num(i);
                     auto res = applyDefine(*macro, call);
-                    result[i-a] = number<uint8_t>(res);
+                    result[i - a] = number<uint8_t>(res);
                 }
                 return std::any(result);
             }

@@ -9,7 +9,7 @@
 #include <unordered_map>
 
 #ifdef _WIN32
-#include <windows.h>
+#    include <windows.h>
 #endif
 
 static std::string logSource = "ECP-NATIVE";
@@ -41,7 +41,8 @@ Level defaultLevel = Info;
 static bool altMode = false;
 static FILE* logFile = nullptr;
 
-void setAltMode(bool on) {
+void setAltMode(bool on)
+{
     altMode = on;
 }
 
@@ -71,8 +72,7 @@ void log(Level level, const std::string& text)
     }
     if (logFile) {
 
-        if (threadId == -1)
-            threadId = threadCount++;
+        if (threadId == -1) threadId = threadCount++;
 
         std::lock_guard<std::mutex> lock(logm);
 
@@ -93,8 +93,7 @@ void log(Level level, const std::string& text)
         fwrite(ts.c_str(), 1, ts.length(), logFile);
         fwrite(text.c_str(), 1, text.length(), logFile);
         char c = text[text.length() - 1];
-        if (c != '\n' && c != '\r')
-            putc('\n', logFile);
+        if (c != '\n' && c != '\r') putc('\n', logFile);
         fflush(logFile);
     }
 }
@@ -105,7 +104,7 @@ void log2(const char* fn, int line, Level level, const std::string& text)
     static int termType = 0;
     static bool winInit = false;
 #ifdef _WIN32
-    if(!winInit) {
+    if (!winInit) {
         auto hStdin = GetStdHandle(STD_OUTPUT_HANDLE);
         if (hStdin == INVALID_HANDLE_VALUE) {
             exit(-1);
@@ -119,20 +118,20 @@ void log2(const char* fn, int line, Level level, const std::string& text)
     }
 #endif;
     // const auto &space = LogSpace::spaces[fn];
-    if (true) { // space.second || space.first == "") {
-        char temp[2048];
+    char temp[2048];
 
-        if (!termType) {
-            const char* tt = getenv("TERM");
-            // log(level, "TERMTYPE %s", tt ? tt : "NULL");
-            termType = 1;
-            if (tt) {
-                if (strncmp(tt, "xterm", 5) == 0) {
-                    termType = 2;
-                }
+    if (!termType) {
+        const char* tt = getenv("TERM");
+        // log(level, "TERMTYPE %s", tt ? tt : "NULL");
+        termType = 1;
+        if (tt) {
+            if (strncmp(tt, "xterm", 5) == 0) {
+                termType = 2;
             }
         }
+    }
 
+    if (level >= defaultLevel) {
         if (termType == 2) {
             int cs = 0;
             for (size_t i = 0; i < strlen(fn); i++)
@@ -140,17 +139,15 @@ void log2(const char* fn, int line, Level level, const std::string& text)
 
             cs = (cs % 6) + 1;
 
-
-
             sprintf(temp, "\x1b[%dm[%s:%d]\x1b[%dm ", cs + 30, fn, line, 39);
         } else {
             sprintf(temp, "[%s:%d] ", fn, line);
         }
-        if(altMode) {
+        if (altMode) {
             fputs("\x1b[?1049l", stdout);
         }
         log(level, std::string(temp).append(text));
-        if(altMode) {
+        if (altMode) {
             fputs("\x1b[?1049h", stdout);
         }
     }
@@ -164,8 +161,7 @@ void setLevel(Level level)
 void setOutputFile(const std::string& fileName)
 {
     std::lock_guard<std::mutex> lock(logm);
-    if (logFile)
-        fclose(logFile);
+    if (logFile) fclose(logFile);
     logFile = fopen(fileName.c_str(), "wb");
 }
 

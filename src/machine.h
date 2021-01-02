@@ -25,20 +25,6 @@ private:
     std::string msg;
 };
 
-enum InterceptType
-{
-    None,
-    Return,
-    Call
-};
-
-struct Intercept
-{
-    enum InterceptType type { InterceptType::None };
-    std::function<bool(uint32_t)> fn;
-};
-
-
 namespace sixfive {
 struct DefaultPolicy;
 template <class POLICY>

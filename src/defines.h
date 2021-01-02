@@ -221,3 +221,17 @@ struct RegState
     std::unordered_map<uint16_t, uint8_t> ram;
 };
 
+enum InterceptType
+{
+    None,
+    Return,
+    Call
+};
+
+struct Intercept
+{
+    enum InterceptType type { InterceptType::None };
+    std::function<bool(uint32_t)> fn;
+};
+
+
