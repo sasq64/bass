@@ -355,7 +355,6 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("section", [&](Meta const& meta) {
-
         if (meta.args.empty()) {
             throw parse_error("Too few arguments");
         }
@@ -456,9 +455,13 @@ void initMeta(Assembler& assem)
     assem.registerMeta("include", [&](Meta const& meta) {
         Check(meta.args.size() == 1, "Incorrect number of arguments");
         auto name = any_cast<std::string_view>(meta.args[0]);
-        auto fileName = persist(assem.evaluatePath(name).string());
+        fs::path fullPath = assem.evaluatePath(name).string();
+        auto fileName = persist(fullPath);
         auto block = assem.includeFile(fileName);
+        auto saved = assem.getCurrentPath();
+        assem.setCurrentPath(fullPath.parent_path());
         assem.evaluateBlock(block);
+        assem.setCurrentPath(saved);
     });
 
     assem.registerMeta("script", [&](Meta const& meta) {

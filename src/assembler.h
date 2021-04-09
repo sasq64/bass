@@ -67,6 +67,7 @@ public:
     bool parse_path(fs::path const& p);
 
     fs::path getCurrentPath() const { return currentPath; }
+    void setCurrentPath(fs::path const& p) { currentPath = p; }
     SymbolTable& getSymbols();
     Machine& getMachine();
     void printSymbols();
