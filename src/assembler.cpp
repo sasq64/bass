@@ -699,6 +699,9 @@ void Assembler::setupRules()
     });
 
     parser.after("Lambda", [&](SV& sv) -> std::any {
+        if (sv.size() < 2) {
+            throw parse_error("Invalid lambda expression");
+        }
         auto args = any_cast<std::vector<std::string_view>>(sv[0]);
         auto block = any_cast<Block>(sv[1]);
         return Macro{"", args, block};
