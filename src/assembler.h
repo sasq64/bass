@@ -132,7 +132,7 @@ public:
     void addLog(std::string_view text, size_t line);
     void addRunnable(std::string_view text, size_t line);
 
-    fs::path evaluatePath(std::string_view name);
+    fs::path evaluatePath(std::string_view name, bool updatesCurrentPath);
     std::string_view getLastLabel() const { return lastLabel; }
     void setLastLabel(std::string_view l) { lastLabel = l; }
     void setLastLabel(std::string const& l) { lastLabel = persist(l); }

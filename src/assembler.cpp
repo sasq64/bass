@@ -138,11 +138,14 @@ void Assembler::setDebugFlags(uint32_t flags)
     syms.trace = passDebug;
 }
 
-fs::path Assembler::evaluatePath(std::string_view name)
+fs::path Assembler::evaluatePath(std::string_view name, bool updatesCurrentPath)
 {
     auto p = fs::path(name);
     if (p.is_relative()) {
         p = currentPath / p;
+    }
+    if (updatesCurrentPath) {
+      currentPath = p.parent_path();
     }
     return p;
 }
