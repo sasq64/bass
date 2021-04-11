@@ -455,8 +455,8 @@ void initMeta(Assembler& assem)
     assem.registerMeta("include", [&](Meta const& meta) {
         Check(meta.args.size() == 1, "Incorrect number of arguments");
         auto name = any_cast<std::string_view>(meta.args[0]);
-        fs::path fullPath = assem.evaluatePath(name).string();
-        auto fileName = persist(fullPath);
+        auto fullPath = assem.evaluatePath(name);
+        auto fileName = persist(fullPath.string());
         auto block = assem.includeFile(fileName);
         auto saved = assem.getCurrentPath();
         assem.setCurrentPath(fullPath.parent_path());
