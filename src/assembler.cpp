@@ -590,16 +590,19 @@ void Assembler::setupRules()
     });
 
     parser.after("IfDefDecl", [&](SV& sv) -> std::any {
+        ::Check(sv.size() >= 1, "Invalid !ifdef declaration");
         auto s = any_cast<std::string_view>(sv[0]);
         return Number(syms.is_defined(s));
     });
 
     parser.after("IfNDefDecl", [&](SV& sv) -> std::any {
+        ::Check(sv.size() >= 1, "Invalid !ifndef declaration");
         auto s = any_cast<std::string_view>(sv[0]);
         return Number(!syms.is_defined(s));
     });
 
     parser.after("CheckDecl", [&](SV& sv) -> std::any {
+        ::Check(sv.size() >= 1, "Invalid !check declaration");
         Meta meta;
         meta.name = "check";
         meta.blocks.push_back(any_cast<Block>(sv[0]));
@@ -617,6 +620,7 @@ void Assembler::setupRules()
     });
 
     parser.after("MacroDecl", [&](SV& sv) -> std::any {
+        ::Check(sv.size() >= 1, "Invalid !macro declaration");
         auto fndef = any_cast<Def>(sv[0]);
         Meta meta;
 
