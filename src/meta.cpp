@@ -383,6 +383,7 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("fill", [&](Meta const& meta) {
+        ::Check(meta.args.size() >= 1, "Invalid !fill meta command");
         auto data = meta.args[0];
         size_t size = 0;
         bool firstConst = false;
@@ -418,7 +419,7 @@ void initMeta(Assembler& assem)
         Assembler::Macro* macro = nullptr;
         Assembler::Call call;
         // Create transform lambda depending on second argument
-        if (meta.args.size() <= 1) {
+        if (meta.args.size() == 1) {
             // If first argument was a constant, fill with zeroes
             if (firstConst) {
                 tx = [](size_t, Number) -> uint8_t { return 0; };
@@ -432,6 +433,7 @@ void initMeta(Assembler& assem)
                 tx = [n](size_t, Number) -> uint8_t { return n; };
             } else {
                 macro = any_cast<Assembler::Macro>(&data);
+                ::Check(macro != nullptr, "Invalid !fill macro");
                 call.args.resize(macro->args.size());
                 tx = [&](size_t i, Number n) -> uint8_t {
                     if (call.args.size() >= 1) {
