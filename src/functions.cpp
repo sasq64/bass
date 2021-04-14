@@ -72,6 +72,8 @@ void initFunctions(Assembler& a)
                        [](double a, double b) { return std::pow(a, b); });
     a.registerFunction("len",
                        [](std::vector<uint8_t> const& v) { return v.size(); });
+    a.registerFunction("floor", [](double a) { return std::floor(a); });
+    a.registerFunction("ceil", [](double a) { return std::ceil(a); });
     a.registerFunction("round", [](double a) { return std::round(a); });
     a.registerFunction("trunc", [](double a) { return std::trunc(a); });
     a.registerFunction("abs", [](double a) { return std::abs(a); });
