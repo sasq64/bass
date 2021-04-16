@@ -443,7 +443,7 @@ void Assembler::handleLabel(std::any const& lbl)
         return;
     }
 
-    std::string label = std::string(std::any_cast<std::string_view>(lbl));
+    std::string label { std::any_cast<std::string_view>(lbl) };
 
     if (label == "$" || label == "-" || label == "+") {
         ::Check(inMacro == 0, "No special labels in macro");
