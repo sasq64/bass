@@ -74,6 +74,17 @@ struct SymbolTable
         return defined;
     }
 
+    bool is_redefinable(std::string_view name) const {
+        std::string s {name};
+        auto const it = syms.find(s);
+        if (it != syms.end() && it->second.final) {
+            // symbol exists and marked final
+            return undefined.count(s) > 0;
+        }
+
+        return true;
+    }
+
     void set_sym(std::string_view name, AnyMap const& symbols)
     {
         auto s = std::string(name);

@@ -457,6 +457,7 @@ void Assembler::handleLabel(std::any const& lbl)
             lastLabel = std::any_cast<std::string_view>(lbl);
         }
     }
+    ::Check(syms.is_redefinable(label), fmt::format("Const Label '{}' cannot be redefined", label));
     // LOGI("Label %s=%x", label, mach->getPC());
     syms.set(label, static_cast<Number>(mach->getPC()));
     if (pendingTest != nullptr) {
