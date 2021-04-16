@@ -446,14 +446,12 @@ void Assembler::handleLabel(std::any const& lbl)
     std::string label = std::string(std::any_cast<std::string_view>(lbl));
 
     if (label == "$" || label == "-" || label == "+") {
-        if (inMacro != 0) throw parse_error("No special labels in macro");
+        ::Check(inMacro == 0, "No special labels in macro");
         label = "__special_" + std::to_string(labelNum);
         labelNum++;
     } else {
         if (label[0] == '.') {
-            if (lastLabel.empty()) {
-                throw parse_error("Local label without global label");
-            }
+            ::Check(!lastLabel.empty(), "Local label without global label");
             label = std::string(lastLabel) + label;
         } else {
             lastLabel = std::any_cast<std::string_view>(lbl);
@@ -471,11 +469,8 @@ void Assembler::handleLabel(std::any const& lbl)
                           {"cycles", num(0)}, {"ram", mach->getRam()}};
             syms.set("tests."s + label, res);
         }
-        if (mach->getPC() == test->start) {
-            test->name = label;
-        } else {
-            throw parse_error("No label found after anonymous test");
-        }
+        ::Check(mach->getPC() == test->start, "No label found after anonymous test");
+        test->name = label;
     }
 }
 
