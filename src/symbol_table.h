@@ -66,6 +66,12 @@ struct SymbolTable
         return syms.find(std::string(name)) != syms.end();
     }
 
+    bool is_defined(std::string_view name) const
+    {
+        auto const it = syms.find(std::string(name));
+        return it != syms.end() ? it->second.defined : false;
+    }
+
     void set_sym(std::string_view name, AnyMap const& symbols)
     {
         auto s = std::string(name);
