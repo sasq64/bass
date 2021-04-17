@@ -61,7 +61,7 @@ struct SymbolTable
 
     void acceptUndefined(bool ok) { undef_ok = ok; }
 
-    bool is_defined(std::string_view name) const
+    bool is_declared(std::string_view name) const
     {
         return syms.find(std::string(name)) != syms.end();
     }

@@ -257,7 +257,7 @@ std::any Assembler::applyDefine(Macro const& fn, Call const& call)
 
     for (unsigned i = 0; i < call.args.size(); i++) {
         // auto const& v = syms.get(args[i]);
-        if (syms.is_defined(args[i])) {
+        if (syms.is_declared(args[i])) {
             errors.emplace_back(
                 0, 0,
                 fmt::format("Function '{}' shadows global symbol {}", call.name,
@@ -431,7 +431,7 @@ void Assembler::handleLabel(std::any const& lbl)
     if (auto const* p =
             std::any_cast<std::pair<std::string_view, int32_t>>(&lbl)) {
         // Indexed symbol: Label is array of values
-        if (!syms.is_defined(p->first)) {
+        if (!syms.is_declared(p->first)) {
             syms.set(p->first, std::vector<Number>{});
         }
         auto& vec = syms.get<std::vector<Number>>(p->first);
@@ -587,13 +587,13 @@ void Assembler::setupRules()
     parser.after("IfDefDecl", [&](SV& sv) -> std::any {
         ::Check(sv.size() >= 1, "Invalid !ifdef declaration");
         auto s = any_cast<std::string_view>(sv[0]);
-        return Number(syms.is_defined(s));
+        return Number(syms.is_declared(s));
     });
 
     parser.after("IfNDefDecl", [&](SV& sv) -> std::any {
         ::Check(sv.size() >= 1, "Invalid !ifndef declaration");
         auto s = any_cast<std::string_view>(sv[0]);
-        return Number(!syms.is_defined(s));
+        return Number(!syms.is_declared(s));
     });
 
     parser.after("CheckDecl", [&](SV& sv) -> std::any {
@@ -1151,7 +1151,7 @@ void Assembler::setupRules()
         val = syms.get(full);
         // Set undefined numbers to PC, to increase likelihood of
         // correct code generation (less passes)
-        if (val.type() == typeid(Number) && !syms.is_defined(full)) {
+        if (val.type() == typeid(Number) && !syms.is_declared(full)) {
             val = static_cast<Number>(mach->getPC());
         }
         return val;
