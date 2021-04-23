@@ -66,11 +66,6 @@ struct SymbolTable
         return accessed.find(std::string(name)) != accessed.end();
     }
 
-    bool is_declared(std::string_view name) const
-    {
-        return syms.find(std::string(name)) != syms.end();
-    }
-
     bool is_defined(std::string_view name) const
     {
         auto const it = syms.find(std::string(name));
