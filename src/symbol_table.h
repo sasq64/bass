@@ -100,7 +100,7 @@ struct SymbolTable
     {
         auto s = std::string(name);
         if (val.type() == typeid(AnyMap)) {
-            set(name, std::any_cast<AnyMap>(val));
+            set_sym(name, std::any_cast<AnyMap>(val));
         } else if (val.type() == typeid(double)) {
             set(name, std::any_cast<double>(val));
         } else {
