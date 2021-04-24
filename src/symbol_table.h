@@ -68,7 +68,14 @@ struct SymbolTable
 
     bool is_defined(std::string_view name) const
     {
-        auto const it = syms.find(std::string(name));
+        std::string s {name};
+        #if 0
+            // TODO: Do we need both the "undefined" set and a "defined" flag?
+            if (undefined.count(s) > 0) {
+                return false;
+            }
+        #endif
+        auto const it = syms.find(s);
         return it != syms.end() ? it->second.defined : false;
     }
 
