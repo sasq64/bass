@@ -68,15 +68,12 @@ struct SymbolTable
 
     bool is_defined(std::string_view name) const
     {
+        // A symbol is defined when contained in the "syms" list
+        // and *not* contained in the "undefined" set
         std::string s {name};
-        #if 0
-            // TODO: Do we need both the "undefined" set and a "defined" flag?
-            if (undefined.count(s) > 0) {
-                return false;
-            }
-        #endif
-        auto const it = syms.find(s);
-        return it != syms.end() ? it->second.defined : false;
+        bool defined = undefined.count(s) == 0;
+        defined &= syms.count(s) > 0;
+        return defined;
     }
 
     void set_sym(std::string_view name, AnyMap const& symbols)
