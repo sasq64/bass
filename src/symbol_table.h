@@ -36,8 +36,6 @@ struct Symbol
     std::any value;
     // This symbol has been read since `clear()`
     bool accessed{false};
-    // This symbol has been defined since `clear()`
-    bool defined{false};
 
     // This symbol is constant and may only be set once.
     bool final{false};
@@ -167,7 +165,6 @@ struct SymbolTable
                 }
             }
             syms[s].value = std::any(val);
-            syms[s].defined = true;
         }
     }
 
@@ -334,7 +331,6 @@ struct SymbolTable
     {
         for (auto& s : syms) {
             s.second.accessed = false;
-            s.second.defined = false;
         }
         accessed.clear();
         undefined.clear();
