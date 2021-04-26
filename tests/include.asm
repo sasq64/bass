@@ -2,4 +2,7 @@
 W = 2
 !include "../asm/test_include.i"
 
-!include "../asm/other.i"
+;FIXME: workaround -> "code" label guards from reincluding
+!ifndef code {
+  !include "../asm/other.i"
+}
