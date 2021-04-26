@@ -179,6 +179,12 @@ struct SymbolTable
         }
     }
 
+    void set_final(std::string_view name)
+    {
+        std::string s {name};
+        syms[s].final = true;
+    }
+
     // Return a map containing all symbols beginning with
     // name.
     AnyMap collect(std::string_view name) const
@@ -342,6 +348,7 @@ struct SymbolTable
     {
         for (auto& s : syms) {
             s.second.accessed = false;
+            s.second.final = false;
         }
         accessed.clear();
         undefined.clear();

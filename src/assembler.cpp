@@ -460,6 +460,7 @@ void Assembler::handleLabel(std::any const& lbl)
     ::Check(syms.is_redefinable(label), fmt::format("Const Label '{}' cannot be redefined", label));
     // LOGI("Label %s=%x", label, mach->getPC());
     syms.set(label, static_cast<Number>(mach->getPC()));
+    syms.set_final(label);
     if (pendingTest != nullptr) {
         auto* test = pendingTest;
         pendingTest = nullptr;
