@@ -36,8 +36,6 @@ struct Symbol
     std::any value;
     // This symbol has been read since `clear()`
     bool accessed{false};
-    // This symbol has been defined since `clear()`
-    bool defined{false};
 
     // This symbol is constant and may only be set once.
     bool final{false};
@@ -61,9 +59,30 @@ struct SymbolTable
 
     void acceptUndefined(bool ok) { undef_ok = ok; }
 
+    bool is_accessed(std::string_view name) const
+    {
+        return accessed.find(std::string(name)) != accessed.end();
+    }
+
     bool is_defined(std::string_view name) const
     {
-        return syms.find(std::string(name)) != syms.end();
+        // A symbol is defined when contained in the "syms" list
+        // and *not* contained in the "undefined" set
+        std::string s {name};
+        bool defined = undefined.count(s) == 0;
+        defined &= syms.count(s) > 0;
+        return defined;
+    }
+
+    bool is_redefinable(std::string_view name) const {
+        std::string s {name};
+        auto const it = syms.find(s);
+        if (it != syms.end() && it->second.final) {
+            // symbol exists and marked final
+            return undefined.count(s) > 0;
+        }
+
+        return true;
     }
 
     void set_sym(std::string_view name, AnyMap const& symbols)
@@ -94,7 +113,7 @@ struct SymbolTable
     {
         auto s = std::string(name);
         if (val.type() == typeid(AnyMap)) {
-            set(name, std::any_cast<AnyMap>(val));
+            set_sym(name, std::any_cast<AnyMap>(val));
         } else if (val.type() == typeid(double)) {
             set(name, std::any_cast<double>(val));
         } else {
@@ -157,8 +176,13 @@ struct SymbolTable
                 }
             }
             syms[s].value = std::any(val);
-            syms[s].defined = true;
         }
+    }
+
+    void set_final(std::string_view name)
+    {
+        std::string s {name};
+        syms[s].final = true;
     }
 
     // Return a map containing all symbols beginning with
@@ -324,7 +348,7 @@ struct SymbolTable
     {
         for (auto& s : syms) {
             s.second.accessed = false;
-            s.second.defined = false;
+            s.second.final = false;
         }
         accessed.clear();
         undefined.clear();
