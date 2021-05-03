@@ -57,7 +57,7 @@ Convert the given string to upper case.
 
 === str(n)
 
-Turns a number into a string
+Turns a number into a decimal string.
 
 === num(s)
 
