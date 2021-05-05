@@ -7,7 +7,7 @@ Statement <- Script / MetaBlock / Line
 
 Line <- EndOfLine / NonEmptyLine
 
-NonEmptyLine <- (AssignLine / OpLine / LabelLine / WhiteLine) _ (&'}' / EndOfLine / &EOT)
+NonEmptyLine <- (AssignLine / OpLine / LabelLine / WhiteLine / Comment) _ (&'}' / EndOfLine / &EOT)
 
 WhiteLine <- WS
 
