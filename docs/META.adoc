@@ -110,7 +110,7 @@ Put data into memory, Essentially a shorthand for
 
 1. `!macro <name>(<args>...) { <statements...> }`
 
-Create a macro. A macro can be called at a later time, at which point its
+Define a macro. A macro can be placed in code later where its
 contents will be inserted into the assembly for parsing.
 
 Note that macros do form a new scope only for local symbols (starting with a dot '.').
