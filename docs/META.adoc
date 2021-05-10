@@ -113,8 +113,7 @@ Put data into memory, Essentially a shorthand for
 Create a macro. A macro can be called at a later time, at which point its
 contents will be inserted into the assembly for parsing.
 
-Note that macros do not form a new scope, so symbols assigned in macros become
-global.
+Note that macros do form a new scope only for local symbols (starting with a dot '.').
 
 1. Create a macro that will insert `<statements>`.
 
@@ -122,7 +121,7 @@ global.
 [source,ca65]
 ----
     !macro WaitLine(line) {
-.wait   lda $d012
+.wait   lda $d012  ; note: local symbol '.wait' is scoped by the macro
         cmp #line
         bne .wait
     }
