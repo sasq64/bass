@@ -668,6 +668,7 @@ void Assembler::setupRules()
     parser.after("MacroCall", [&](SV& sv) { return sv[0]; });
 
     parser.after("FnCall", [&](SV& sv) {
+        ::Check(sv.size() >= 1, "Invalid function call");
         auto call = any_cast<Call>(sv[0]);
         auto name = std::string(call.name);
         bool found = false;
