@@ -5,13 +5,11 @@ Program <- Statement*
 
 Statement <- Script / MetaBlock / Line
 
-Line <- EndOfLine / NonEmptyLine
+Line <- EndOfLine / NonEmptyLine / CommentLine / WS
 
-NonEmptyLine <- (AssignLine / OpLine / LabelLine / WhiteLine) _ (&'}' / EndOfLine / &EOT)
+NonEmptyLine <- (AssignLine / OpLine / Label) _ (&'}' EndOfLine)?
 
-WhiteLine <- WS
-
-LabelLine <- Label
+CommentLine <- _ Comment
 
 OpLine <- Label? _ (MacroCall / Instruction)
 
@@ -138,8 +136,8 @@ Expression2  <- Atom (Operator Atom)* {
 
 Tern <- '?' DelayedExpression ':' DelayedExpression
 
-Atom <- _? (Star / Unary / Unary2 / Number / String /
-        Index / Lambda / ArrayLiteral / FnCall / Variable / '(' Expression ')') _?
+Atom <- _ (Star / Unary / Unary2 / Number / String /
+        Index / Lambda / ArrayLiteral / FnCall / Variable / '(' Expression ')') _
 
 Star <- '*'
 
