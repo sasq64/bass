@@ -9,7 +9,7 @@ normally do not have any side effects.
 
 Trigonometric functions.
 
-=== sqrt(f), min(a,b), max(a,b), pow(f), round(f)
+=== sqrt(f), min(a,b), max(a,b), pow(f), round(f), floor(f), ceil(f)
 
 Other math functions.
 
@@ -57,7 +57,7 @@ Convert the given string to upper case.
 
 === str(n)
 
-Turns a number into a string
+Turns a number into a decimal string.
 
 === num(s)
 
