@@ -15,8 +15,8 @@ struct Image
 };
 
 Image loadPng(std::string_view name);
-std::vector<uint8_t> layoutTiles(std::vector<uint8_t> const& pixels, int stride,
-                                 int w, int h, int gap);
+std::vector<uint8_t> layoutTiles(std::vector<uint8_t> const& pixels, unsigned stride,
+                                 unsigned w, unsigned h, unsigned gap);
 std::vector<uint8_t> indexTiles(std::vector<uint8_t>& pixels, int size);
 std::vector<uint8_t> convertPalette(std::vector<uint32_t> const& colors32);
 std::vector<uint8_t> convertPalette(std::vector<double> const& colors32);

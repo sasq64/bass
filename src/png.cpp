@@ -229,33 +229,33 @@ std::vector<uint8_t> toMonochrome(image::bitmap8 const& bm)
     return result;
 }
 
-std::vector<uint8_t> layoutTiles(std::vector<uint8_t> const& pixels, int stride,
-                                 int w, int h, int gap)
+std::vector<uint8_t> layoutTiles(std::vector<uint8_t> const& pixels, unsigned stride,
+                                 unsigned w, unsigned h, unsigned gap)
 {
 
-    size_t tileCount = pixels.size() / (w * h);
+    auto tileCount = pixels.size() / static_cast<size_t>(w * h);
     size_t extra = gap * tileCount;
 
     std::vector<uint8_t> result(pixels.size() + extra);
     uint8_t* target = result.data();
-    int line = 0;
+    size_t line = 0;
 
     while (true) {
-        if ((line + 1) * h * stride > static_cast<int64_t>(pixels.size())) {
+        if ((line + 1) * h * stride > pixels.size()) {
             break;
         }
 
         const auto* start = pixels.data() + line * h * stride;
         const auto* src = start;
         while (src - start < stride) {
-            for (int y = 0; y < h; y++) {
-                for (int x = 0; x < w; x++) {
+            for (unsigned y = 0; y < h; y++) {
+                for (unsigned x = 0; x < w; x++) {
                     *target++ = *src++;
                 }
                 src = (src - w) + stride;
             }
-            src = src - stride * h + w;
-            for (int i = 0; i < gap; i++) {
+            src = src - static_cast<size_t>(stride * h) + w;
+            for (unsigned i = 0; i < gap; i++) {
                 *target++ = 0;
                 extra--;
             }

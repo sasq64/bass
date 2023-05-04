@@ -1,6 +1,4 @@
-
-
-#include "catch.hpp"
+#include "doctest.h"
 
 #include "assembler.h"
 #include "png.h"
@@ -67,7 +65,7 @@ bool checkErrors(std::vector<Error> errs)
     return errs.empty();
 }
 
-TEST_CASE("png.remap", "[assembler]")
+TEST_CASE("png.remap")
 {
     Image image = loadPng((projDir() / "data" / "tiles.png").string());
 
@@ -85,11 +83,11 @@ TEST_CASE("png.remap", "[assembler]")
     savePng("remapped.png", image);
 }
 
-TEST_CASE("png.layout", "[assembler]")
+TEST_CASE("png.layout")
 {
     auto get = [&](auto const& vec, int n) -> uint16_t {
-        return vec[n * 3] | (vec[n * 3 + 1] << 8) |(vec[n * 3 + 2] << 16) ;
-    };
+        return vec[n * 2] | (vec[n * 2 + 1] << 8);
+   };
 
     Image image = loadPng((projDir() / "data" / "test.png").string());
 
@@ -106,11 +104,15 @@ TEST_CASE("png.layout", "[assembler]")
     }
     puts("");
     for (int i = 0; i < 8 * 8; i++) {
-        fmt::print("{:02x} ", tiles[i + 8 * 8]);
+        fmt::print("{:02x} ", tiles[i + 2 * 8 * 8]);
     }
 
+    fmt::print("INDEXES\n");
     pixels = tiles;
     auto indexes = indexTiles(tiles, 8 * 8);
+    for (auto&& i : indexes) {
+        fmt::print("{:02x} ", i);
+    }
 
     REQUIRE(get(indexes, 0) == get(indexes, 15));
     REQUIRE(get(indexes, 8) == get(indexes, 10));
@@ -131,7 +133,7 @@ TEST_CASE("png.layout", "[assembler]")
     }
 }
 
-TEST_CASE("any_callable", "[assembler]")
+TEST_CASE("any_callable")
 {
     AnyCallable fn;
     fn = [](std::string s) -> long { return std::stol(s) + 3; };
@@ -140,7 +142,7 @@ TEST_CASE("any_callable", "[assembler]")
     REQUIRE(std::any_cast<double>(res) == 103);
 }
 
-TEST_CASE("png", "[assembler]")
+TEST_CASE("png")
 {
 
     Image image = loadPng((projDir() / "data" / "tiles.png").string());
@@ -161,7 +163,7 @@ TEST_CASE("png", "[assembler]")
     auto tiles8 = layoutTiles(tiles, 2, 1, 8, 0);
 }
 
-TEST_CASE("all", "[assembler]")
+TEST_CASE("all")
 {
     for (auto const& p : fs::directory_iterator(projDir() / "tests")) {
         Assembler ass;
@@ -177,7 +179,7 @@ TEST_CASE("all", "[assembler]")
     }
 }
 
-TEST_CASE("assembler.sections", "[assembler]")
+TEST_CASE("assembler.sections")
 {
     Assembler ass;
     auto& syms = ass.getSymbols();
@@ -209,7 +211,7 @@ TEST_CASE("assembler.sections", "[assembler]")
     ass.getMachine().write("_test.crt", OutFmt::EasyFlash);
 }
 
-TEST_CASE("assembler.sections2", "[assembler]")
+TEST_CASE("assembler.sections2")
 {
     Assembler ass;
 
@@ -230,7 +232,7 @@ TEST_CASE("assembler.sections2", "[assembler]")
     }
 }
 
-TEST_CASE("assembler.section_move", "[assembler]")
+TEST_CASE("assembler.section_move")
 {
     Assembler ass;
     auto& syms = ass.getSymbols();
@@ -260,7 +262,7 @@ print:
     REQUIRE(syms.at<Number>("print.skip") == 0xd);
 }
 
-TEST_CASE("assembler.sine_table", "[assembler]")
+TEST_CASE("assembler.sine_table")
 {
     using std::any_cast;
     Assembler ass;
@@ -285,7 +287,7 @@ amplitude = round(endValue-startValue)
     }
 }
 
-TEST_CASE("assembler.math", "[assembler]")
+TEST_CASE("assembler.math")
 {
     Assembler ass;
     auto& syms = ass.getSymbols();
@@ -305,14 +307,14 @@ sine_table:
 
     auto& mach = ass.getMachine();
     int sine_table = static_cast<int>(syms.get<Number>("sine_table"));
+    auto&& section = mach.getSection("main");
     for (int i = 0; i < 256; i++) {
         unsigned v = static_cast<int>(sin(i * M_PI / 180) * 127);
-        REQUIRE(mach.getSection("main").data[sine_table + i - 0x800] ==
-                (v & 0xff));
+        REQUIRE(section.data[sine_table + i - 0x800] == (v & 0xff));
     }
 }
 
-TEST_CASE("assembler.functions", "[assembler]")
+TEST_CASE("assembler.functions")
 {
     Assembler ass;
 

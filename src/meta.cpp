@@ -219,7 +219,7 @@ void initMeta(Assembler& assem)
                     mach.writeChar(c);
                 }
             } else {
-                auto b = number<uint8_t>(v);
+                auto b = number<int8_t>(v);
                 mach.writeByte(b);
             }
         }
