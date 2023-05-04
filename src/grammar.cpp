@@ -5,13 +5,11 @@ Program <- Statement*
 
 Statement <- Script / MetaBlock / Line
 
-Line <- EndOfLine / NonEmptyLine
+Line <- EndOfLine / NonEmptyLine / CommentLine / WS
 
-NonEmptyLine <- (AssignLine / OpLine / LabelLine / WhiteLine) _ (&'}' / EndOfLine / &EOT)
+NonEmptyLine <- (AssignLine / OpLine / Label) _ (&'}' EndOfLine)?
 
-WhiteLine <- WS
-
-LabelLine <- Label
+CommentLine <- _ Comment
 
 OpLine <- Label? _ (MacroCall / Instruction)
 
@@ -47,7 +45,7 @@ BlockProgram <- Program
 ScriptBlock <- '{:' ScriptContents2 ':}'
 ScriptContents2 <- (!':}' .)* 
 
-AssignLine <- _ ('*' / Assignee) _ '=' _ (String / Lambda / Expression)
+AssignLine <- _ ('*' / Assignee) _ '=' _ Expression
 Assignee <- AsmSymbol _
 
 Lambda <- '[' FnArgs '->' EndOfLine? DelayedExpression ']'
@@ -118,7 +116,9 @@ Comment <- ';' (!EOL .)*
 EOL <- '\r\n' / '\r' / '\n'
 EOT <- !.
 
-Expression  <- Atom (Operator Atom)* {
+Expression <- Expression2 Tern?
+
+Expression2  <- Atom (Operator Atom)* {
                          precedence
                            L :
                            L &&
@@ -134,9 +134,10 @@ Expression  <- Atom (Operator Atom)* {
                            L / * % \
                        }
 
+Tern <- '?' DelayedExpression ':' DelayedExpression
 
-Atom <- _? (Star / Unary / Unary2 / Number /
-        Index / ArrayLiteral / FnCall / Variable / '(' Expression ')') _?
+Atom <- _ (Star / Unary / Unary2 / Number / String /
+        Index / Lambda / ArrayLiteral / FnCall / Variable / '(' Expression ')') _
 
 Star <- '*'
 
@@ -144,7 +145,7 @@ ArrayLiteral <- '[' Expression (',' Expression)* ']'
 
 Index <- Indexable '[' Expression? (IndexSep Expression?)? ']'
 
-Indexable <- FnCall / Variable
+Indexable <- FnCall / Variable / Lambda
 
 IndexSep <- ':'
 
@@ -156,7 +157,7 @@ FnCall <- Call
 Call <- CallName '(' CallArgs ')'
 CallName <- Symbol
 CallArgs <- (_ CallArg (',' _ CallArg)*)?
-CallArg <- (Symbol _? '=' !'=')? (String / Lambda / Expression)
+CallArg <- (Symbol _? '=' !'=')? Expression
 Operator <-  
         '&&' / '||' / '<<' / '>>' / '==' / '!=' /
         '>=' / '<=' /

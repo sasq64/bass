@@ -344,7 +344,7 @@ void Assembler::defineMacro(std::string_view name,
 
 void initMeta(Assembler& assem);
 void initFunctions(Assembler& ass);
-void registerLuaFunctions(Assembler& a, Scripting& s);
+void registerLuaFunctions(Assembler& text, Scripting& scripting);
 
 void Assembler::setRegSymbols()
 {
@@ -443,24 +443,24 @@ void Assembler::handleLabel(std::any const& lbl)
         return;
     }
 
-    std::string label = std::string(std::any_cast<std::string_view>(lbl));
+    std::string label { std::any_cast<std::string_view>(lbl) };
 
     if (label == "$" || label == "-" || label == "+") {
-        if (inMacro != 0) throw parse_error("No special labels in macro");
+        ::Check(inMacro == 0, "No special labels in macro");
         label = "__special_" + std::to_string(labelNum);
         labelNum++;
     } else {
         if (label[0] == '.') {
-            if (lastLabel.empty()) {
-                throw parse_error("Local label without global label");
-            }
+            ::Check(!lastLabel.empty(), "Local label without global label");
             label = std::string(lastLabel) + label;
         } else {
             lastLabel = std::any_cast<std::string_view>(lbl);
         }
     }
+    ::Check(syms.is_redefinable(label), fmt::format("already defined label '{}'", label));
     // LOGI("Label %s=%x", label, mach->getPC());
     syms.set(label, static_cast<Number>(mach->getPC()));
+    syms.set_final(label);
     if (pendingTest != nullptr) {
         auto* test = pendingTest;
         pendingTest = nullptr;
@@ -471,11 +471,8 @@ void Assembler::handleLabel(std::any const& lbl)
                           {"cycles", num(0)}, {"ram", mach->getRam()}};
             syms.set("tests."s + label, res);
         }
-        if (mach->getPC() == test->start) {
-            test->name = label;
-        } else {
-            throw parse_error("No label found after anonymous test");
-        }
+        ::Check(mach->getPC() == test->start, "No label found after anonymous test");
+        test->name = label;
     }
 }
 
@@ -535,16 +532,9 @@ void Assembler::setupRules()
             }
             if (!scopes.empty()) {
                 sym = std::string(scopes.back()) + "." + sym;
-                LOGI("Prefixed to %s", sym);
+                //LOGI("Prefixed to %s", sym);
             }
-            auto value = sv[1];
-            if (auto* macro = any_cast<Macro>(&value)) {
-                auto view = persist(sym);
-                definitions[view] = *macro;
-
-            } else {
-                syms.set(sym, value);
-            }
+            syms.set(sym, sv[1]);
         } else if (sv.size() == 1) {
             mach->getCurrentSection().pc = number<uint16_t>(sv[0]);
         }
@@ -597,16 +587,19 @@ void Assembler::setupRules()
     });
 
     parser.after("IfDefDecl", [&](SV& sv) -> std::any {
+        ::Check(sv.size() >= 1, "Invalid !ifdef declaration");
         auto s = any_cast<std::string_view>(sv[0]);
         return Number(syms.is_defined(s));
     });
 
     parser.after("IfNDefDecl", [&](SV& sv) -> std::any {
+        ::Check(sv.size() >= 1, "Invalid !ifndef declaration");
         auto s = any_cast<std::string_view>(sv[0]);
         return Number(!syms.is_defined(s));
     });
 
     parser.after("CheckDecl", [&](SV& sv) -> std::any {
+        ::Check(sv.size() >= 1, "Invalid !check declaration");
         Meta meta;
         meta.name = "check";
         meta.blocks.push_back(any_cast<Block>(sv[0]));
@@ -624,6 +617,7 @@ void Assembler::setupRules()
     });
 
     parser.after("MacroDecl", [&](SV& sv) -> std::any {
+        ::Check(sv.size() >= 1, "Invalid !macro declaration");
         auto fndef = any_cast<Def>(sv[0]);
         Meta meta;
 
@@ -674,12 +668,16 @@ void Assembler::setupRules()
     parser.after("MacroCall", [&](SV& sv) { return sv[0]; });
 
     parser.after("FnCall", [&](SV& sv) {
+        ::Check(sv.size() >= 1, "Invalid function call");
         auto call = any_cast<Call>(sv[0]);
         auto name = std::string(call.name);
+        bool found = false;
 
-        auto it0 = definitions.find(name);
-        if (it0 != definitions.end()) {
-            return applyDefine(it0->second, call);
+        if (auto sym = syms.get_sym(name)) {
+            if (auto const* macro = std::any_cast<Macro>(&sym->value)) {
+                return applyDefine(*macro, call);
+            }
+            found = true;
         }
 
         auto it = functions.find(name);
@@ -693,6 +691,10 @@ void Assembler::setupRules()
 
         if (scripting.hasFunction(call.name)) {
             return scripting.call(call.name, call.args);
+        }
+
+        if(found) {
+            throw parse_error(fmt::format("'{}' is not callable", name));
         }
 
         throw parse_error(fmt::format("Unknown function '{}'", name));
@@ -969,6 +971,22 @@ void Assembler::setupRules()
     parser.after("Star", [&](SV&) -> Number { return mach->getPC(); });
 
     parser.after("Expression", [&](SV& sv) {
+        if(sv.size() == 2) {
+            // Tern
+            auto p = any_cast<std::pair<Block, Block>>(sv[1]);
+            if(number(sv[0]) != 0) {
+                return parser.evaluate(p.first.node);
+            }
+            return parser.evaluate(p.second.node);
+        }
+        return sv[0];
+    });
+
+    parser.after("Tern", [&](SV& sv) -> std::any {
+        return std::make_pair(std::any_cast<Block>(sv[0]), std::any_cast<Block>(sv[1]));
+    });
+
+    parser.after("Expression2", [&](SV& sv) {
         if (sv.size() == 1) {
             return sv[0];
         }
@@ -1024,7 +1042,7 @@ void Assembler::setupRules()
         return sv[0];
     });
 
-    parser.after("Index", [&](SV& sv) {
+    parser.after("Index", [&](SV& sv) -> std::any {
         if (sv.size() == 1) {
             return sv[0];
         }
@@ -1051,6 +1069,19 @@ void Assembler::setupRules()
             if (auto const* vn = any_cast<std::vector<Number>>(&vec)) {
                 return slice(*vn, a, b);
             }
+
+            if (auto const* macro = any_cast<Macro>(&vec)) {
+                std::vector<Number> result(b-a);
+                Call call;
+                call.args.resize(1);
+                for(int64_t i = a; i<b; i++) {
+                    call.args[0] = any_num(i);
+                    auto res = applyDefine(*macro, call);
+                    result[i-a] = number<uint8_t>(res);
+                }
+                return std::any(result);
+            }
+
             throw parse_error("Can not slice non-array");
         }
 
@@ -1334,7 +1365,6 @@ void Assembler::popScope()
 void Assembler::clear()
 {
     macros.clear();
-    definitions.clear();
     errors.clear();
     passNo = 0;
 }

@@ -257,10 +257,11 @@ int main(int argc, char** argv)
     }
 
     if (!state.quiet) {
+        mach.sortSectionsByStart();
         for (auto const& section : mach.getSections()) {
             if (!section.data.empty()) {
                 fmt::print("{:04x}-{:04x} {}\n", section.start,
-                           section.start + section.data.size(), section.name);
+                           section.start + section.data.size()-1, section.name);
             }
         }
     }

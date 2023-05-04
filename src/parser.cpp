@@ -62,7 +62,6 @@ Parser::Parser(const char* s) : p(std::make_unique<peg::parser>(s))
     p->enable_ast<peg::AstBase<BassNode>>();
     p->log = [&](size_t line, size_t, std::string const& msg) {
         if (!haveError) {
-            LOGI("Msg %s", msg);
             setError(msg, "", line);
         }
     };

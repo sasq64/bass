@@ -144,6 +144,11 @@ public:
     Section& getSection(std::string const& name);
     Section& getCurrentSection();
     std::deque<Section> const& getSections() const { return sections; }
+    void sortSectionsByStart() {
+        std::sort(sections.begin(), sections.end(), [](auto a, auto b){
+            return a.start < b.start;
+        });
+    }
     uint32_t getPC() const;
     void write(std::string_view name, OutFmt fmt);
     void writeListFile(std::string_view name);

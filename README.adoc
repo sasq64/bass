@@ -1,4 +1,6 @@
 
+image:https://www.travis-ci.com/sasq64/bass.svg?branch=dev["Build (dev)", link="https://www.travis-ci.com/sasq64/bass"]
+
 = The Bass 6502 Assembler
 
 * ACME like syntax
@@ -28,11 +30,11 @@ from the github releases page.
 
 == Further Documentation
 
-User manual: http://apone.org/bass/
+User manual: http://minnberg.se/bass/
 
-Tutorial: http://apone.org/bass/part1.html
+Tutorial: http://minnberg.se/bass/part1.html
 
-Example: http://apone.org/bass/example.asm.html
+Example: http://minnberg.se/bass/example.asm.html
 
 == Example
 

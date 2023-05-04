@@ -226,7 +226,7 @@ void Pet100::run(uint16_t pc)
     }
 }
 
-uint16_t Pet100::get_ticks() const
+uint32_t Pet100::get_ticks() const
 {
     auto us = frozenTimer
                   ? frozenTime

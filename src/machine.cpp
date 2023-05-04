@@ -8,6 +8,8 @@
 #include <coreutils/log.h>
 #include <coreutils/text.h>
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <array>
 #include <map>
@@ -575,7 +577,7 @@ std::string Machine::disassemble(uint32_t* pc)
     }
 
     std::array<char, 16> argstr; // NOLINT
-    sprintf(argstr.data(), modeTemplate.at(static_cast<int>(opcode.mode)), arg);
+    snprintf(argstr.data(), argstr.size(), modeTemplate.at(static_cast<int>(opcode.mode)), arg);
 
     return fmt::format("{} {}", name, argstr.data());
 }

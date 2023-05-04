@@ -34,7 +34,7 @@ public:
         RegState regs;
     };
 
-    struct Block
+    struct Block //NOLINT
     {
         std::string_view contents;
         size_t line;
@@ -54,7 +54,7 @@ public:
         std::vector<std::any> args;
     };
 
-    void handleLabel(std::any const& label);
+    void handleLabel(std::any const& lbl);
 
     void pushScope(std::string_view name);
     void popScope();
@@ -67,6 +67,7 @@ public:
     bool parse_path(fs::path const& p);
 
     fs::path getCurrentPath() const { return currentPath; }
+    void setCurrentPath(fs::path const& p) { currentPath = p; }
     SymbolTable& getSymbols();
     Machine& getMachine();
     void printSymbols();
@@ -95,7 +96,7 @@ public:
         std::string_view name;
         std::vector<std::any> args;
         std::vector<Block> blocks;
-        size_t line;
+        size_t line = 0;
     };
 
     using MetaFn = std::function<void(Meta const&)>;
@@ -118,7 +119,7 @@ public:
     void evaluateBlock(Block const& block);
 
     void runTest(Test const& test);
-    void addTest(std::string name, uint32_t start, RegState const& state);
+    void addTest(std::string name, uint32_t start, RegState const& regs);
 
     enum DebugFlags
     {
@@ -206,7 +207,6 @@ private:
     std::deque<std::string> stored_includes;
     std::shared_ptr<Machine> mach;
     std::unordered_map<std::string_view, Macro> macros;
-    std::unordered_map<std::string_view, Macro> definitions;
     SymbolTable syms;
     std::string_view lastLabel;
     bool finalPass{false};

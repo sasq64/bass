@@ -355,8 +355,6 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("section", [&](Meta const& meta) {
-        auto& syms = assem.getSymbols();
-
         if (meta.args.empty()) {
             throw parse_error("Too few arguments");
         }
@@ -369,6 +367,7 @@ void initMeta(Assembler& assem)
         auto& section = mach.addSection(sectionArgs);
 
         if (!meta.blocks.empty()) {
+            auto& syms = assem.getSymbols();
             mach.pushSection(section.name);
             auto sz = section.data.size();
             assem.evaluateBlock(meta.blocks[0]);
@@ -384,9 +383,9 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("fill", [&](Meta const& meta) {
-        auto& syms = assem.getSymbols();
+        ::Check(meta.args.size() >= 1, "Invalid !fill meta command");
         auto data = meta.args[0];
-        size_t size;
+        size_t size = 0;
         bool firstConst = false;
 
         // Create source lambda depending on first argument
@@ -412,7 +411,7 @@ void initMeta(Assembler& assem)
             };
         } else {
             size = number<size_t>(data);
-            src = [](size_t i) -> Number { return i; };
+            src = [](size_t i) { return static_cast<Number>(i); };
             firstConst = true;
         }
 
@@ -420,12 +419,12 @@ void initMeta(Assembler& assem)
         Assembler::Macro* macro = nullptr;
         Assembler::Call call;
         // Create transform lambda depending on second argument
-        if (meta.args.size() <= 1) {
+        if (meta.args.size() == 1) {
             // If first argument was a constant, fill with zeroes
             if (firstConst) {
-                tx = [](size_t, Number n) -> uint8_t { return 0; };
+                tx = [](size_t, Number) -> uint8_t { return 0; };
             } else {
-                tx = [](size_t, Number n) -> uint8_t { return n; };
+                tx = [](size_t, Number n) { return static_cast<uint8_t>(n); };
             }
         } else {
             data = meta.args[1];
@@ -434,6 +433,7 @@ void initMeta(Assembler& assem)
                 tx = [n](size_t, Number) -> uint8_t { return n; };
             } else {
                 macro = any_cast<Assembler::Macro>(&data);
+                ::Check(macro != nullptr, "Invalid !fill macro");
                 call.args.resize(macro->args.size());
                 tx = [&](size_t i, Number n) -> uint8_t {
                     if (call.args.size() >= 1) {
@@ -457,9 +457,13 @@ void initMeta(Assembler& assem)
     assem.registerMeta("include", [&](Meta const& meta) {
         Check(meta.args.size() == 1, "Incorrect number of arguments");
         auto name = any_cast<std::string_view>(meta.args[0]);
-        auto fileName = persist(assem.evaluatePath(name).string());
+        auto fullPath = assem.evaluatePath(name);
+        auto fileName = persist(fullPath.string());
         auto block = assem.includeFile(fileName);
+        auto saved = assem.getCurrentPath();
+        assem.setCurrentPath(fullPath.parent_path());
         assem.evaluateBlock(block);
+        assem.setCurrentPath(saved);
     });
 
     assem.registerMeta("script", [&](Meta const& meta) {
