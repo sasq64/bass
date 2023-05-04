@@ -49,6 +49,7 @@ AssignLine <- _ ('*' / Assignee) _ '=' _ Expression
 Assignee <- AsmSymbol _
 
 Lambda <- '[' FnArgs '->' EndOfLine? DelayedExpression ']'
+Lambda2 <- ('[>' / '[->') EndOfLine? DelayedExpression ']'
 
 
 Script <- '%{' ScriptContents '}%'
@@ -137,7 +138,7 @@ Expression2  <- Atom (Operator Atom)* {
 Tern <- '?' DelayedExpression ':' DelayedExpression
 
 Atom <- _ (Star / Unary / Unary2 / Number / String /
-        Index / Lambda / ArrayLiteral / FnCall / Variable / '(' Expression ')') _
+        Index / Lambda / Lambda2 / ArrayLiteral / FnCall / Variable / '(' Expression ')') _
 
 Star <- '*'
 

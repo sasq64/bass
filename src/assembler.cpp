@@ -707,6 +707,12 @@ void Assembler::setupRules()
         return Macro{"", args, block};
     });
 
+    parser.after("Lambda2", [&](SV& sv) -> std::any {
+      ::Check(sv.size() >= 1, "Invalid lambda expression");
+      auto block = any_cast<Block>(sv[0]);
+      return Macro{"", {}, block};
+    });
+
     parser.after("Call", [&](SV& sv) {
         auto name = any_cast<std::string_view>(sv[0]);
         auto args = any_cast<std::vector<std::any>>(sv[1]);
