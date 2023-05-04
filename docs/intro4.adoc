@@ -194,7 +194,7 @@ reads and write to certain memory areas.This way you can actually emulate those
 parts of your target system that you need for testing.
 
 And at the end of this LUA code you also see the `get_vram()` function used in the
-asserts above.This function returnes the data written to VRAM, so we can verify
+asserts above. This function returns the data written to VRAM, so we can verify
 that it contains what we want.
 
 

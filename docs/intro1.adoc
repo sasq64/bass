@@ -31,11 +31,11 @@ start:
     sta $d020
 ----
 
-What happens here ?Well the `!byte` meta command accepts both numbers
+What happens here? Well the `!byte` meta command accepts both numbers
 and strings, and for strings it inserts each character one by one.
 
-The `str()` function takes a value and converts it to a string.So this
-is how we insert the correct sys adress into the basic, regardless of
+The `str()` function takes a value and converts it to a string. So this
+is how we insert the correct sys address into the basic, regardless of
 where that `start:` label is placed.
 
 Let's add some more code;
@@ -61,14 +61,14 @@ start:
     !incbin "music.raw"
 ----
 
-This is a short program that wait for a certain scan line, calls a music routine,
-and loops.The music is expected to reside in the file "music.raw" and must
+This is a short program that waits for a certain scan line, calls a music routine,
+and loops. The music is expected to reside in the file "music.raw" and must
 be placed at address $1000.
 
-But what if music is a PRG with 2 bytes load address first.Or a sid file ?
+But what if music is a PRG with 2 bytes load address first. Or a sid file?
 
 The functional approach of bass lets us manipulate not only numeric data, but also
-byte arrays.So to strip out the 2 first byte of a file and place it in memory we
+byte arrays. So to strip out the 2 first byte of a file and place it in memory we
 can do:
 
 [source,ca65]
@@ -80,10 +80,10 @@ can do:
 A few new things here, the `data` symbol now refers to a byte array, and we use
 the `!fill` meta command to insert it into memory.
 
-The `[2:]` part is called _slicing_.To extract a range from a byte array you use
+The `[2:]` part is called _slicing_. To extract a range from a byte array you use
 it like: `data[start:end]` (where start is inclusive and end exclusive).
 
-So what about the load address, can we use it?Sure;
+So what about the load address, can we use it? Sure;
 
 [source,ca65]
 ----
@@ -95,9 +95,9 @@ music:
 
 As you may have figured out, the `word()` function decodes a little endian 16-bit word from an array.
 
-Except what if the load address is not compatible with our layout?If we load another song at a different adress it will probably break our code.
+Except what if the load address is not compatible with our layout? If we load another song at a different address it will probably break our code.
 
-Instead we can just _verify_ the load address:
+So instead of blindly trusting the load address we can _verify_ it:
 
 [source,ca65]
 ----
@@ -105,7 +105,7 @@ Instead we can just _verify_ the load address:
     !assert word(data[0:2]) == musicStart
 ----
 
-Lets put it all together:
+Let's put it all together:
 
 [source,ca65]
 ----

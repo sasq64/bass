@@ -36,10 +36,10 @@ spriteData:
 ----
 
 The `!rept` command is used to repeat any block of statements a given number
-of times.Here we user it to create a solid rectangle as out sprite.
+of times. Here we use it to create a solid rectangle as out sprite.
 
 But of course we want to generate something more nice looking.
-For this it's time to turn to lua scripting;
+For this it's time to turn to _lua_ scripting;
 
 [source]
 ----
@@ -80,10 +80,10 @@ spriteData:
 ----
 
 The LUA function will take an array as input, and return an array
-with the rendered circle.Just like we did with the graphics and music
+with the rendered circle. Just like we did with the graphics and music
 earlier, we can use the `!fill` command to put it into memory.
 
-Let's make ths sprite move.Here is some code to make the
+Let's make ths sprite move. Here is some code to make the
 sprite move in a sine wave:
 
 [source,ca65]
@@ -137,7 +137,7 @@ $   lda spriteData-1+i*64,x
 }
 ----
 
-Then lets add another sine table with an amplitude that matches the number of
+Then let's add another sine table with an amplitude that matches the number of
 frames, and add some code to set the sprite pointer every frame:
 
 [source,ca65]

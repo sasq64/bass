@@ -38,7 +38,7 @@ The first macro sets the VIC base address, which can only be located in one of
 will not compile if we try to use an incompatible address.
 
 The second macro is similar, but it takes offsets (from the VIC base address)
-and also makes sure the are legal.We use local symbols (starting with a `'.'`)
+and also makes sure they are legal. We use local symbols (starting with a `'.'`)
 to avoid polluting the namespace (yes symbols defined in macros will affect the
 global symbol table).
 
@@ -72,10 +72,10 @@ screen:
 
 Here we use array slicing again to extract all the parts.
 
-The bitmap we is placed directly at `$6000` using a `!section` command, but
+The bitmap is placed directly at `$6000` using a `!section` command, but
 the screen and color data needs to be copied.
 
-Here is the code to coy our colors to Color RAM, and out screen to `$4000`,
+Here is the code to copy our colors to Color RAM, and our screen to `$4000`,
 where we set it up earlier:
 
 [source,ca65]
