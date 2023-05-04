@@ -344,7 +344,7 @@ void Assembler::defineMacro(std::string_view name,
 
 void initMeta(Assembler& assem);
 void initFunctions(Assembler& ass);
-void registerLuaFunctions(Assembler& a, Scripting& s);
+void registerLuaFunctions(Assembler& text, Scripting& scripting);
 
 void Assembler::setRegSymbols()
 {

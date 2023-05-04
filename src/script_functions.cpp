@@ -2,16 +2,15 @@
 #include "machine.h"
 #include "script.h"
 #include <fmt/core.h>
-#include <fmt/format.h>
 
 #include <sol/sol.hpp>
 
-void registerLuaFunctions(Assembler& a, Scripting& s)
+void registerLuaFunctions(Assembler& assembler, Scripting& scripting)
 {
-    auto& lua = s.getState();
-    auto& mach = a.getMachine();
+    auto& lua = scripting.getState();
+    auto& mach = assembler.getMachine();
 
-    lua["fmt"] = [&](std::string const& f, sol::variadic_args args) {
+    lua["fmt"] = [&](std::string const& text, sol::variadic_args args) {
         fmt::dynamic_format_arg_store<fmt::format_context> store;
         for (auto arg : args) {
             if (arg.is<int32_t>()) {
@@ -21,13 +20,13 @@ void registerLuaFunctions(Assembler& a, Scripting& s)
                 store.push_back(arg.as<std::string>());
             }
         }
-        std::string result = fmt::vformat(f, store);
+        auto result = fmt::vformat(text, store);
         puts(result.c_str());
     };
 
     lua["sym"] = [&](std::string const& name) {
-        auto aval = a.getSymbols().get(name);
-        return s.to_object(aval);
+        auto aval = assembler.getSymbols().get(name);
+        return scripting.to_object(aval);
     };
 
     lua["start_run"] = [&] {

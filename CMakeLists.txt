@@ -50,7 +50,7 @@ add_subdirectory(external/lua)
 add_subdirectory(external/sol3)
 add_subdirectory(external/ansi)
 
-add_library(lodepng STATIC external/lodepng/lodepng)
+add_library(lodepng STATIC external/lodepng/lodepng.cpp)
 target_include_directories(lodepng PUBLIC external/lodepng)
 target_compile_options(lodepng PRIVATE ${WARN_EXT})
 

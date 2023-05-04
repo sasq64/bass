@@ -117,7 +117,7 @@ void log2(const char* fn, int line, Level level, const std::string& text)
         SetConsoleMode(hStdin, oldMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
         winInit = true;
     }
-#endif;
+#endif
     // const auto &space = LogSpace::spaces[fn];
     if (true) { // space.second || space.first == "") {
         char temp[2048];
@@ -139,12 +139,9 @@ void log2(const char* fn, int line, Level level, const std::string& text)
                 cs = cs ^ fn[i];
 
             cs = (cs % 6) + 1;
-
-
-
-            sprintf(temp, "\x1b[%dm[%s:%d]\x1b[%dm ", cs + 30, fn, line, 39);
+            snprintf(temp, sizeof(temp), "\x1b[%dm[%s:%d]\x1b[%dm ", cs + 30, fn, line, 39);
         } else {
-            sprintf(temp, "[%s:%d] ", fn, line);
+            snprintf(temp, sizeof(temp), "[%s:%d] ", fn, line);
         }
         if(altMode) {
             fputs("\x1b[?1049l", stdout);
