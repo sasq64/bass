@@ -42,6 +42,30 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     set(WARNINGS ${WARNINGS} ${MSVC_WARNINGS})
 endif()
 
+set(LZSA external/lzsa/src)
+set(LZSA_SRC
+    ${LZSA}/lzsa.c
+    ${LZSA}/dictionary.c
+    ${LZSA}/expand_block_v1.c
+    ${LZSA}/expand_block_v2.c
+    ${LZSA}/expand_context.c
+    ${LZSA}/expand_inmem.c
+    ${LZSA}/expand_streaming.c
+    ${LZSA}/frame.c
+    ${LZSA}/matchfinder.c
+    ${LZSA}/shrink_block_v1.c
+    ${LZSA}/shrink_block_v2.c
+    ${LZSA}/shrink_context.c
+    ${LZSA}/shrink_inmem.c
+    ${LZSA}/shrink_streaming.c
+    ${LZSA}/stream.c
+    ${LZSA}/libdivsufsort/lib/divsufsort.c
+    ${LZSA}/libdivsufsort/lib/divsufsort_utils.c
+    ${LZSA}/libdivsufsort/lib/sssort.c
+    ${LZSA}/libdivsufsort/lib/trsort.c
+)
+add_library(lzsa STATIC ${LZSA_SRC})
+target_include_directories(lzsa PUBLIC ${LZSA} ${LZSA}/libdivsufsort/include)
 
 add_subdirectory(external/fmt)
 add_subdirectory(external/CLI11)
@@ -67,7 +91,7 @@ add_library(badlib STATIC
 target_compile_definitions(badlib PUBLIC SOL_USING_CXX_LUA USE_FMT)
 target_compile_options(badlib PUBLIC ${WARNINGS})
 target_include_directories(badlib PRIVATE external/peglib PUBLIC src)
-target_link_libraries(badlib PUBLIC coreutils
+target_link_libraries(badlib PUBLIC coreutils lzsa
         PRIVATE lua lodepng fmt ${THREAD_LIB} PUBLIC sol2::sol2 sha512)
 
 if(FUZZ)
