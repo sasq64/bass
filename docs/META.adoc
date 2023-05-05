@@ -122,7 +122,8 @@ in the macro will only be visible in the macro.
 [source,ca65]
 ----
     !macro WaitLine(line) {
-.wait   lda $d012
+    ; NOTE: local symbol '.wait' is scoped to the macro
+.wait   lda $d012  
         cmp #line
         bne .wait
     }
