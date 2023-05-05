@@ -48,6 +48,7 @@ struct AssemblerState
     std::string programFile;
     OutFmt outFmt = OutFmt::Prg;
     bool compress = false;
+    bool astCache = true;
 
     void parseArgs(int argc, char** argv)
     {
@@ -57,6 +58,7 @@ struct AssemblerState
             {"crt"s, OutFmt::Crt},
         };
 
+        bool noCache = false;
         CLI::App app{"badass"};
         app.set_help_flag();
         auto* help = app.add_flag("-h,--help", "Request help");
@@ -69,6 +71,8 @@ struct AssemblerState
                      "Show undefined after each pass");
         app.add_flag("-q,--quiet", quiet, "Less noise");
         app.add_flag("-c,--compress", compress, "Compress program");
+        app.add_flag("--no-cache", noCache, "Don't cache generated ASTs");
+
         app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
         app.add_option("-l,--list-file", listFile, "Output assembly listing");
         app.add_flag("--65c02", use65c02, "Target 65c02");
@@ -87,6 +91,7 @@ struct AssemblerState
 
         try {
             app.parse(argc, argv);
+            astCache = !noCache;
             showHelp = (*help || (sourceFiles.empty() && scriptFiles.empty() &&
                                   programFile.empty()));
             if (showHelp) {
@@ -106,7 +111,7 @@ struct AssemblerState
         assem.setDebugFlags((showUndef ? Assembler::DEB_PASS : 0) |
                             (showTrace ? Assembler::DEB_TRACE : 0));
 
-        assem.useCache(!doRun);
+        assem.useCache(!doRun && astCache);
 
         if (outFile.empty()) {
             outFile =
