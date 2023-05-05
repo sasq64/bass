@@ -31,7 +31,8 @@ data.
 * _pc_ : Set the initial program counter. Defaults to _start_.
 * _align_ : Set alignment (in bytes) of this section
 * _file_ : Set output file of this section. Will remove the section from the
-  main output file.  _ReadOnly_ : Flag that marks this section (and all
+  main output file.
+* _ReadOnly_ : Flag that marks this section (and all
   children) as read only. Used for ROM areas.
 * _NoStore_ : Flag that marks this section as not having data in the output
   file. This is normally used for the zero page, and other bss sections.
@@ -55,22 +56,18 @@ start:
 
 === !org
 
-1. `!org <start>`
+`!org <start>`
 
 Creates an anonymous section beginning at _start_.
 
 === !rept
 
-1. `!rept [<ivar>=]<count> { <statements...> }`
-2. `!rept <array> { <statements...> }`
+ `!rept [<ivar>=]<count> { <statements...> }`
 
 Repeat a block of statements a specific number of times.
 
-1. Evaluate _statements_ _count_ times.For each iteration, set the symbol
+Evaluate _statements_ _count_ times.For each iteration, set the symbol
 <ivar> to the iteration number.If <ivar> is not provided, it defaults to `i`.
-
-2. Parse statements once for each item in _array_.For each iteration, sets `i`
-to the iteration number and `v` to the `i`th  value in the array.
 
 ==== Example
 [source,ca65]
@@ -78,8 +75,9 @@ to the iteration number and `v` to the `i`th  value in the array.
     !rept 25 { nop }
 xor_data:
     secret = [0x35, 0xcf, 0xa9, 0x44]
-    !rept load("raw.dat") {
-        !byte secret[i % len(secret] ^ v
+    data = load("raw.dat")
+    !rept len(data) {
+        !byte secret[i % len(secret)] ^ data[i]
     }
 ----
 
@@ -108,15 +106,17 @@ Put data into memory, Essentially a shorthand for
 
 === !macro
 
-1. `!macro <name>(<args>...) { <statements...> }`
+`!macro <name>(<args>...) { <statements...> }`
 
-Create a macro. A macro can be called at a later time, at which point its
+Create a macro that will insert `<statements>`.
+
+A macro can be called at a later time, at which point its
 contents will be inserted into the assembly for parsing.
 
 Note that macros do not form a new scope, so symbols assigned in macros become
-global.
+global. They do however implicitly add a non-local label, so dot-labels defined
+in the macro will only be visible in the macro.
 
-1. Create a macro that will insert `<statements>`.
 
 ==== Example
 [source,ca65]
@@ -129,19 +129,19 @@ global.
 ----
 === !byte
 
-1. `!byte <expression> [,<expression>]...`
+`!byte <expression> [,<expression>]...`
 
 Insert bytes into memory.
 
 === !word
 
-1. `!word <expression> [,<expression>]...`
+`!word <expression> [,<expression>]...`
 
 Insert 16bit words into memory.
 
 === !byte3
 
-1. `!byte3 <expression> [,<expression>]...`
+`!byte3 <expression> [,<expression>]...`
 
 Insert 24bit words into memory. Useful for C64 sprites.
 
@@ -179,27 +179,27 @@ Manual setup of translation of characters coming from `!text` commands.
 
 === !assert
 
-* `!assert <expression> [,<string>]`
+`!assert <expression> [,<string>]`
 
 Assert that _expression_ is true.Fail compilation otherwise.
 Asserts are only evaluated in the final pass.
 
 === !align
 
-* `!align <bytes>`
+`!align <bytes>`
 
 Align the _Program Counter_ so it is evenly dividable with _bytes_.
 Normal use case is `!align 256` to ensure page boundary.
 
 ===  !pc
 
-* `!pc <address>`
+`!pc <address>`
 
 Explicitly set the _Program Counter_ to the given address.
 
 === !ds
 
-* `!ds <bytes>`
+`!ds <bytes>`
 
 Declare an empty sequence of _size_ bytes.Only increase the _Program Counter_,
 will not put any data into the current section.
@@ -227,45 +227,83 @@ Conditional parsing of statements.
 
 === !include
 
-* `!include <filename>`
+`!include <filename>`
 
 Include another file, relative to this file.
 
 === !incbin
 
-* `!incbin <filename>`
+`!incbin <filename>`
 
 Include a binary file, relative to this file.
 
 === !script
 
-* `!script <filename>`
+`!script <filename>`
 
 Include a script file, relative to this file.
 
 === !cpu
 
-* `!cpu <cpuname>`
+`!cpu <cpuname>`
 
-Set the CPU to use.Valid arguments are only `"6502"` or `"65c02"`.
+Set the CPU to use. Valid arguments are only `"6502"` or `"65c02"`.
 
 === !test
 
-* `!test [<name>] [<registers>]`
+1. `!test [<name>] [<registers>]`
 
-Mark the current position (PC) as the start of a test.  Registers take the
-form: <reg>=<value>, ...
+2. `!test [<name>] <address> [<registers>]`
 
-* `!test [<name>] <address> [<registers>]`
+Create a test that will be run inside the built-in emulator after assembly
+is successfully completed.
 
-Create a test that starts at _address_.
+You can put values into registers before running the test. Registers take the form: `<reg>=<value>`, ...
+
+If you need to add code just for the test, you can put it in a `NoStore=true`
+section to make sure it is not included in the output file.
+
+1. Mark the current position (PC) as the start of a test. If name is not given
+  the test statement must be followed by a global label which will be used
+  to name the test.
+
+2. Create a test that starts at _address_.
+
+==== Example
+[source,ca65]
+----
+    !test A=9
+setup:
+    tax
+    lda #3
+    sta $4000,x
+    !check RAM[$4009] == 3
+    !rts
+    sei
+    lda #0
+    sta $ffff
+    jmp somewhere
+
+    !section "tests", $c000, NoStore=true
+    !test "Does music work"
+    jsr init_music
+    jsr play_music
+
+----
+
+=== !rts
+
+`!rts`
+
+Exit early from test. Useful for testing part of routine.
 
 === !log
 
 * `!log <text>`
 
+
 Runtime log function during tests.Registers are available as special arguments
-between braces ({A}, {X}, {Y} etc).
+between braces (`+{A}+`, `+{X}+`, `+{Y}+` etc).
 
 ==== Example
 [source,ca65]
@@ -280,7 +318,7 @@ between braces ({A}, {X}, {Y} etc).
 * `!check <expression>`
 
 This is similar to assert, except it happens _runtime_ during the execution of
-tests.Symbols A,X,Y,SP,SR are available in expressions.
+tests.Symbols `A`, `X`, `Y`, `SP`, `SR` and `RAM[]` are available in expressions.
 
 ==== Example
 [source,ca65]
@@ -290,6 +328,8 @@ tests.Symbols A,X,Y,SP,SR are available in expressions.
     sec
     rol a
     !check A == 5
+    sta $1000
+    !check RAM[$1000] == 5
 ----
 
 === !run
@@ -301,6 +341,6 @@ logging.
 
 === !print
 
-* `!print <value> [,<value> ...]`
+1. `!print <value> [,<value> ...]`
 
 Print values during assembly.

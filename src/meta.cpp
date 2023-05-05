@@ -13,7 +13,9 @@
 
 using namespace std::string_literals;
 
-static Section parseArgs(std::vector<std::any> const& args)
+namespace {
+
+Section parseArgs(std::vector<std::any> const& args)
 {
     Section result;
     int i = 0;
@@ -57,6 +59,8 @@ static Section parseArgs(std::vector<std::any> const& args)
     }
     return result;
 }
+
+} // namespace
 
 void initMeta(Assembler& assem)
 {
@@ -383,7 +387,7 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("fill", [&](Meta const& meta) {
-        ::Check(meta.args.size() >= 1, "Invalid !fill meta command");
+        ::Check(!meta.args.empty(), "Invalid !fill meta command");
         auto data = meta.args[0];
         size_t size = 0;
         bool firstConst = false;
@@ -485,7 +489,7 @@ void initMeta(Assembler& assem)
         if (p.is_relative()) {
             p = assem.getCurrentPath() / p;
         }
-        utils::File f{p.string()};
+        utils::File const f{p.string()};
         for (auto const& b : f.readAll()) {
             mach.writeByte(b);
         }

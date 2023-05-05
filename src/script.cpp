@@ -108,7 +108,8 @@ std::any Scripting::to_any(sol::object const& obj)
         std::vector<uint8_t> vec;
         bool isVec = false;
         bool first = true;
-        t.for_each([&](sol::object const& key, sol::object const& val) {
+        t.for_each([this, &first, &isVec, &vec, &syms](sol::object const& key,
+                                                       sol::object const& val) {
             if (first) {
                 isVec = (key.is<size_t>() && val.is<Number>());
                 first = false;

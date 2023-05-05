@@ -158,7 +158,7 @@ public:
 
     uint32_t run(uint16_t pc);
     uint32_t go(uint16_t pc);
-    void runSetup();
+    std::pair<uint32_t, uint32_t> runSetup();
     std::vector<uint8_t> getRam();
 
     unsigned getReg(sixfive::Reg reg);

@@ -224,6 +224,8 @@ struct Machine
     {
         auto& p = policy();
         cycles = 0;
+        // We sometimes set 'cycles' high to break out of emulation,
+        // in that case 'realCycles' will contain the real value
         realCycles = 0;
         while (cycles < toCycles) {
             if (POLICY::eachOp(p)) break;
@@ -235,8 +237,8 @@ struct Machine
         if (realCycles != 0) {
             cycles = realCycles;
             realCycles = 0;
-        } else
-            return 0;
+        } //else
+          //  return 0;
 
         return cycles;
     }

@@ -20,6 +20,15 @@ inline void Check(bool v, std::string const& txt)
     if (!v) throw parse_error(txt);
 }
 
+enum class Base
+{
+    Hex = 16,
+    Decimal = 10,
+    Octal = 8,
+    Quad = 4,
+    Binary= 2
+};
+
 class Assembler
 {
 
@@ -200,7 +209,7 @@ private:
         std::variant<Check, Log, std::function<void()>> action;
     };
 
-    std::unordered_map<int32_t, std::vector<EmuAction>> actions;
+    std::unordered_map<uint32_t, std::vector<EmuAction>> actions;
 
     fs::path currentPath;
     std::unordered_map<std::string, Block> includes;

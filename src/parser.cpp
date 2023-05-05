@@ -60,7 +60,7 @@ Parser::Parser(const char* s) : p(std::make_unique<peg::parser>(s))
         exit(0);
     }
     p->enable_ast<peg::AstBase<BassNode>>();
-    p->log = [&](size_t line, size_t, std::string const& msg) {
+    p->log = [this](size_t line, size_t, std::string const& msg) {
         if (!haveError) {
             setError(msg, "", line);
         }
@@ -172,11 +172,11 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
     SHA512(reinterpret_cast<const uint8_t*>(source.data()), source.size(),
            sha.data());
     auto shaName = hex_encode(sha, 32);
-    fs::path home = getHomeDir();
+    fs::path const home = getHomeDir();
     if (!fs::exists(home / ".basscache")) {
         fs::create_directories(home / ".basscache");
     }
-    fs::path target = home / ".basscache" / shaName;
+    auto target = home / ".basscache" / shaName;
 
     currentSource = source;
     currentFile = file;
@@ -245,15 +245,15 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
 std::any Parser::evaluate(AstNode const& node)
 {
     // LOGI("Evaluate %s", node->name);
-    std::string spaces{
+    std::string const spaces{
         "                                                        "};
 
-    std::function<std::any(AstNode const&, int)> eval =
-        [&](AstNode const& ast, int indent) -> std::any {
+    std::function<std::any(AstNode const&, int)> const eval =
+        [this, &eval](AstNode const& ast, int indent) -> std::any {
         bool descend = true;
         auto it0 = preActions.find(std::string(ast->name));
         if (it0 != preActions.end()) {
-            SemanticValues sv{ast};
+            SemanticValues const sv{ast};
             descend = it0->second(sv);
         }
 
@@ -272,7 +272,7 @@ std::any Parser::evaluate(AstNode const& node)
                            "'{}'\n-------------------------------------\n",
                            sv.name(), ast->line, sv.token_view());
                 for (size_t i = 0; i < sv.size(); i++) {
-                    std::any v = sv[i];
+                    std::any const v = sv[i];
                     fmt::print("  {}: {}\n", i, any_to_string(v));
                 }
                 auto ret = callAction(sv, *ast->action);

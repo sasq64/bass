@@ -7,7 +7,6 @@
 #ifndef _WIN32
 #    include <cxxabi.h>
 #endif
-#include <coreutils/algorithm.h>
 #include <coreutils/file.h>
 #include <coreutils/log.h>
 #include <coreutils/split.h>
@@ -34,17 +33,16 @@ Number operator"" _N(unsigned long long a)
 }
 Number to_number(std::string_view txt)
 {
-    double result{};
-    std::string t{txt};
+    std::string const t{txt};
     return static_cast<Number>(std::stod(t));
 }
 
-Number to_number(std::string_view txt, int base, int skip = 0)
+Number to_number(std::string_view txt, Base base, int skip = 0)
 {
     int64_t result{};
     txt.remove_prefix(skip);
-    auto [ptr, ec] =
-        std::from_chars(txt.data(), txt.data() + txt.size(), result, base);
+    auto [ptr, ec] = std::from_chars(txt.data(), txt.data() + txt.size(),
+                                     result, static_cast<int>(base));
     if (ec != std::errc()) {
         throw parse_error("Number conversion");
     }
@@ -88,19 +86,6 @@ std::string any_to_string(std::any const& val)
 #endif
 }
 
-std::string_view rstrip(std::string_view text)
-{
-    auto sz = static_cast<int64_t>(text.size());
-    auto p = sz - 1;
-    while (p >= 0 && (text[p] == ' ' || text[p] == '\t')) {
-        p--;
-    }
-    if (sz > p) {
-        text.remove_suffix(text.size() - 1 - p);
-    }
-    return text;
-}
-
 template <typename T>
 std::any Assembler::slice(std::vector<T> const& v, int64_t a, int64_t b)
 {
@@ -132,7 +117,7 @@ std::any Assembler::index(std::vector<T> const& v, int64_t index)
 
 void Assembler::setDebugFlags(uint32_t flags)
 {
-    bool doTrace = (flags & DEB_TRACE) != 0;
+    auto doTrace = (flags & DEB_TRACE) != 0;
     parser.doTrace(doTrace);
     passDebug = (flags & DEB_PASS) != 0;
     syms.trace = passDebug;
@@ -164,13 +149,13 @@ Assembler::Block Assembler::includeFile(std::string_view name)
     utils::File f{fn};
     stored_includes.push_back(f.readAllString());
 
-    std::string_view source = stored_includes.back();
+    std::string_view const source = stored_includes.back();
     auto ast = parser.parse(source, name);
     if (ast == nullptr) {
         throw parse_error("");
     }
 
-    Block block{source, 1, ast};
+    Block const block{source, 1, ast};
 
     includes[fn] = block;
     return includes.at(fn);
@@ -195,7 +180,6 @@ int Assembler::checkUndefined()
 
 void Assembler::addTest(std::string name, uint32_t start, RegState const& regs)
 {
-
     tests.push_back({name, start, regs});
     if (name.empty()) {
         pendingTest = &tests.back();
@@ -203,7 +187,7 @@ void Assembler::addTest(std::string name, uint32_t start, RegState const& regs)
     }
 
     if (passNo == 0) {
-        AnyMap res = {{"A", num(0)},      {"X", num(0)},
+        AnyMap const res = {{"A", num(0)},      {"X", num(0)},
                       {"Y", num(0)},      {"SR", num(0)},
                       {"SP", num(0)},     {"PC", num(0)},
                       {"cycles", num(0)}, {"ram", mach->getRam()}};
@@ -250,13 +234,8 @@ void Assembler::runTest(Test const& test)
 std::any Assembler::applyDefine(Macro const& fn, Call const& call)
 {
     AnyMap shadowed;
-    std::vector<std::string> args;
-    for (auto const& a : fn.args) {
-        args.emplace_back(a);
-    }
-
+    std::vector<std::string> args { fn.args.begin(), fn.args.end() };
     for (unsigned i = 0; i < call.args.size(); i++) {
-        // auto const& v = syms.get(args[i]);
         if (syms.is_defined(args[i])) {
             errors.emplace_back(
                 0, 0,
@@ -321,7 +300,7 @@ void Assembler::applyMacro(Call const& call)
 
     auto ll = lastLabel;
     auto pc = mach->getPC();
-    std::string macroLabel = "__macro_"s + std::to_string(pc);
+    auto macroLabel = "__macro_"s + std::to_string(pc);
     lastLabel = macroLabel;
     inMacro++;
     parser.evaluate(m.contents.node);
@@ -388,7 +367,7 @@ Assembler::Assembler() : parser(grammar6502)
             setRegSymbols();
             if (std::holds_alternative<Check>(action.action)) {
                 auto const& check = std::get<Check>(action.action);
-                std::any v = parser.evaluate(check.expression.node);
+                auto v = parser.evaluate(check.expression.node);
                 // evaluateExpression(check.expression, action.line);
                 if (!number<bool>(v)) {
                     syms = saved;
@@ -465,7 +444,7 @@ void Assembler::handleLabel(std::any const& lbl)
         auto* test = pendingTest;
         pendingTest = nullptr;
         if (passNo == 0) {
-            AnyMap res = {{"A", num(0)},      {"X", num(0)},
+            AnyMap const res = {{"A", num(0)},      {"X", num(0)},
                           {"Y", num(0)},      {"SR", num(0)},
                           {"SP", num(0)},     {"PC", num(0)},
                           {"cycles", num(0)}, {"ram", mach->getRam()}};
@@ -513,8 +492,8 @@ std::variant<A, bool> operation(std::string_view ope, A const& a, B const& b)
         if (ope == ":") return (a<<16) | b;
     }
     // clang-format on
-    throw parse_error(fmt::format("Unhandled: {} {} {}", typeid(A).name(), ope,
-                                  typeid(B).name()));
+    throw parse_error{fmt::format("Unhandled: {} {} {}", typeid(A).name(), ope,
+                                  typeid(B).name())};
 }
 
 void Assembler::setupRules()
@@ -523,7 +502,7 @@ void Assembler::setupRules()
     using SV = const SemanticValues;
     using namespace std::string_literals;
 
-    parser.after("AssignLine", [&](SV& sv) {
+    parser.after("AssignLine", [this](SV& sv) {
         // LOGI("Assign %s %d", sv[0].type().name(), sv.size());
         if (sv.size() == 2) {
             auto sym = std::string(any_cast<std::string_view>(sv[0]));
@@ -553,7 +532,7 @@ void Assembler::setupRules()
         return sv.token_view();
     });
 
-    parser.after("Label", [&](SV& sv) -> std::any {
+    parser.after("Label", [this](SV& sv) -> std::any {
         handleLabel(sv[0]);
         return {};
     });
@@ -586,13 +565,13 @@ void Assembler::setupRules()
         return meta;
     });
 
-    parser.after("IfDefDecl", [&](SV& sv) -> std::any {
+    parser.after("IfDefDecl", [this](SV& sv) -> std::any {
         ::Check(sv.size() >= 1, "Invalid !ifdef declaration");
         auto s = any_cast<std::string_view>(sv[0]);
         return Number(syms.is_defined(s));
     });
 
-    parser.after("IfNDefDecl", [&](SV& sv) -> std::any {
+    parser.after("IfNDefDecl", [this](SV& sv) -> std::any {
         ::Check(sv.size() >= 1, "Invalid !ifndef declaration");
         auto s = any_cast<std::string_view>(sv[0]);
         return Number(!syms.is_defined(s));
@@ -630,7 +609,7 @@ void Assembler::setupRules()
         return meta;
     });
 
-    parser.after("MetaBlock", [&](SV& sv) {
+    parser.after("MetaBlock", [this](SV& sv) {
         size_t i = 0;
 
         if (!sv[i].has_value()) {
@@ -667,7 +646,7 @@ void Assembler::setupRules()
 
     parser.after("MacroCall", [&](SV& sv) { return sv[0]; });
 
-    parser.after("FnCall", [&](SV& sv) {
+    parser.after("FnCall", [this](SV& sv) {
         ::Check(sv.size() >= 1, "Invalid function call");
         auto call = any_cast<Call>(sv[0]);
         auto name = std::string(call.name);
@@ -756,7 +735,7 @@ void Assembler::setupRules()
         return Block{sv.token_view(), sv.line(), get_child(sv.get_node(), 0)};
     });
 
-    parser.after("EnumLine", [&](SV& sv) -> std::any {
+    parser.after("EnumLine", [this](SV& sv) -> std::any {
         if (sv.size() == 0) {
             // Empty line
             return {};
@@ -771,7 +750,7 @@ void Assembler::setupRules()
         return std::pair(sym, value);
     });
 
-    parser.after("EnumBlock", [&](SV& sv) -> std::any {
+    parser.after("EnumBlock", [this](SV& sv) -> std::any {
         AnyMap m;
         nextEnumValue = 0;
         if (!sv[0].has_value()) {
@@ -799,7 +778,7 @@ void Assembler::setupRules()
     });
 
     parser.after("Opcode", [&](SV& sv) {
-        std::string_view suffix = "";
+        std::string_view suffix;
         auto name = any_cast<std::string_view>(sv[0]);
         if (sv.size() == 2) {
             suffix = any_cast<std::string_view>(sv[1]);
@@ -808,7 +787,7 @@ void Assembler::setupRules()
     });
     parser.after("StringContents", [](SV& sv) { return sv.token_view(); });
 
-    parser.after("OpLine", [&](SV& sv) {
+    parser.after("OpLine", [this](SV& sv) {
         for (size_t n = 0; n < sv.size(); n++) {
             auto arg = sv[n];
             if (auto* i = any_cast<Instruction>(&arg)) {
@@ -874,16 +853,15 @@ void Assembler::setupRules()
         parser.after(name.c_str(), buildArg);
     }
 
-    parser.after("ZRel", [&](SV& sv) -> Instruction {
-        int32_t v = (number<int32_t>(sv[1]) << 24) |
-                    (number<int32_t>(sv[0]) << 16) | number<int32_t>(sv[2]);
+    parser.after("ZRel", [](SV& sv) -> Instruction {
+      auto v = (number<int32_t>(sv[1]) << 24) |
+          (number<int32_t>(sv[0]) << 16) | number<int32_t>(sv[2]);
         return {"", Mode::ZP_REL, static_cast<Number>(v)};
     });
 
-    parser.after("LabelRef", [&](SV& sv) {
+    parser.after("LabelRef", [this](SV& sv) {
         auto label = sv.token_view();
 
-        std::any val;
         std::string l = std::string(label);
         if (label[0] == '+') {
             if (inMacro != 0) throw parse_error("No special labels in macro");
@@ -895,7 +873,7 @@ void Assembler::setupRules()
         return syms.get(l);
     });
 
-    parser.after("Decimal", [&](SV& sv) -> Number {
+    parser.after("Decimal", [this](SV& sv) -> Number {
         try {
             return to_number(sv.token_view());
         } catch (std::out_of_range&) {
@@ -906,9 +884,9 @@ void Assembler::setupRules()
         }
     });
 
-    parser.after("Octal", [&](SV& sv) -> Number {
+    parser.after("Octal", [this](SV& sv) -> Number {
         try {
-            return to_number(sv.token_view(), 8, 2);
+            return to_number(sv.token_view(), Base::Octal, 2);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
@@ -917,9 +895,9 @@ void Assembler::setupRules()
         }
     });
 
-    parser.after("Multi", [&](SV& sv) -> Number {
+    parser.after("Multi", [this](SV& sv) -> Number {
         try {
-            return to_number(sv.token_view(), 4, 2);
+            return to_number(sv.token_view(), Base::Quad, 2);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
@@ -928,11 +906,11 @@ void Assembler::setupRules()
         }
     });
 
-    parser.after("Binary", [&](SV& sv) -> Number {
+    parser.after("Binary", [this](SV& sv) -> Number {
         try {
             int skip = 1;
             if (sv.token_view()[0] == '0') skip++;
-            return to_number(sv.token_view(), 2, skip);
+            return to_number(sv.token_view(), Base::Binary, skip);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
@@ -952,11 +930,11 @@ void Assembler::setupRules()
         return s[0];
     });
 
-    parser.after("HexNum", [&](SV& sv) -> Number {
+    parser.after("HexNum", [this](SV& sv) -> Number {
         try {
             int skip = 1;
             if (sv.token_view()[0] == '0') skip++;
-            return to_number(sv.token_view(), 16, skip);
+            return to_number(sv.token_view(), Base::Hex, skip);
         } catch (std::out_of_range&) {
             if (isFinalPass()) {
                 throw parse_error("Out of range");
@@ -965,7 +943,7 @@ void Assembler::setupRules()
         }
     });
 
-    parser.after("ArrayLiteral", [&](SV& sv) -> std::vector<Number> {
+    parser.after("ArrayLiteral", [](SV& sv) -> std::vector<Number> {
         std::vector<Number> v;
         for (size_t i = 0; i < sv.size(); i++) {
             std::any const& a = sv[i];
@@ -974,9 +952,9 @@ void Assembler::setupRules()
         return v;
     });
 
-    parser.after("Star", [&](SV&) -> Number { return mach->getPC(); });
+    parser.after("Star", [this](SV&) -> Number { return mach->getPC(); });
 
-    parser.after("Expression", [&](SV& sv) {
+    parser.after("Expression", [this](SV& sv) {
         if(sv.size() == 2) {
             // Tern
             auto p = any_cast<std::pair<Block, Block>>(sv[1]);
@@ -992,7 +970,7 @@ void Assembler::setupRules()
         return std::make_pair(std::any_cast<Block>(sv[0]), std::any_cast<Block>(sv[1]));
     });
 
-    parser.after("Expression2", [&](SV& sv) {
+    parser.after("Expression2", [this](SV& sv) {
         if (sv.size() == 1) {
             return sv[0];
         }
@@ -1041,14 +1019,14 @@ void Assembler::setupRules()
         }
     });
 
-    parser.after("Script", [&](SV& sv) {
+    parser.after("Script", [this](SV& sv) {
         if (passNo == 0) {
             scripting.add(std::any_cast<std::string_view>(sv[0]));
         }
         return sv[0];
     });
 
-    parser.after("Index", [&](SV& sv) -> std::any {
+    parser.after("Index", [this](SV& sv) -> std::any {
         if (sv.size() == 1) {
             return sv[0];
         }
@@ -1085,7 +1063,7 @@ void Assembler::setupRules()
                     auto res = applyDefine(*macro, call);
                     result[i-a] = number<uint8_t>(res);
                 }
-                return std::any(result);
+                return result;
             }
 
             throw parse_error("Can not slice non-array");
@@ -1135,7 +1113,7 @@ void Assembler::setupRules()
 
     parser.after("Operator", [&](SV& sv) { return sv.token_view(); });
 
-    parser.after("Variable", [&](SV& sv) {
+    parser.after("Variable", [this](SV& sv) {
         std::any val;
         std::string full;
 
@@ -1160,7 +1138,7 @@ void Assembler::setupRules()
 
         val = syms.get(full);
         // Set undefined numbers to PC, to increase likelihood of
-        // correct code generation (less passes)
+        // correct code generation (fewer passes)
         if (val.type() == typeid(Number) && !syms.is_defined(full)) {
             val = static_cast<Number>(mach->getPC());
         }

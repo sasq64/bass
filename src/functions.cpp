@@ -4,7 +4,6 @@
 #include "png.h"
 
 #include <cmath>
-#include <coreutils/algorithm.h>
 #include <coreutils/file.h>
 #include <lodepng.h>
 
@@ -91,7 +90,7 @@ void initFunctions(Assembler& a)
             p = a.getCurrentPath() / p;
         }
         try {
-            utils::File f{p.string()};
+            utils::File const f{p.string()};
             return f.readAll();
         } catch (utils::io_exception&) {
             throw parse_error(fmt::format("Could not load {}", name));
@@ -158,8 +157,7 @@ void initFunctions(Assembler& a)
                        [&](std::vector<uint8_t> const& pixels, int32_t size) {
                            AnyMap result;
                            auto pixelCopy = pixels;
-                           std::vector<uint8_t> v = indexTiles(pixelCopy, size);
-                           result["indexes"] = v;
+                           result["indexes"] = indexTiles(pixelCopy, size);
                            result["tiles"] = pixelCopy;
                            return result;
                        });
@@ -181,7 +179,7 @@ void initFunctions(Assembler& a)
 
             image.pixels = layoutTiles(image.pixels, stride, tw, th, 0);
             image.width = w;
-            image.height = (int32_t)(image.pixels.size() / tw);
+            image.height = static_cast<int32_t>(image.pixels.size() / tw);
             return from_image(image);
         });
 

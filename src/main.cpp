@@ -47,6 +47,7 @@ struct AssemblerState
     std::string symbolFile;
     std::string programFile;
     OutFmt outFmt = OutFmt::Prg;
+    bool compress = false;
 
     void parseArgs(int argc, char** argv)
     {
@@ -67,6 +68,7 @@ struct AssemblerState
         app.add_flag("--show-undefined", showUndef,
                      "Show undefined after each pass");
         app.add_flag("-q,--quiet", quiet, "Less noise");
+        app.add_flag("-c,--compress", compress, "Compress program");
         app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
         app.add_option("-l,--list-file", listFile, "Output assembly listing");
         app.add_flag("--65c02", use65c02, "Target 65c02");
@@ -179,11 +181,11 @@ int main(int argc, char** argv)
         Pet100 emu;
 
         if (!state.programFile.empty()) {
-            utils::File f{state.programFile};
+            const utils::File f{state.programFile};
             uint16_t start = f.read<uint8_t>();
             start |= (f.read<uint8_t>() << 8);
             std::vector<uint8_t> data(f.getSize() - 2);
-            f.read(&data[0], data.size());
+            f.read(data.data(), data.size());
             emu.load(start, data);
             emu.run(start);
             exit(0);

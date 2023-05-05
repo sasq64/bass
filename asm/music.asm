@@ -145,7 +145,7 @@ sid_data:
     end)
 }%
 
-    !section "test", $c000
+    !section "test", $c000, NoStore=true
 
 !test "fast_play"
     jsr fast_init

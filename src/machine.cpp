@@ -10,6 +10,9 @@
 
 #include <fmt/format.h>
 
+//#include <lib.h>
+//#include <shrink_inmem.h>
+
 #include <algorithm>
 #include <array>
 #include <map>
@@ -19,7 +22,7 @@ using namespace std::string_literals;
 
 struct EmuPolicy : public sixfive::DefaultPolicy
 {
-    explicit EmuPolicy(sixfive::Machine<EmuPolicy>& m) : machine(m) {}
+    explicit EmuPolicy(sixfive::Machine<EmuPolicy>& m) : machine(&m) {}
 
     static constexpr bool ExitOnStackWrap = true;
 
@@ -34,13 +37,13 @@ struct EmuPolicy : public sixfive::DefaultPolicy
 
     std::array<Intercept*, 64 * 1024> intercepts{};
 
-    sixfive::Machine<EmuPolicy>& machine;
+    sixfive::Machine<EmuPolicy>* machine;
 
     // This function is run after each opcode. Return true to stop emulation.
     static bool eachOp(EmuPolicy& policy)
     {
         static unsigned last_pc = 0xffffffff;
-        auto pc = policy.machine.regPC();
+        auto pc = policy.machine->regPC();
 
         if (pc != last_pc) {
             // fmt::print("{:04x}\n", pc);
@@ -450,6 +453,27 @@ void Machine::write(std::string_view name, OutFmt fmt)
         outFile.write<uint8_t>(start >> 8);
     }
 
+    auto [low, high] = runSetup();
+    std::vector<uint8_t> target(high - low);
+    machine->read_ram(low, target.data(), target.size());
+//    std::vector<uint8_t> output(64*1024);
+//    int flags = LZSA_FLAG_RAW_BACKWARD | LZSA_FLAG_RAW_BLOCK;
+//    int res = lzsa_compress_inmem(target.data(), output.data(), target.size(), output.size(), flags, 0, 1);
+//    auto of = createFile("compress.test");
+//    output.resize(res);
+//    of.write(output);
+//    of.close();
+//
+//    of = createFile("noncompressed.test");
+//    of.write(target);
+//    of.close();
+
+
+    // compress memory
+    //size_t lzsa_compress_inmem(unsigned char *pInputData, unsigned char *pOutBuffer, size_t nInputSize, size_t nMaxOutBufferSize,
+    //                           const unsigned int nFlags, const int nMinMatchSize, const int nFormatVersion) {
+
+
     // bool bankFile = false;
 
     for (auto const& section : non_empty) {
@@ -515,19 +539,27 @@ uint32_t Machine::go(uint16_t pc)
     return machine->run();
 }
 
-void Machine::runSetup()
+std::pair<uint32_t, uint32_t> Machine::runSetup()
 {
+    uint32_t low = 0;
+    uint32_t high = 0;
     for (auto const& section : sections) {
         if (section.start < 0x10000 && !section.data.empty()) {
             if ((section.flags & NoStorage) != 0) {
                 continue;
             }
-            LOGD("Writing '%s' to %x-%x", section.name, section.start,
+            if (low == 0) {
+                low = section.start;
+            }
+            high = section.start + section.data.size();
+            LOGI("Writing '%s' to %x-%x", section.name, section.start,
                  section.start + section.data.size());
             machine->write_ram(section.start, section.data.data(),
                                section.data.size());
         }
     }
+
+    return { low, high };
 }
 
 uint32_t Machine::writeByte(uint8_t b)
