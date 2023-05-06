@@ -181,6 +181,7 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
     currentSource = source;
     currentFile = file;
 
+    ruleNames.clear();
     p->get_rule_names(ruleNames);
 
     try {
