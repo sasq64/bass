@@ -49,6 +49,7 @@ struct AssemblerState
     OutFmt outFmt = OutFmt::Prg;
     bool compress = false;
     bool astCache = true;
+    int32_t start = -1;
 
     void parseArgs(int argc, char** argv)
     {
@@ -70,6 +71,7 @@ struct AssemblerState
         app.add_flag("--show-undefined", showUndef,
                      "Show undefined after each pass");
         app.add_flag("-q,--quiet", quiet, "Less noise");
+        app.add_option("--org", start, "Set default start address");
         app.add_flag("-c,--compress", compress, "Compress program");
         app.add_flag("--no-cache", noCache, "Don't cache generated ASTs");
 
@@ -92,6 +94,10 @@ struct AssemblerState
         try {
             app.parse(argc, argv);
             astCache = !noCache;
+            if (compress) {
+                outFmt = OutFmt::PackedPrg;
+            }
+
             showHelp = (*help || (sourceFiles.empty() && scriptFiles.empty() &&
                                   programFile.empty()));
             if (showHelp) {
@@ -122,6 +128,11 @@ struct AssemblerState
         auto& mach = assem.getMachine();
         auto& syms = assem.getSymbols();
         mach.setCpu(use65c02 ? Machine::CPU::CPU_65C02 : Machine::CPU_6502);
+
+        if (start >= 0) {
+            auto& section = mach.getSection("default");
+            section.start = start;
+        }
 
         for (auto const& sf : scriptFiles) {
             assem.addScript(fs::path(sf));

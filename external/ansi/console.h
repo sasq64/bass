@@ -178,8 +178,6 @@ public:
 
     void flush()
     {
-        int chars = 0;
-        int xy = 0;
         int16_t cur_flags = 0;
         cur_x = cur_y = -1;
         for (size_t y = 0; y < height; y++) {
@@ -189,7 +187,6 @@ public:
                 if (t0 != t1) {
                     // if (cur_y != y || cur_x != x) {
                     write(protocol.goto_xy(x, y));
-                    xy++;
                     cur_x = x;
                     cur_y = y;
                     //}
@@ -204,12 +201,10 @@ public:
                     }
                     terminal->write(utils::utf8_encode({t1.c}));
                     // cur_x++;
-                    chars++;
                     t0 = t1;
                 }
             }
         }
-        //    LOGI("Flush %d/%d", xy, chars);
     }
 
 #if 0

@@ -113,6 +113,7 @@ public:
     inline void registerMeta(std::string const& name, MetaFn const& fn)
     {
         metaFunctions[name] = fn;
+        metaFunctions[utils::toUpper(name)] = fn;
     }
 
     struct Def

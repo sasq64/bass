@@ -5,23 +5,8 @@
 ;----------------------------------------------------------
 !script "../lua/sid.lua"
 
-; Set the 16k VIC area. Can only point
-; to $0000, $4000, $8000 or $c000
-!macro VicAdr(adr) {
-    !assert (adr & $3fff) == 0
-    lda #((~adr)&$ffff)>>14
-    sta $dd00
-}
-
-; Set the Bitmap and Screen offsets within VIC
-!macro BitmapAndScreen(bm_offs, scr_offs) {
-    !assert (bm_offs & $dfff) == 0
-    !assert (scr_offs & $c3ff) == 0
-    .bits0 = (bm_offs>>10)
-    .bits1 = (scr_offs>>6)
-    lda #.bits0 | .bits1
-    sta $d018
-}
+!include "utils.inc"
+!include "vic.inc"
 
 ; Silly short hand macros
 !macro ldxy(v) {
@@ -50,12 +35,12 @@ bitmapMem = $4000
 spriteMem = $7000
 spritePtrs = screenMem + 1016
 
-    !section "RAM",$880
+    !section "RAM",$801
     !section "main",in="RAM"
     !section "data",in="RAM"
 
     !section "code",in="main"
-    ; !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
+    !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
 start:
 
     !test "setup"

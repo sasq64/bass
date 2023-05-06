@@ -503,7 +503,6 @@ void Assembler::setupRules()
     using namespace std::string_literals;
 
     parser.after("AssignLine", [this](SV& sv) {
-        // LOGI("Assign %s %d", sv[0].type().name(), sv.size());
         if (sv.size() == 2) {
             auto sym = std::string(any_cast<std::string_view>(sv[0]));
             if (sym[0] == '.') {

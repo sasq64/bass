@@ -358,6 +358,13 @@ void initMeta(Assembler& assem)
         fmt::print("\n");
     });
 
+    assem.registerMeta("trace", [&](Meta const& meta) {
+        for (auto const& arg : meta.args) {
+            printArg(arg);
+        }
+        fmt::print("\n");
+    });
+
     assem.registerMeta("section", [&](Meta const& meta) {
         if (meta.args.empty()) {
             throw parse_error("Too few arguments");

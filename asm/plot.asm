@@ -1,4 +1,5 @@
     !include "vic.inc"
+    !include "utils.inc"
 
     !section "zpage", 2, NoStore=true
     
@@ -11,6 +12,8 @@ start:
 
     sei
 
+    MemCpy($c000, copy_start, plotbit_end - plotbit)
+
     VicAdr($4000)
     BitmapAndScreen($2000, $1000)
 
@@ -20,13 +23,8 @@ start:
     lda #$3b
     sta $d011
 
-    ; Clear colors to white on black
-    ldx #0
-    lda #$10
-$   
-    !rept 4 { sta COLORS + i*256, x }
-    inx
-    bne -
+   ; Clear colors to white on black
+   MemSet(COLORS, $10, 1000)
 
     jsr clear_screen
     jsr plot_sine
@@ -37,7 +35,8 @@ $
 sinx: !byte 0
     }
 
-!test
+;!test "plot_sine", $c000
+
 plot_sine:
     lda #0
     sta sinx
@@ -49,24 +48,17 @@ plot_sine:
 .t:
     lda sine, x
     sta ycoord
-    jsr plotbit
+    jsr $c000 ; plotbit
     inc sinx
     bne  .loop
     rts
+
 !test
 clear_screen:
-    lda #0
-    ldx #0
-.loop
-    !rept 32 {
-        sta SCREEN + i * 256,x
-    }
-    inx
-    bne .loop
+    MemSet(SCREEN, 0, 320*200/8)
     rts
 
-    
-!test "Verify plot pixel logic"
+;!test "Verify plot pixel logic"
 plot_test:
     jsr clear_screen
     lda #0
@@ -98,7 +90,9 @@ plot_test:
         mask:   !byte 0
     }
 
-!test "Plot single pixel"
+copy_start:
+    !pc $c000
+;!test "Plot single pixel"
 plotbit:
 
 		lda	#0
@@ -159,3 +153,4 @@ offs:   !fill 8, [i -> $80>>i]
 sine:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 }
 
+plotbit_end:

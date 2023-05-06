@@ -113,12 +113,13 @@ enum class OutFmt
     Prg,
     Crt,
     EasyFlash,
+    PackedPrg
 };
 
 class Machine
 {
 public:
-    Machine();
+    explicit Machine(uint32_t start = 0);
     ~Machine();
 
     void clear();

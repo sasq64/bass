@@ -4,10 +4,23 @@
 
 namespace utils {
 
+inline static void makeUpper(std::string& s)
+{
+    for (auto& c : s)
+        c = static_cast<char>(toupper(c));
+}
+
+inline static std::string toUpper(const std::string& s)
+{
+    std::string s2 = s;
+    makeUpper(s2);
+    return s2;
+}
+
 inline static void makeLower(std::string& s)
 {
     for (auto& c : s)
-        c = (char)tolower(c);
+        c = static_cast<char>(tolower(c));
 }
 
 inline static std::string toLower(const std::string& s)

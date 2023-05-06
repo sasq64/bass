@@ -10,8 +10,8 @@
 
 #include <fmt/format.h>
 
-//#include <lib.h>
-//#include <shrink_inmem.h>
+#include <lib.h>
+#include <shrink_inmem.h>
 
 #include <algorithm>
 #include <array>
@@ -71,10 +71,10 @@ inline void Check(bool v, std::string const& txt)
     if (!v) throw machine_error(txt);
 }
 
-Machine::Machine()
+Machine::Machine(uint32_t start)
 {
     machine = std::make_unique<sixfive::Machine<EmuPolicy>>();
-    addSection({"default", 0});
+    addSection({"default", start});
     setSection("default");
 }
 
@@ -453,26 +453,20 @@ void Machine::write(std::string_view name, OutFmt fmt)
         outFile.write<uint8_t>(start >> 8);
     }
 
-    auto [low, high] = runSetup();
-    std::vector<uint8_t> target(high - low);
-    machine->read_ram(low, target.data(), target.size());
-//    std::vector<uint8_t> output(64*1024);
-//    int flags = LZSA_FLAG_RAW_BACKWARD | LZSA_FLAG_RAW_BLOCK;
-//    int res = lzsa_compress_inmem(target.data(), output.data(), target.size(), output.size(), flags, 0, 1);
-//    auto of = createFile("compress.test");
-//    output.resize(res);
-//    of.write(output);
-//    of.close();
-//
-//    of = createFile("noncompressed.test");
-//    of.write(target);
-//    of.close();
+    if (fmt == OutFmt::PackedPrg) {
+        auto [low, high] = runSetup();
+        std::vector<uint8_t> target(high - low);
+        machine->read_ram(low, target.data(), target.size());
 
-
-    // compress memory
-    //size_t lzsa_compress_inmem(unsigned char *pInputData, unsigned char *pOutBuffer, size_t nInputSize, size_t nMaxOutBufferSize,
-    //                           const unsigned int nFlags, const int nMinMatchSize, const int nFormatVersion) {
-
+        std::vector<uint8_t> packed(0x10000);
+        int flags = LZSA_FLAG_RAW_BACKWARD | LZSA_FLAG_RAW_BLOCK;
+        auto packed_size =
+            lzsa_compress_inmem(target.data(), packed.data(), target.size(),
+                                packed.size(), flags, 0, 1);
+        packed.resize(packed_size);
+        outFile.write(packed);
+        return;
+    }
 
     // bool bankFile = false;
 
@@ -493,8 +487,8 @@ void Machine::write(std::string_view name, OutFmt fmt)
             continue;
         }
 
-        //fmt::print("{} {:04x}->{:04x}\n", section.name, section.start,
-        //           section.data.size() + section.start);
+        // fmt::print("{} {:04x}->{:04x}\n", section.name, section.start,
+        //            section.data.size() + section.start);
 
         if (section.start < last_end) {
             throw machine_error(
@@ -559,7 +553,7 @@ std::pair<uint32_t, uint32_t> Machine::runSetup()
         }
     }
 
-    return { low, high };
+    return {low, high};
 }
 
 uint32_t Machine::writeByte(uint8_t b)
@@ -609,7 +603,8 @@ std::string Machine::disassemble(uint32_t* pc)
     }
 
     std::array<char, 16> argstr; // NOLINT
-    snprintf(argstr.data(), argstr.size(), modeTemplate.at(static_cast<int>(opcode.mode)), arg);
+    snprintf(argstr.data(), argstr.size(),
+             modeTemplate.at(static_cast<int>(opcode.mode)), arg);
 
     return fmt::format("{} {}", name, argstr.data());
 }
@@ -696,9 +691,11 @@ AsmResult Machine::assemble(Instruction const& instr)
     cs.data.push_back(it_op->code);
     if (sz > 1) {
         cs.data.push_back(arg.val & 0xff);
+        dis.erase(cs.pc + 1);
     }
     if (sz > 2) {
         cs.data.push_back(arg.val >> 8);
+        dis.erase(cs.pc + 2);
     }
     cs.pc += sz;
 
