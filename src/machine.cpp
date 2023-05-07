@@ -537,6 +537,7 @@ std::pair<uint32_t, uint32_t> Machine::runSetup()
 {
     uint32_t low = 0;
     uint32_t high = 0;
+    machine->clear_ram();
     for (auto const& section : sections) {
         if (section.start < 0x10000 && !section.data.empty()) {
             if ((section.flags & NoStorage) != 0) {

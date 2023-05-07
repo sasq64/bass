@@ -188,9 +188,9 @@ void Assembler::addTest(std::string name, uint32_t start, RegState const& regs)
 
     if (passNo == 0) {
         AnyMap const res = {{"A", num(0)},      {"X", num(0)},
-                      {"Y", num(0)},      {"SR", num(0)},
-                      {"SP", num(0)},     {"PC", num(0)},
-                      {"cycles", num(0)}, {"ram", mach->getRam()}};
+                            {"Y", num(0)},      {"SR", num(0)},
+                            {"SP", num(0)},     {"PC", num(0)},
+                            {"cycles", num(0)}, {"ram", mach->getRam()}};
         syms.set("tests."s + name, res);
     }
 }
@@ -234,7 +234,7 @@ void Assembler::runTest(Test const& test)
 std::any Assembler::applyDefine(Macro const& fn, Call const& call)
 {
     AnyMap shadowed;
-    std::vector<std::string> args { fn.args.begin(), fn.args.end() };
+    std::vector<std::string> args{fn.args.begin(), fn.args.end()};
     for (unsigned i = 0; i < call.args.size(); i++) {
         if (syms.is_defined(args[i])) {
             errors.emplace_back(
@@ -422,7 +422,7 @@ void Assembler::handleLabel(std::any const& lbl)
         return;
     }
 
-    std::string label { std::any_cast<std::string_view>(lbl) };
+    std::string label{std::any_cast<std::string_view>(lbl)};
 
     if (label == "$" || label == "-" || label == "+") {
         ::Check(inMacro == 0, "No special labels in macro");
@@ -436,7 +436,8 @@ void Assembler::handleLabel(std::any const& lbl)
             lastLabel = std::any_cast<std::string_view>(lbl);
         }
     }
-    ::Check(syms.is_redefinable(label), fmt::format("already defined label '{}'", label));
+    ::Check(syms.is_redefinable(label),
+            fmt::format("already defined label '{}'", label));
     // LOGI("Label %s=%x", label, mach->getPC());
     syms.set(label, static_cast<Number>(mach->getPC()));
     syms.set_final(label);
@@ -445,12 +446,13 @@ void Assembler::handleLabel(std::any const& lbl)
         pendingTest = nullptr;
         if (passNo == 0) {
             AnyMap const res = {{"A", num(0)},      {"X", num(0)},
-                          {"Y", num(0)},      {"SR", num(0)},
-                          {"SP", num(0)},     {"PC", num(0)},
-                          {"cycles", num(0)}, {"ram", mach->getRam()}};
+                                {"Y", num(0)},      {"SR", num(0)},
+                                {"SP", num(0)},     {"PC", num(0)},
+                                {"cycles", num(0)}, {"ram", mach->getRam()}};
             syms.set("tests."s + label, res);
         }
-        ::Check(mach->getPC() == test->start, "No label found after anonymous test");
+        ::Check(mach->getPC() == test->start,
+                "No label found after anonymous test");
         test->name = label;
     }
 }
@@ -510,7 +512,7 @@ void Assembler::setupRules()
             }
             if (!scopes.empty()) {
                 sym = std::string(scopes.back()) + "." + sym;
-                //LOGI("Prefixed to %s", sym);
+                // LOGI("Prefixed to %s", sym);
             }
             syms.set(sym, sv[1]);
         } else if (sv.size() == 1) {
@@ -671,7 +673,7 @@ void Assembler::setupRules()
             return scripting.call(call.name, call.args);
         }
 
-        if(found) {
+        if (found) {
             throw parse_error(fmt::format("'{}' is not callable", name));
         }
 
@@ -686,9 +688,9 @@ void Assembler::setupRules()
     });
 
     parser.after("Lambda2", [&](SV& sv) -> std::any {
-      ::Check(sv.size() >= 1, "Invalid lambda expression");
-      auto block = any_cast<Block>(sv[0]);
-      return Macro{"", {}, block};
+        ::Check(sv.size() >= 1, "Invalid lambda expression");
+        auto block = any_cast<Block>(sv[0]);
+        return Macro{"", {}, block};
     });
 
     parser.after("Call", [&](SV& sv) {
@@ -853,8 +855,8 @@ void Assembler::setupRules()
     }
 
     parser.after("ZRel", [](SV& sv) -> Instruction {
-      auto v = (number<int32_t>(sv[1]) << 24) |
-          (number<int32_t>(sv[0]) << 16) | number<int32_t>(sv[2]);
+        auto v = (number<int32_t>(sv[1]) << 24) |
+                 (number<int32_t>(sv[0]) << 16) | number<int32_t>(sv[2]);
         return {"", Mode::ZP_REL, static_cast<Number>(v)};
     });
 
@@ -954,10 +956,10 @@ void Assembler::setupRules()
     parser.after("Star", [this](SV&) -> Number { return mach->getPC(); });
 
     parser.after("Expression", [this](SV& sv) {
-        if(sv.size() == 2) {
+        if (sv.size() == 2) {
             // Tern
             auto p = any_cast<std::pair<Block, Block>>(sv[1]);
-            if(number(sv[0]) != 0) {
+            if (number(sv[0]) != 0) {
                 return parser.evaluate(p.first.node);
             }
             return parser.evaluate(p.second.node);
@@ -966,7 +968,8 @@ void Assembler::setupRules()
     });
 
     parser.after("Tern", [&](SV& sv) -> std::any {
-        return std::make_pair(std::any_cast<Block>(sv[0]), std::any_cast<Block>(sv[1]));
+        return std::make_pair(std::any_cast<Block>(sv[0]),
+                              std::any_cast<Block>(sv[1]));
     });
 
     parser.after("Expression2", [this](SV& sv) {
@@ -1054,13 +1057,13 @@ void Assembler::setupRules()
             }
 
             if (auto const* macro = any_cast<Macro>(&vec)) {
-                std::vector<Number> result(b-a);
+                std::vector<Number> result(b - a);
                 Call call;
                 call.args.resize(1);
-                for(int64_t i = a; i<b; i++) {
+                for (int64_t i = a; i < b; i++) {
                     call.args[0] = any_num(i);
                     auto res = applyDefine(*macro, call);
-                    result[i-a] = number<uint8_t>(res);
+                    result[i - a] = number<uint8_t>(res);
                 }
                 return result;
             }
@@ -1213,7 +1216,7 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
         return false;
     }
 
-    syms.acceptUndefined(true);
+    syms.accept_undefined(true);
     while (true) {
         if (passNo >= maxPasses) {
             errors.emplace_back(0, 0, "Max number of passes");
@@ -1279,7 +1282,7 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
     if (needsFinalPass) {
         finalPass = true;
         fmt::print("* FINAL PASS\n");
-        syms.acceptUndefined(false);
+        syms.accept_undefined(false);
         return pass(ast);
     }
     return true;

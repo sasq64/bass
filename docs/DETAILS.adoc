@@ -8,6 +8,9 @@ A label starting with a dot ('.') is a _local_ label and treated
 as _lastLabel.label_, where _lastLabel_ is the closest previous
 _non local_ label.
 
+Macros defined an implict _lastLabel_ to support scoped local
+labels. So does Rept-blocks, but maybe the shouldn't.
+
 A label can be also called '$'.
 
 Referencing '+' will mean the closest _following_ '$' label.

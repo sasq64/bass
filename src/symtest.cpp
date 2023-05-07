@@ -1,5 +1,5 @@
 
-#include "catch.hpp"
+#include "doctest.h"
 
 #include "symbol_table.h"
 
@@ -30,7 +30,7 @@ using namespace std::string_literals;
  * If we read a symbol that is the prefix of several symbols followed
  * by a dot, we create a map and return instead.
  */
-TEST_CASE("symbol_table.basic", "[symbols]")
+TEST_CASE("symbol_table.basic")
 {
     SymbolTable st;
     using std::any_cast;

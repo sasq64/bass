@@ -138,6 +138,12 @@ struct Machine
 
     void write_ram(uint16_t org, const Word data) { ram[org] = data; }
 
+    void clear_ram()
+    {
+        std::fill(ram.begin(), ram.end(), 0);
+    }
+
+
     void write_ram(uint16_t org, const uint8_t* data, size_t size)
     {
         for (size_t i = 0; i < size; i++)

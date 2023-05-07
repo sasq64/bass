@@ -3,6 +3,9 @@
 #include "defines.h"
 #include "machine.h"
 
+#include <lib.h>
+#include <shrink_inmem.h>
+
 #include <any>
 #include <coreutils/file.h>
 #include <coreutils/log.h>
@@ -40,6 +43,8 @@ Section parseArgs(std::vector<std::any> const& args)
                 result.flags |= NoStorage;
             } else if (p->first == "ToFile") {
                 result.flags |= WriteToDisk;
+            } else if (p->first == "Compress") {
+                result.flags |= Compressed;
             }
         } else {
             if (i == 0) {
@@ -110,7 +115,7 @@ void initMeta(Assembler& assem)
                 assem.getSymbols().erase("v");
                 assem.getSymbols().set("v", any_num((*vec)[i]));
             }
-            assem.setLastLabel("__rept" + std::to_string(mach.getPC()));
+            //assem.setLastLabel("__rept" + std::to_string(mach.getPC()));
             assem.evaluateBlock(meta.blocks[0]);
             assem.getSymbols().erase(indexVar);
         }
@@ -381,12 +386,30 @@ void initMeta(Assembler& assem)
             auto& syms = assem.getSymbols();
             mach.pushSection(section.name);
             auto sz = section.data.size();
+            auto pc = section.pc; 
             assem.evaluateBlock(meta.blocks[0]);
             if (!section.parent.empty()) {
                 mach.getSection(section.parent).pc +=
                     static_cast<int32_t>(section.data.size() - sz);
             }
-            syms.set("sections."s + std::string(section.name), section.data);
+
+            auto p = "sections."s + std::string(section.name);
+            if ((section.flags & Compressed) != 0) {
+                std::vector<uint8_t> packed(0x10000);
+                int flags = LZSA_FLAG_RAW_BLOCK;
+                auto packed_size =
+                    lzsa_compress_inmem(section.data.data(), packed.data(),
+                            section.data.size(), packed.size(), flags, 0, 1);
+                packed.resize(packed_size);
+                syms.set(p + ".original_size", (double)section.data.size());
+                section.data = packed;
+            }
+
+
+            syms.set(p + ".data", section.data);
+            syms.set(p + ".start", (double)section.start);
+            syms.set(p + ".pc", (double)pc);
+            syms.set(p + ".size", (double)section.data.size());
             mach.popSection();
             return;
         }

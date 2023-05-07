@@ -34,8 +34,6 @@ private:
 struct Symbol
 {
     std::any value;
-    // This symbol has been read since `clear()`
-    bool accessed{false};
 
     // This symbol is constant and may only be set once.
     bool final{false};
@@ -50,14 +48,7 @@ struct SymbolTable
     bool trace = false;
     bool undef_ok = true;
 
-    bool is_constant(std::string_view name) const {
-        if(auto sym = get_sym(name)) {
-            return sym->final;
-        }
-        return false;
-    }
-
-    void acceptUndefined(bool ok) { undef_ok = ok; }
+    void accept_undefined(bool ok) { undef_ok = ok; }
 
     bool is_accessed(std::string_view name) const
     {
@@ -347,7 +338,6 @@ struct SymbolTable
     void clear()
     {
         for (auto& s : syms) {
-            s.second.accessed = false;
             s.second.final = false;
         }
         accessed.clear();

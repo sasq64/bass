@@ -67,8 +67,14 @@ void Scripting::load(fs::path const& p)
 
 std::function<void()> Scripting::make_function(std::string_view code)
 {
-    sol::load_result fn = lua.load(code);
-    return [code, this]() { lua.script(code); };
+    //sol::load_result fn = lua.load(code);
+    return [code, this]() { 
+        auto res = lua.script(code); 
+        if (res.status() != sol::call_status::ok) {
+            sol::error e = res;
+            throw script_error(e.what());
+        }
+    };
 }
 
 void Scripting::add(std::string_view code)

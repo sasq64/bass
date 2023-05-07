@@ -63,7 +63,8 @@ enum SectionFlags
     KeepFirst = 8,   // Keep first even if new First section is added
     KeepLast = 16,   // Keep last when new sections are added
     FixedStart = 32, // Section may not moved (specified with Start)
-    FixedSize = 64   // Specified with size
+    FixedSize = 64,  // Specified with size
+    Compressed = 128,
 };
 
 struct Section
