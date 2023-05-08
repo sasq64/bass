@@ -47,28 +47,11 @@ start:
     sei
 
     ; Copy colors and screen data
-    ldx #$00
-$   lda colors,x
-    sta $d800,x
-    lda colors+$100,x
-    sta $d900,x
-    lda colors+$200,x
-    sta $da00,x
-    lda colors+$2e8,x
-    sta $dae8,x 
+    MemMove($d800, colors, 1000)
 
     !if screen != screenMem {
-        lda screen,x
-        sta screenMem,x
-        lda screen+$100,x
-        sta screenMem+$100,x
-        lda screen+$200,x
-        sta screenMem+$200,x
-        lda screen+$2e8,x
-        sta screenMem+$2E8,x
+        MemMove(screenMem, screen, 1000)
     }
-    inx
-    bne -
     !log "copy done, A = ${A:x}"
     !run {: fmt("d810 = {:x}", mem_read(0xd810)) :}
 

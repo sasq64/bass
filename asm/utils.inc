@@ -33,7 +33,7 @@
     }
 }
 
-!macro MemCpy(dest, src, len) {
+!macro FastCopy(dest, src, len) {
 
     .blocks = len >> 8
     .rest = len & 0xff
@@ -142,9 +142,17 @@
 
 !macro MemMove(dest, src, len)
 {
-    !if dest > src {
-        MemCpyBack(dest, src, len)
+    !if (src + len < dest) || (dest + len < src) {
+        !print "FastCopy"
+        FastCopy(dest, src, len)
     } else {
-        MemCpyForward(dest, src, len)
+        !if dest > src {
+            !print "CopyBackward"
+            MemCpyBack(dest, src, len)
+        } else {
+            !print "CopyForward"
+            MemCpyForward(dest, src, len)
+        }
     }
 }
+

@@ -12,8 +12,6 @@ start:
 
     sei
 
-    MemCpy($c000, copy_start, plotbit_end - plotbit)
-
     VicAdr($4000)
     BitmapAndScreen($2000, $1000)
 
@@ -28,6 +26,18 @@ start:
 
     jsr clear_screen
     jsr plot_sine
+
+    ldx #10
+    ldy #10
+    jsr fast_plot
+
+    ldx #20
+    ldy #20
+    jsr fast_plot
+
+    ldx #30
+    ldy #30
+    jsr fast_plot
 $
     jmp -
 
@@ -39,18 +49,26 @@ sinx: !byte 0
 
 plot_sine:
     lda #0
-    sta sinx
     sta xcoord
     sta xcoord+1
-.loop
-    ldx sinx
-    stx xcoord
-.t:
+$
+    ldx xcoord
     lda sine, x
     sta ycoord
-    jsr $c000 ; plotbit
-    inc sinx
-    bne  .loop
+    jsr plotbit
+    inc xcoord
+    bne -
+    inc xcoord+1
+$
+    ldx xcoord
+    cpx #320-256
+    beq .done
+    lda sine, x
+    sta ycoord
+    jsr plotbit ; plotbit
+    inc xcoord
+    bne -
+.done
     rts
 
 !test
@@ -90,8 +108,6 @@ plot_test:
         mask:   !byte 0
     }
 
-copy_start:
-    !pc $c000
 ;!test "Plot single pixel"
 plotbit:
 
@@ -153,4 +169,45 @@ offs:   !fill 8, [i -> $80>>i]
 sine:
     !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 }
 
-plotbit_end:
+target = $20
+
+;xy == coord
+!test "fast_plot", X=10, Y=10
+fast_plot:
+
+    lda lookup_lo,y
+    sta target
+    lda lookup_hi,y
+    sta target+1
+
+    txa
+    and #$f8
+    tay
+    lda lookup_mask,x
+
+    ora (target),y
+    sta (target),y
+    
+    rts
+    !assert tests.fast_plot.ram[$614A] == $20
+
+yoffset = [y -> (y>>3) * 40 * 8 + (y&7) + SCREEN ]
+
+!rept 256 {
+    !print yoffset(i)
+}
+
+lookup_lo:
+    !rept 256 {
+        !byte (i>>3) * 40 * 8 + (i&7) + SCREEN 
+    }
+lookup_hi:
+    !rept 256 {
+        !byte ((i>>3) * 40 * 8 + (i&7) + SCREEN) >> 8
+    }
+lookup_mask:
+    !rept 256 {
+        !byte (1<<(7-(i&7)))
+    }
+
+
