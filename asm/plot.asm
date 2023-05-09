@@ -193,17 +193,13 @@ fast_plot:
 
 yoffset = [y -> (y>>3) * 40 * 8 + (y&7) + SCREEN ]
 
-!rept 256 {
-    !print yoffset(i)
-}
-
 lookup_lo:
     !rept 256 {
-        !byte (i>>3) * 40 * 8 + (i&7) + SCREEN 
+        !byte yoffset(i)
     }
 lookup_hi:
     !rept 256 {
-        !byte ((i>>3) * 40 * 8 + (i&7) + SCREEN) >> 8
+        !byte yoffset(i) >> 8
     }
 lookup_mask:
     !rept 256 {
