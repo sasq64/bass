@@ -166,6 +166,7 @@ private:
     template <typename T>
     std::any index(std::vector<T> const& v, int64_t index);
 
+    void setSym(std::string_view sym, std::any val);
     void setRegSymbols();
 
     std::vector<Error> errors;

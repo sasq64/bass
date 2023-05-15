@@ -102,12 +102,12 @@ struct SymbolTable
 
     void set(std::string_view name, std::any const& val)
     {
-        auto s = std::string(name);
         if (val.type() == typeid(AnyMap)) {
             set_sym(name, std::any_cast<AnyMap>(val));
         } else if (val.type() == typeid(double)) {
             set(name, std::any_cast<double>(val));
         } else {
+            auto s = std::string(name);
             /* if (accessed.count(s) > 0) { */
             /*     throw sym_error( */
             /*         fmt::format("Can not redefine generic any type {} ({})",

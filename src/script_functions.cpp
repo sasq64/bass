@@ -59,6 +59,7 @@ void registerLuaFunctions(Assembler& assembler, Scripting& scripting)
             mach.setBankRead(hi_adr, len, bank);
         });
 
+    lua["reg_pc"] = [&]() { return mach.getReg(sixfive::Reg::PC); };
     lua["reg_a"] = [&]() { return mach.getReg(sixfive::Reg::A); };
     lua["reg_x"] = [&]() { return mach.getReg(sixfive::Reg::X); };
     lua["reg_y"] = [&]() { return mach.getReg(sixfive::Reg::Y); };

@@ -524,7 +524,7 @@ void Machine::write(std::string_view name, OutFmt fmt)
 uint32_t Machine::run(uint16_t pc)
 {
     runSetup();
-    fmt::print("Running code at ${:x}\n", pc);
+    //fmt::print("Running code at ${:x}\n", pc);
     return go(pc);
 }
 uint32_t Machine::go(uint16_t pc)
@@ -547,8 +547,8 @@ std::pair<uint32_t, uint32_t> Machine::runSetup()
                 low = section.start;
             }
             high = section.start + section.data.size();
-            LOGI("Writing '%s' to %x-%x", section.name, section.start,
-                 section.start + section.data.size());
+            //LOGI("Writing '%s' to %x-%x", section.name, section.start,
+            //     section.start + section.data.size());
             machine->write_ram(section.start, section.data.data(),
                                section.data.size());
         }

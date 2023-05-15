@@ -45,8 +45,13 @@ BlockProgram <- Program
 ScriptBlock <- '{:' ScriptContents2 ':}'
 ScriptContents2 <- (!':}' .)* 
 
-AssignLine <- _ ('*' / Assignee) _ '=' _ Expression
+AssignLine <- _ ('*' / Assignee / Destructure) _ '=' _ Expression
 Assignee <- AsmSymbol _
+
+Destructure <- '[' DArgs ']'
+
+DArgs <- (DArg (',' DArg)*)?
+DArg <- _? (DotSymbol / Symbol) _?
 
 Lambda <- '[' FnArgs '->' EndOfLine? DelayedExpression ']'
 Lambda2 <- ('[>' / '[->') EndOfLine? DelayedExpression ']'
@@ -99,7 +104,7 @@ Octal <- '0o' [0-7]+
 Binary <- ('0b' / '%')  [01]+
 Char <- '\'' . '\''
 Decimal <- ([0-9]+ '.')? [0-9]+
-Multi <- '0m' [0-3]+
+Multi <- ('0m' / '0q') [0-3]+
 Number <-  HexNum / Binary / Octal / Multi / Decimal / Char
 
 ~_ <- Space*

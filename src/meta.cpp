@@ -45,6 +45,8 @@ Section parseArgs(std::vector<std::any> const& args)
                 result.flags |= WriteToDisk;
             } else if (p->first == "Compress") {
                 result.flags |= Compressed;
+            } else if (p->first == "Backwards") {
+                result.flags |= Backwards;
             }
         } else {
             if (i == 0) {
@@ -393,10 +395,19 @@ void initMeta(Assembler& assem)
                     static_cast<int32_t>(section.data.size() - sz);
             }
 
+            if ((section.flags & Backwards) != 0) {
+                section.flags |= Compressed;
+            }
+
+
             auto p = "sections."s + std::string(section.name);
             if ((section.flags & Compressed) != 0) {
+                LOGI("Packing %s", p.c_str());
                 std::vector<uint8_t> packed(0x10000);
                 int flags = LZSA_FLAG_RAW_BLOCK;
+                if ((section.flags & Backwards) != 0) {
+                    flags |= LZSA_FLAG_RAW_BACKWARD;
+                }
                 auto packed_size =
                     lzsa_compress_inmem(section.data.data(), packed.data(),
                             section.data.size(), packed.size(), flags, 0, 1);

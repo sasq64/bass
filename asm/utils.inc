@@ -156,3 +156,43 @@
     }
 }
 
+bits_below = [x,bits -> x & ~(0xffff<<bits)]
+; Extract all bits above and including bit b
+bits_above = [x,bits -> x & (0xffff<<bits)]
+
+!assert bits_below(0xf0, 4) == 0
+!assert bits_below(0xf0, 5) != 0
+!assert bits_below(0xe0, 5) == 0
+
+!macro Mul(n) {
+    [.lo, .hi] = zarg
+    [.lox, .hix] = ztemp
+    lda .lo
+    !rept 8 {
+        !if 1<<i & n {
+            !if bits_below(n,i) == 0 {
+                ;lda .lo
+                sta .lox
+                lda .hi
+                sta .hix
+            } else {
+                clc
+                lda .lo
+                adc .lox
+                sta .lox
+                lda .hi
+                adc .hix
+                sta .hix
+            }
+        }
+        !if bits_above(n, (i+1)) != 0 {
+            !if bits_below(n,i) == 0 {
+                asl
+            } else {
+                asl .lo
+            }
+            rol .hi
+        }
+    }
+}
+

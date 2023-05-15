@@ -498,6 +498,19 @@ std::variant<A, bool> operation(std::string_view ope, A const& a, B const& b)
                                   typeid(B).name())};
 }
 
+void Assembler::setSym(std::string_view sym, std::any val)
+{
+    if (sym[0] == '.') {
+        syms.set(std::string(lastLabel) + sym, val);
+    } else
+    if (!scopes.empty()) {
+        syms.set(std::string(scopes.back()) + "." + sym, val);
+        // LOGI("Prefixed to %s", sym);
+    } else {
+        syms.set(sym, val);
+    }
+}
+
 void Assembler::setupRules()
 {
     using std::any_cast;
@@ -506,15 +519,41 @@ void Assembler::setupRules()
 
     parser.after("AssignLine", [this](SV& sv) {
         if (sv.size() == 2) {
-            auto sym = std::string(any_cast<std::string_view>(sv[0]));
-            if (sym[0] == '.') {
-                sym = std::string(lastLabel) + sym;
+
+            if (sv[0].type() == typeid(std::string_view)) {
+                setSym(any_cast<std::string_view>(sv[0]), sv[1]);
+                /* auto sym = std::string(any_cast<std::string_view>(sv[0])); */
+                /* if (sym[0] == '.') { */
+                /*     sym = std::string(lastLabel) + sym; */
+                /* } */
+                /* if (!scopes.empty()) { */
+                /*     sym = std::string(scopes.back()) + "." + sym; */
+                /*     // LOGI("Prefixed to %s", sym); */
+                /* } */
+                /* syms.set(sym, sv[1]); */
+            } else {
+                auto args = any_cast<std::vector<std::string_view>>(sv[0]);
+                fmt::print("ARGS {}\n", args.size());
+                std::any vec = sv[1];
+                size_t i = 0;
+                if (auto const* v8 = any_cast<std::vector<uint8_t>>(&vec)) {
+                    for(auto&& sym : args) {
+                        auto v = i < v8->size() ? (*v8)[i] : 0;
+                        syms.set(sym, v);
+                        i++;
+                    }
+                }
+                else if (auto const* vn = any_cast<std::vector<Number>>(&vec)) {
+                    for(auto&& sym : args) {
+                        auto v = i < vn->size() ? (*vn)[i] : 0;
+                        setSym(sym, v);
+                        i++;
+                    }
+                } else {
+                    // TODO: Also handle lambda and map
+                    throw parse_error("Can not destructure non-array");
+                }
             }
-            if (!scopes.empty()) {
-                sym = std::string(scopes.back()) + "." + sym;
-                // LOGI("Prefixed to %s", sym);
-            }
-            syms.set(sym, sv[1]);
         } else if (sv.size() == 1) {
             mach->getCurrentSection().pc = number<uint16_t>(sv[0]);
         }
@@ -722,6 +761,14 @@ void Assembler::setupRules()
     parser.after("Symbol", [&](SV& sv) { return sv.token_view(); });
     parser.after("Dollar", [&](SV& sv) { return sv.token_view(); });
     parser.after("FnArgs", [&](SV& sv) {
+        std::vector<std::string_view> parts;
+        parts.reserve(sv.size());
+        for (size_t i = 0; i < sv.size(); i++) {
+            parts.emplace_back(any_cast<std::string_view>(sv[i]));
+        }
+        return parts;
+    });
+    parser.after("DArgs", [&](SV& sv) {
         std::vector<std::string_view> parts;
         parts.reserve(sv.size());
         for (size_t i = 0; i < sv.size(); i++) {

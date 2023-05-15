@@ -65,6 +65,7 @@ enum SectionFlags
     FixedStart = 32, // Section may not moved (specified with Start)
     FixedSize = 64,  // Specified with size
     Compressed = 128,
+    Backwards = 256,
 };
 
 struct Section
