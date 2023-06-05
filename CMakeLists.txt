@@ -22,8 +22,8 @@ set(GCC_CLANG_WARNINGS -Werror -Wall -Wextra -Wnon-virtual-dtor -pedantic
 set(MSVC_WARNINGS /W2)
 
 if(FUZZ)
-    set(CMAKE_CXX_FLAGS  ${CMAKE_CXX_FLAGS} -fsanitize=fuzzer,address)
-    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address)
+    set(CMAKE_CXX_FLAGS  ${CMAKE_CXX_FLAGS} -fsanitize=fuzzer,undefined)
+    set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -fsanitize=fuzzer,undefined)
 endif()
 
 # GCC specific warnings
@@ -44,7 +44,7 @@ endif()
 
 set(LZSA external/lzsa/src)
 set(LZSA_SRC
-    ${LZSA}/lzsa.c
+    #${LZSA}/lzsa.c
     ${LZSA}/dictionary.c
     ${LZSA}/expand_block_v1.c
     ${LZSA}/expand_block_v2.c

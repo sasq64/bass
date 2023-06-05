@@ -171,7 +171,7 @@ public:
     {
         std::string target;
         if (terminal->read(target)) {
-            return Protocol::translate_key(target);
+            return static_cast<int32_t>(Protocol::translate_key(target));
         }
         return 0;
     }

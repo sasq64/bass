@@ -4,9 +4,11 @@
 #include <ansi/terminal.h>
 #include <coreutils/algorithm.h>
 #include <coreutils/utf8.h>
+#include <coreutils/log.h>
 #include <thread>
 
 #include "emulator.h"
+#include "machine.h"
 #include "petscii.h"
 
 #include <array>
@@ -60,13 +62,14 @@ void Pet100::writeChar(uint16_t adr, uint8_t t)
     if (regs[RealW] == 0 || regs[RealH] == 0) {
         return;
     }
-    auto offset = adr - (regs[TextPtr] * 256);
+    unsigned offset = adr - (regs[TextPtr] * 256);
     // textRam[offset] = t;
 
     auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
     auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
 
-    textRam[x + regs[RealW] * y] = t;
+    if (offset >= textRam.size()) { return; }
+    textRam[offset] = t;
 
     uint16_t flags = (t & 0x80) != 0 ? 1 : 0;
     console->put_char(x, y, trans_char(t), flags);
@@ -74,22 +77,26 @@ void Pet100::writeChar(uint16_t adr, uint8_t t)
 
 uint8_t Pet100::readChar(uint16_t adr)
 {
-    auto offset = adr - (regs[TextPtr] * 256);
+    unsigned offset = adr - (regs[TextPtr] * 256);
 
     auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
     auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
+    offset = x + regs[RealW] * y;
 
+    if (offset >= textRam.size()) { return 0; }
     return textRam[x + regs[RealW] * y];
 }
 
 uint8_t Pet100::readColor(uint16_t adr)
 {
-    auto offset = adr - (regs[ColorPtr] * 256);
+    unsigned  offset = adr - (regs[ColorPtr] * 256);
 
     auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
     auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
 
-    return colorRam[x + regs[RealW] * y];
+    offset = x + regs[RealW] * y;
+    if (offset >= colorRam.size()) { return 0; }
+    return colorRam[offset];
 }
 
 void Pet100::writeColor(uint16_t adr, uint8_t c)
@@ -97,11 +104,14 @@ void Pet100::writeColor(uint16_t adr, uint8_t c)
     if (regs[RealW] == 0 || regs[RealH] == 0) {
         return;
     }
-    auto offset = adr - (regs[ColorPtr] * 256);
+    unsigned offset = adr - (regs[ColorPtr] * 256);
     auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
     auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
 
-    colorRam[x + regs[RealW] * y] = c;
+    offset = x + regs[RealW] * y;
+    if (offset >= colorRam.size()) { return; }
+
+    colorRam[offset] = c;
 
     int b = (c & 0xf) * 3;
     int f = ((c >> 4) + 16) * 3;
@@ -118,26 +128,15 @@ void Pet100::updateRegs()
     auto sz = (regs[WinW] * regs[WinH] + 255) & 0xffff00;
     auto banks = sz / 256;
 
-    emu->map_write_callback(regs[TextPtr], banks, this,
-                            [](uint16_t adr, uint8_t v, void* data) {
-                                auto* thiz = static_cast<Pet100*>(data);
-                                thiz->writeChar(adr, v);
-                            });
-    emu->map_read_callback(regs[TextPtr], banks, this,
-                           [](uint16_t adr, void* data) {
-                               auto* thiz = static_cast<Pet100*>(data);
-                               return thiz->readChar(adr);
-                           });
-    emu->map_write_callback(regs[ColorPtr], banks, this,
-                            [](uint16_t adr, uint8_t v, void* data) {
-                                auto* thiz = static_cast<Pet100*>(data);
-                                thiz->writeColor(adr, v);
-                            });
-    emu->map_read_callback(regs[ColorPtr], banks, this,
-                           [](uint16_t adr, void* data) {
-                               auto* thiz = static_cast<Pet100*>(data);
-                               return thiz->readColor(adr);
-                           });
+    mach.setBankWrite(regs[TextPtr], banks,
+                      [this](uint16_t adr, uint8_t v) { writeChar(adr, v); });
+    mach.setBankRead(regs[TextPtr], banks,
+                     [this](uint16_t adr) { return readChar(adr); });
+
+    mach.setBankWrite(regs[ColorPtr], banks,
+                      [this](uint16_t adr, uint8_t v) { writeColor(adr, v); });
+    mach.setBankRead(regs[ColorPtr], banks,
+                     [this](uint16_t adr) { return readColor(adr); });
 }
 
 void Pet100::fillOutside(uint8_t col)
@@ -156,48 +155,67 @@ void Pet100::fillOutside(uint8_t col)
     }
 }
 
-Pet100::Pet100()
+class DummyTerminal : public bbs::Terminal
 {
-    auto terminal = bbs::create_local_terminal();
-    terminal->open();
-    console = std::make_unique<bbs::Console>(std::move(terminal));
-    logging::setAltMode(true);
+    size_t write(std::string_view source) override { return source.length(); }
 
-    auto cw = console->get_width();
-    auto ch = console->get_height();
+    bool read(std::string& target) override { return false; }
+
+    int width() const override { return 40; }
+    int height() const override { return 25; }
+};
+
+Pet100::Pet100(Machine& m, bool noScreen) : mach(m)
+{
+    using sixfive::Reg;
+    int cw = 40;
+    int ch = 25;
+    if (noScreen) {
+        std::unique_ptr<bbs::Terminal> terminal = std::make_unique<DummyTerminal>();
+        console = std::make_unique<bbs::Console>(std::move(terminal));
+    } else {
+        auto terminal = bbs::create_local_terminal();
+        terminal->open();
+        console = std::make_unique<bbs::Console>(std::move(terminal));
+        logging::setAltMode(true);
+        cw = static_cast<int>(console->get_width());
+        ch = static_cast<int>(console->get_height());
+        if (cw <= 0 || ch <= 0) {
+            fmt::print("Illegal console size\n");
+            exit(1);
+        }
+    }
 
     textRam.resize(cw * ch);
     colorRam.resize(cw * ch);
 
-    for (size_t y = 0; y < ch; y++) {
-        for (size_t x = 0; x < cw; x++) {
+    for (int y = 0; y < ch; y++) {
+        for (int x = 0; x < cw; x++) {
             // colorRam[x + cw * y] = 0x01;
             // textRam[x + cw * y] = ' ';
             console->at(x, y) = {' ', 0x000000, 0xffffffff, 0};
         }
     }
 
-    emu = std::make_unique<sixfive::Machine<>>();
+    mach.setBankRead(0xd7, 1,
+                     // Map IO area
+                     [this](uint16_t adr) -> uint8_t {
+                         // auto* thiz = static_cast<Pet100*>(data);
 
-    // Map IO area
-    emu->map_read_callback(0xd7, 1, this,
-                           [](uint16_t adr, void* data) -> uint8_t {
-                               auto* thiz = static_cast<Pet100*>(data);
-                               if (adr >= 0xd780) {
-                                   return thiz->palette[adr - 0xd780];
-                               }
-                               return thiz->readReg(adr & 0xff);
-                           });
+                         if (adr >= 0xd780) {
+                             return palette[adr - 0xd780];
+                         }
+                         return readReg(adr & 0xff);
+                     });
 
-    emu->map_write_callback(0xd7, 1, this,
-                            [](uint16_t adr, uint8_t v, void* data) {
-                                auto* thiz = static_cast<Pet100*>(data);
-                                if (adr < 0xd780) {
-                                    thiz->writeReg(adr & 0xff, v);
-                                } else {
-                                    thiz->palette[adr - 0xd780] = v;
-                                }
-                            });
+    mach.setBankWrite(0xd7, 1, [this](uint16_t adr, uint8_t v) {
+        // auto* thiz = static_cast<Pet100*>(data);
+        if (adr < 0xd780) {
+            writeReg(adr & 0xff, v);
+        } else {
+            palette[adr - 0xd780] = v;
+        }
+    });
     regs[WinH] = 25;
     regs[WinW] = 40;
     regs[WinX] = (cw - regs[WinW]) / 2;
@@ -323,24 +341,30 @@ void Pet100::doUpdate()
     auto oldR = regs[IrqR];
     regs[IrqR] |= 1;
 
-    if ((~oldR & regs[IrqR]) != 0) {
-        if ((regs[IrqR] & regs[IrqE]) != 0) {
-            emu->irq(emu->read_mem(0xfffc) | (emu->read_mem(0xfffd) << 8));
-        }
+    auto sr = mach.getReg(sixfive::Reg::SR);
+
+    if ((sr & 4) == 0) {
+        //if ((~oldR & regs[IrqR]) != 0) {
+        //    if ((regs[IrqR] & regs[IrqE]) != 0) {
+                auto adr = mach.readRam(0xfffc) | (mach.readRam(0xfffd)<<8);
+                //logging::log("IRQ at %04x", adr);
+                mach.doIrq(adr);
+        //    }
+       // }
     }
 }
 
 bool Pet100::update()
 {
     try {
-        auto cycles = emu->run(10000);
+        auto done = mach.runCycles(10000);
         if (clk::now() >= nextUpdate) {
             nextUpdate += 20ms;
             doUpdate();
         } else {
             std::this_thread::sleep_for(1ms);
         }
-        return cycles != 0;
+        return done;
     } catch (exit_exception&) {
         return true;
     }
@@ -351,7 +375,7 @@ void Pet100::load(uint16_t start, uint8_t const* ptr, size_t size) const
     constexpr uint8_t Sys_Token = 0x9e;
     constexpr uint8_t Space = 0x20;
 
-    if (start == 0x0801) {
+    if (start == 0x0801 || start == 0x0401) {
         const auto* p = ptr;
         size_t sz = size > 12 ? 12 : size;
         const auto* endp = ptr + sz;
@@ -363,21 +387,24 @@ void Pet100::load(uint16_t start, uint8_t const* ptr, size_t size) const
             p++;
         if (p < endp) {
             basicStart = std::atoi(reinterpret_cast<char const*>(p));
-            fmt::print("Detected basic start at {:04x}", basicStart);
+            fmt::print("Detected basic start at {:04x}\n", basicStart);
         }
     }
-    emu->write_memory(start, ptr, size);
+    mach.writeRam(start, ptr, size);
 }
 
 void Pet100::start(uint16_t pc)
 {
-    if (pc == 0x0801 && basicStart >= 0) {
+    fmt::print("Start {:04x}\n", pc);
+    if ((pc == 0x0801 || pc == 0x0401) && basicStart >= 0) {
         pc = basicStart;
     }
 
     fillOutside(0x01);
 
-    emu->setPC(pc);
+    mach.setPC(pc);
+    // emu->setPC(pc);
+    // mach.setReg();
     start_t = clk::now();
     nextUpdate = start_t + 10ms;
 }

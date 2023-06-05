@@ -49,7 +49,7 @@ end
 
 Scripting::Scripting() : luap(std::make_unique<sol::state>()), lua(*luap)
 {
-    lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::string,
+    lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::string, sol::lib::io,
                        sol::lib::math, sol::lib::table, sol::lib::debug);
 
     lua.script(to_string);

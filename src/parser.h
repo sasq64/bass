@@ -55,6 +55,7 @@ public:
     std::string_view name() const;
 
     AstNode get_node() const { return ast; }
+    std::string const& file_name() const;
 
     template <typename T>
     T to(size_t i) const

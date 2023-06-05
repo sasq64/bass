@@ -18,11 +18,16 @@ section will be restored after.
 
 If no block is given, this section is active until the next section directive.
 
-A _root_ section is a a top level section with no parent. It must have a start
+A _root_ section is a top level section with no parent. It must have a start
 address.
 
 A _leaf_ section is a section without children.  Only leaf sections may contain
 data.
+
+Root sections are always placed at their start address. Child sections are
+layed out in order. If a child section has a start address it must be
+defined in an order that makes sense (sections after will always be layed
+out after and can not have start addresses that are lower).
 
 * _name_ : Name of the section. Not required for child sections.
 * _start_ : Start in memory. Only required for root sections.
@@ -32,10 +37,12 @@ data.
 * _align_ : Set alignment (in bytes) of this section
 * _file_ : Set output file of this section. Will remove the section from the
   main output file.
-* _ReadOnly_ : Flag that marks this section (and all
-  children) as read only. Used for ROM areas.
+* _ToFile_ : Write section to a separate file and don't include in the main binary.
+* _ReadOnly_ : Flag that marks this section (and all children) as read only.
+  Used for ROM areas.
 * _NoStore_ : Flag that marks this section as not having data in the output
-  file. This is normally used for the zero page, and other bss sections.
+  file. This is normally used for the zero page, and other bss sections. It
+  can also be used for code that is only used for !test.
 
 Unrecognized options will be passed on to the output module.
 

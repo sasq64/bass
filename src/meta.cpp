@@ -69,6 +69,59 @@ Section parseArgs(std::vector<std::any> const& args)
 
 } // namespace
 
+static auto is_space = [](char const c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+};
+
+static auto strip_space = [](std::string_view sv) -> std::string_view {
+  if (sv.empty()) return sv;
+  while (is_space(sv.front())) {
+      sv.remove_prefix(1);
+  }
+  if (sv.empty()) return sv;
+  while (is_space(sv.back())) {
+      sv.remove_suffix(1);
+  }
+  return sv;
+};
+
+void metaText(Assembler::Meta const& meta, Machine& mach)
+{
+    for (auto const& v : meta.args) {
+        if (auto const* s = std::any_cast<std::string_view>(&v)) {
+            auto ws = utils::utf8_decode(*s);
+            for (auto c : ws) {
+                auto b = translateChar(c);
+                mach.writeChar(b);
+            }
+        } else if (auto const* n = std::any_cast<Number>(&v)) {
+            mach.writeByte(*n);
+        } else {
+            throw parse_error("Need text");
+        }
+    }
+    for (auto const& block : meta.blocks) {
+        auto contents = std::string(block.contents);
+        auto parts = utils::split(contents, "\n");
+        bool first = true;
+        for (auto const* part : parts) {
+            std::string_view sv = part;
+            sv = strip_space(sv);
+            auto ws = utils::utf8_decode(sv);
+            if (first) {
+                mach.writeChar(' ');
+                first = false;
+            }
+            for (auto c : ws) {
+                auto b = translateChar(c);
+                mach.writeChar(b);
+            }
+        }
+    }
+}
+
+extern Translation currentTranslation;
+
 void initMeta(Assembler& assem)
 {
     using std::any_cast;
@@ -77,22 +130,6 @@ void initMeta(Assembler& assem)
     auto& mach = assem.getMachine();
 
     setTranslation(Translation::ScreencodeUpper);
-
-    static auto is_space = [](char const c) {
-        return c == ' ' || c == '\t' || c == '\n' || c == '\r';
-    };
-
-    static auto strip_space = [](std::string_view sv) -> std::string_view {
-        if (sv.empty()) return sv;
-        while (is_space(sv.front())) {
-            sv.remove_prefix(1);
-        }
-        if (sv.empty()) return sv;
-        while (is_space(sv.back())) {
-            sv.remove_suffix(1);
-        }
-        return sv;
-    };
 
     assem.registerMeta("rept", [&](Meta const& meta) {
         Check(meta.blocks.size() == 1, "Expected block");
@@ -191,36 +228,23 @@ void initMeta(Assembler& assem)
         }
     });
 
+    // ACME compability
+    assem.registerMeta("scr", [&](Meta const& meta) {
+        auto ct = currentTranslation;
+        setTranslation(Translation::ScreencodeLower);
+        metaText(meta, mach);
+        setTranslation(ct);
+    });
+
+    assem.registerMeta("pet", [&](Meta const& meta) {
+      auto ct = currentTranslation;
+      setTranslation(Translation::PetsciiLower);
+      metaText(meta, mach);
+      setTranslation(ct);
+    });
+
     assem.registerMeta("text", [&](Meta const& meta) {
-        for (auto const& v : meta.args) {
-            if (auto const* s = any_cast<std::string_view>(&v)) {
-                auto ws = utils::utf8_decode(*s);
-                for (auto c : ws) {
-                    auto b = translateChar(c);
-                    mach.writeChar(b);
-                }
-            } else {
-                throw parse_error("Need text");
-            }
-        }
-        for (auto const& block : meta.blocks) {
-            auto contents = std::string(block.contents);
-            auto parts = utils::split(contents, "\n");
-            bool first = true;
-            for (auto const* part : parts) {
-                std::string_view sv = part;
-                sv = strip_space(sv);
-                auto ws = utils::utf8_decode(sv);
-                if (first) {
-                    mach.writeChar(' ');
-                    first = false;
-                }
-                for (auto c : ws) {
-                    auto b = translateChar(c);
-                    mach.writeChar(b);
-                }
-            }
-        }
+        metaText(meta, mach);
     });
 
     assem.registerMeta("byte", [&](Meta const& meta) {
@@ -335,6 +359,10 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("ds", [&](Meta const& meta) {
+        if (meta.args.empty()) {
+            mach.getCurrentSection().pc ++;
+            return;
+        }
         auto sz = number<int32_t>(meta.args[0]);
         mach.getCurrentSection().pc += sz;
     });
@@ -390,9 +418,10 @@ void initMeta(Assembler& assem)
             auto sz = section.data.size();
             auto pc = section.pc; 
             assem.evaluateBlock(meta.blocks[0]);
+
             if (!section.parent.empty()) {
                 mach.getSection(section.parent).pc +=
-                    static_cast<int32_t>(section.data.size() - sz);
+                    static_cast<int32_t>(section.get_size() - sz);
             }
 
             if ((section.flags & Backwards) != 0) {
@@ -412,15 +441,13 @@ void initMeta(Assembler& assem)
                     lzsa_compress_inmem(section.data.data(), packed.data(),
                             section.data.size(), packed.size(), flags, 0, 1);
                 packed.resize(packed_size);
-                syms.set(p + ".original_size", (double)section.data.size());
+                syms.set(p + ".original_size", section.data.size());
                 section.data = packed;
             }
-
-
             syms.set(p + ".data", section.data);
-            syms.set(p + ".start", (double)section.start);
-            syms.set(p + ".pc", (double)pc);
-            syms.set(p + ".size", (double)section.data.size());
+            syms.set(p + ".start", section.start);
+            syms.set(p + ".pc", pc);
+            syms.set(p + ".size", section.data.size());
             mach.popSection();
             return;
         }
@@ -442,9 +469,6 @@ void initMeta(Assembler& assem)
             size = nv->size();
             src = [v = *nv](size_t i) -> Number {
                 auto d = v[i];
-                if (d > 255 || d < -127) {
-                    throw parse_error("Value does not fit");
-                }
                 return d;
             };
         } else if (auto* sv = any_cast<std::string_view>(&data)) {
@@ -495,7 +519,11 @@ void initMeta(Assembler& assem)
 
         for (size_t i = 0; i < size; i++) {
             auto n = src(i);
-            mach.writeByte(tx(i, n));
+            n = tx(i, src(i));
+            if (n > 255 || n < -127) {
+                throw parse_error("Value does not fit");
+            }
+            mach.writeByte(n);
         }
     });
 

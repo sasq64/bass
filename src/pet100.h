@@ -5,7 +5,10 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <string>
 #include <vector>
+
+class Machine;
 
 namespace sixfive {
 struct DefaultPolicy;
@@ -49,7 +52,8 @@ struct Pet100
         IrqR
 
     };
-    std::unique_ptr<sixfive::Machine<sixfive::DefaultPolicy>> emu;
+//    std::unique_ptr<sixfive::Machine<sixfive::DefaultPolicy>> emu;
+    Machine& mach;
     std::array<uint8_t, 128> regs{};
     std::unique_ptr<bbs::Console> console;
     std::vector<uint8_t> textRam;
@@ -77,7 +81,7 @@ struct Pet100
     void writeReg(int reg, uint8_t val);
     uint32_t get_ticks() const;
 
-    Pet100();
+    Pet100(Machine& m, bool noScreen);
     ~Pet100();
 
     void run(uint16_t start);
@@ -97,5 +101,7 @@ struct Pet100
 
     clk::time_point start_t;
     clk::time_point nextUpdate;
+
+    std::string fileName;
 };
 

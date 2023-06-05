@@ -154,6 +154,8 @@ public:
 
     void useCache(bool on);
 
+    std::vector<std::pair<std::string, int>> const& getLines() const { return lines; }
+
 private:
     template <typename T>
     T& sym(std::string const& s)
@@ -223,6 +225,8 @@ private:
     bool finalPass{false};
     bool needsFinalPass{false};
     int passNo{0};
+
+    std::vector<std::pair<std::string, int>> lines;
 
     std::string fileName;
 

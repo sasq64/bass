@@ -1,6 +1,8 @@
 #include "assembler.h"
 #include "machine.h"
 #include "script.h"
+#include "keycodes.h"
+
 #include <fmt/core.h>
 
 #include <sol/sol.hpp>
@@ -9,6 +11,13 @@ void registerLuaFunctions(Assembler& assembler, Scripting& scripting)
 {
     auto& lua = scripting.getState();
     auto& mach = assembler.getMachine();
+
+    lua["KEY_UP"] = KEY_UP;
+    lua["KEY_DOWN"] = KEY_DOWN;
+    lua["KEY_LEFT"] = KEY_LEFT;
+    lua["KEY_RIGHT"] = KEY_RIGHT;
+    lua["KEY_F1"] = KEY_F1;
+    lua["KEY_F7"] = KEY_F7;
 
     lua["fmt"] = [&](std::string const& text, sol::variadic_args args) {
         fmt::dynamic_format_arg_store<fmt::format_context> store;
@@ -36,15 +45,32 @@ void registerLuaFunctions(Assembler& assembler, Scripting& scripting)
     lua["call"] = [&](int32_t adr) { mach.go(adr); };
 
     lua["read_mem_6502"] = [&](int adr) { return mach.readRam(adr); };
-    lua["mem_read"] = [&](int adr) { return mach.readRam(adr); };
+    lua["mem_read"] = [&](int adr) {
+        return mach.readMem(adr);
+    };
     lua["mem_write"] = [&](int adr, int val) {
         return mach.writeRam(adr, val);
+    };
+
+    lua["cbm_load"] = [&](std::string const& name) {
+      const utils::File f{name};
+      uint16_t start = f.read<uint8_t>();
+      start |= (f.read<uint8_t>() << 8);
+      //fmt::print("Loading {} to {:04x}\n", name, start);
+      std::vector<uint8_t> data(f.getSize() - 2);
+      f.read(data.data(), data.size());
+      mach.writeRam(start, data.data(), data.size());
     };
 
     //    lua["set_break_fn"] = [&](int what, std::function<void(int)> const&
     //    fn) {
     //        mach.setBreakFunction(what, fn);
     //    };
+
+    lua["map_jsr"] = [&](uint16_t adr, std::function<void(uint16_t)> const& fn)
+    {
+        mach.addJsrFunction(adr, fn);
+    };
 
     lua["map_bank_write"] =
         [&](int hi_adr, int len,

@@ -1,6 +1,6 @@
-#include "src/assembler.h"
-#include "src/defines.h"
-#include "src/machine.h"
+#include "assembler.h"
+#include "defines.h"
+#include "machine.h"
 
 #include <cstdint>
 #include <cstdio>

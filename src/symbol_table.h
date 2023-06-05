@@ -166,7 +166,12 @@ struct SymbolTable
                     }
                 }
             }
-            syms[s].value = std::any(val);
+
+            if constexpr (std::is_arithmetic_v<T>) {
+                syms[s].value = std::any((double)val);
+            } else {
+                syms[s].value = std::any(val);
+            }
         }
     }
 

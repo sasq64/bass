@@ -357,6 +357,7 @@ void Assembler::machineLog(std::string_view text)
 
 Assembler::Assembler() : parser(grammar6502)
 {
+    lines.resize(0x10000);
     parser.packrat();
     mach = std::make_shared<Machine>();
 
@@ -516,6 +517,12 @@ void Assembler::setupRules()
     using std::any_cast;
     using SV = const SemanticValues;
     using namespace std::string_literals;
+
+    parser.before("NonEmptyLine", [this](SV& sv) {
+        auto pc = mach->getPC();
+        lines[pc & 0xffff] = std::make_pair(sv.file_name(), sv.line());
+        return true;
+    });
 
     parser.after("AssignLine", [this](SV& sv) {
         if (sv.size() == 2) {

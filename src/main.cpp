@@ -40,8 +40,10 @@ struct AssemblerState
     bool dumpSyms = false;
     bool showUndef = false;
     bool showTrace = false;
+    bool noScreen = false;
     bool quiet = false;
     bool doRun = false;
+    bool traceCode = false;
     int maxPasses = 10;
     std::string listFile;
     std::string symbolFile;
@@ -74,6 +76,8 @@ struct AssemblerState
         app.add_option("--org", start, "Set default start address");
         app.add_flag("-c,--compress", compress, "Compress program");
         app.add_flag("--no-cache", noCache, "Don't cache generated ASTs");
+        app.add_flag("--no-screen", noScreen, "Don't use textmode graphics in emulator");
+        app.add_flag("--trace-code", traceCode, "Trace executed assembly");
 
         app.add_flag("-S,--symbols", dumpSyms, "Dump symbol table");
         app.add_option("-l,--list-file", listFile, "Output assembly listing");
@@ -129,6 +133,8 @@ struct AssemblerState
         auto& syms = assem.getSymbols();
         mach.setCpu(use65c02 ? Machine::CPU::CPU_65C02 : Machine::CPU_6502);
 
+        mach.SetTracing(traceCode);
+
         if (start >= 0) {
             auto& section = mach.getSection("default");
             section.start = start;
@@ -165,6 +171,13 @@ struct AssemblerState
                 }
             }
         }
+//        int pc = 0;
+//        for(auto&& info : assem.getLines()) {
+//            if (info.second > 0) {
+//                fmt::print("{:04x} {}:{}\n", pc, info.first, info.second);
+//            }
+//            pc++;
+//        }
         return !failed;
     }
 };
@@ -194,7 +207,7 @@ int main(int argc, char** argv)
 
     while (state.doRun) {
 
-        Pet100 emu;
+        Pet100 emu{assem.getMachine(), state.noScreen};
 
         if (!state.programFile.empty()) {
             const utils::File f{state.programFile};

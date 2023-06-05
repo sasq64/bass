@@ -27,7 +27,7 @@ struct EmuPolicy : public sixfive::DefaultPolicy
     static constexpr bool ExitOnStackWrap = true;
 
     // PC accesses does not normally need to work in IO areas
-    static constexpr int PC_AccessMode = sixfive::Banked;
+    static constexpr int PC_AccessMode = sixfive::Callback;
 
     // Generic reads and writes should normally not be direct
     static constexpr int Read_AccessMode = sixfive::Callback;
@@ -37,7 +37,15 @@ struct EmuPolicy : public sixfive::DefaultPolicy
 
     std::array<Intercept*, 64 * 1024> intercepts{};
 
+    std::unordered_map<uint32_t, std::function<void(uint32_t)>> jsrFunctions;
+
     sixfive::Machine<EmuPolicy>* machine;
+
+    int breakId = -1;
+
+    std::array<int, 65536> coverage;
+
+    bool doTrace = false;
 
     // This function is run after each opcode. Return true to stop emulation.
     static bool eachOp(EmuPolicy& policy)
@@ -46,7 +54,12 @@ struct EmuPolicy : public sixfive::DefaultPolicy
         auto pc = policy.machine->regPC();
 
         if (pc != last_pc) {
-            // fmt::print("{:04x}\n", pc);
+            policy.coverage[pc]++;
+            //auto code = policy.machine->read_ram(pc);
+            if (policy.doTrace) {
+                uint32_t pp = pc;
+                fmt::print("{:04x} {}\n", pc, Machine::disassemble(*policy.machine, &pp));
+            }
             if (auto* ptr = policy.intercepts[pc]) {
                 return ptr->fn(pc);
             }
@@ -54,7 +67,38 @@ struct EmuPolicy : public sixfive::DefaultPolicy
         }
         return false;
     }
+
+    static bool breakFn(EmuPolicy& policy, int n)
+    {
+        policy.breakId = n;
+        fmt::print("BRK in {:04x}\n", policy.machine->regPC());
+        return true;
+    }
+    static constexpr uint32_t jsrMask = 0xffffffff;
+
+    static bool jsrFn(EmuPolicy& p, uint32_t target) {
+        //fmt::print("JSR {:04x}\n", target);
+        auto it = p.jsrFunctions.find(target);
+        if (it != p.jsrFunctions.end()) {
+            it->second(target);
+            return true;
+        }
+        return false;
+    }
 };
+
+void Machine::SetTracing(bool b) {
+    machine->policy().doTrace = b;
+
+}
+
+void Machine::addJsrFunction(uint32_t address,
+                             const std::function<void(uint32_t)>& fn)
+{
+    fmt::print("JSR {:x}\n", address);
+    machine->policy().jsrFunctions[address] = fn;
+}
+
 void Machine::addIntercept(uint32_t address,
                            std::function<bool(uint32_t)> const& fn)
 {
@@ -143,6 +187,21 @@ Section& Machine::addSection(Section const& s)
     Check(section.start != -1, "Section must have start");
 
     return section;
+}
+
+void Machine::mapFile(std::string const& name, uint8_t bank)
+{
+    const utils::File f{name};
+    //uint16_t start = f.read<uint8_t>();
+    //start |= (f.read<uint8_t>() << 8);
+    std::vector<uint8_t> data(f.getSize());
+    f.read(data.data(), data.size());
+
+    auto len = (data.size()+255)/256;
+    setBankRead(bank, len, [d=std::move(data), bank](uint32_t adr) {
+        return d[adr - (bank<<8)];
+    });
+
 }
 
 void Machine::removeSection(std::string const& name)
@@ -459,7 +518,7 @@ void Machine::write(std::string_view name, OutFmt fmt)
         machine->read_ram(low, target.data(), target.size());
 
         std::vector<uint8_t> packed(0x10000);
-        int flags = LZSA_FLAG_RAW_BACKWARD | LZSA_FLAG_RAW_BLOCK;
+        int const flags = LZSA_FLAG_RAW_BACKWARD | LZSA_FLAG_RAW_BLOCK;
         auto packed_size =
             lzsa_compress_inmem(target.data(), packed.data(), target.size(),
                                 packed.size(), flags, 0, 1);
@@ -496,26 +555,15 @@ void Machine::write(std::string_view name, OutFmt fmt)
         }
 
         auto offset = section.start;
-        // auto adr = section.start & 0xffff;
-        // auto hi_adr = section.start >> 16;
-        // if (hi_adr > 0) {
-        //     offset = section.start & 0xffff;
-        //     if (adr >= 0xa000 && adr + section.data.size() <= 0xc000) {
-        //         offset = hi_adr * 8192 + adr;
-        //     } else {
-        //         throw machine_error("Illegal address");
-        //     }
-        // }
 
         if (last_end >= 0) {
-            // LOGI("Padding %d bytes", offset - last_end);
             while (last_end < offset) {
                 outFile.write<uint8_t>(0);
                 last_end++;
             }
         }
 
-        last_end = static_cast<uint32_t>(offset + section.data.size());
+        last_end = offset + section.data.size();
 
         outFile.write(section.data);
     }
@@ -527,10 +575,31 @@ uint32_t Machine::run(uint16_t pc)
     //fmt::print("Running code at ${:x}\n", pc);
     return go(pc);
 }
+
 uint32_t Machine::go(uint16_t pc)
 {
     machine->setPC(pc);
     return machine->run();
+}
+
+void Machine::setPC(uint32_t pc)
+{
+    machine->setPC(pc);
+}
+
+void Machine::doIrq(uint16_t adr)
+{
+    machine->irq(adr);
+}
+
+bool Machine::runCycles(uint32_t cycles)
+{
+    auto realCycles = machine->run(cycles);
+    if (realCycles == 0) { return true; }
+    if (machine->policy().breakId >= 0) {
+        return true;
+    }
+    return false;
 }
 
 std::pair<uint32_t, uint32_t> Machine::runSetup()
@@ -573,10 +642,10 @@ uint32_t Machine::writeChar(uint8_t b)
     return currentSection->pc;
 }
 
-std::string Machine::disassemble(uint32_t* pc)
+std::string Machine::disassemble(sixfive::Machine<EmuPolicy>& m, uint32_t* pc)
 {
-    auto code = machine->read_mem(*pc);
-    pc++;
+    auto code = m.read_mem(*pc);
+    (*pc)++;
     auto const& instructions = sixfive::Machine<EmuPolicy>::getInstructions();
     sixfive::Machine<EmuPolicy>::Opcode opcode{};
 
@@ -593,21 +662,18 @@ std::string Machine::disassemble(uint32_t* pc)
     auto sz = opSize(opcode.mode);
     int32_t arg = 0;
     if (sz == 3) {
-        arg = machine->read_mem(pc[0]) | (machine->read_mem(pc[1]) << 8);
-        pc += 2;
+        arg = m.read_mem(*pc) | (m.read_mem((*pc)+1) << 8);
+        *pc += 2;
     } else if (sz == 2) {
-        arg = machine->read_mem(*pc++);
+        arg = m.read_mem((*pc)++);
     }
 
     if (opcode.mode == sixfive::Mode::REL) {
         arg = (static_cast<int8_t>(arg)) + *pc;
     }
 
-    std::array<char, 16> argstr; // NOLINT
-    snprintf(argstr.data(), argstr.size(),
-             modeTemplate.at(static_cast<int>(opcode.mode)), arg);
-
-    return fmt::format("{} {}", name, argstr.data());
+    auto argstr = fmt::format(modeTemplate.at(static_cast<int>(opcode.mode)), arg);
+    return fmt::format("{} {}", name, argstr);
 }
 
 AsmResult Machine::assemble(Instruction const& instr)
@@ -707,13 +773,23 @@ AsmResult Machine::assemble(Instruction const& instr)
     return AsmResult::Ok;
 }
 
+uint8_t Machine::readMem(uint16_t adr) const
+{
+    return machine->read_mem(adr);
+}
+
 uint8_t Machine::readRam(uint16_t offset) const
 {
-    return machine->read_mem(offset);
+    return machine->read_ram(offset);
 }
 void Machine::writeRam(uint16_t offset, uint8_t val)
 {
     machine->write_ram(offset, val);
+}
+
+void Machine::writeRam(uint16_t org, const uint8_t* data, size_t size)
+{
+    machine->write_ram(org, data, size);
 }
 
 void Machine::bankWriteFunction(uint16_t adr, uint8_t val, void* data)
@@ -731,14 +807,18 @@ uint8_t Machine::bankReadFunction(uint16_t adr, void* data)
 void Machine::setBankWrite(int hi_adr, int len,
                            std::function<void(uint16_t, uint8_t)> const& fn)
 {
-    bank_write_functions[hi_adr] = fn;
+    for (int i=0; i<len; i++) {
+        bank_write_functions[hi_adr+i] = fn;
+    }
     machine->map_write_callback(hi_adr, len, this, bankWriteFunction);
 }
 
 void Machine::setBankRead(int hi_adr, int len,
                           std::function<uint8_t(uint16_t)> const& fn)
 {
-    bank_read_functions[hi_adr] = fn;
+    for (int i=0; i<len; i++) {
+        bank_read_functions[hi_adr+i] = fn;
+    }
     machine->map_read_callback(hi_adr, len, this, bankReadFunction);
 }
 

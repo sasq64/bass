@@ -1,12 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <limits>
 #include <tuple>
 #include <vector>
-
-#include <coreutils/log.h>
 
 #include "6502.h"
 
@@ -45,6 +44,10 @@ struct DefaultPolicy
 
     static constexpr int MemSize = 65536;
 
+    static constexpr bool breakFn(DefaultPolicy&, int n) { return false; }
+    static constexpr uint32_t jsrMask = 0;
+    static constexpr bool jsrFn(DefaultPolicy&, uint32_t target) { return false; }
+
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
 };
@@ -82,22 +85,17 @@ struct Machine
     Machine(Machine&& op) noexcept = default;
     Machine& operator=(Machine&& op) noexcept = default;
 
-    Opcode illgal_opcode = {
+    Opcode illegal_opcode = {
         0xff, 0, Mode::IMM, [](Machine& m) {
-            fmt::print("** Illegal opcode at {:04x}\n", m.regPC());
+            //fmt::print("** Illegal opcode at {:04x}\n", m.regPC());
             m.realCycles = m.cycles;
             m.cycles = std::numeric_limits<uint32_t>::max() - 32;
         }};
 
-    Machine()
+    Machine() : p{*this}
     {
-        sp = 0xff;
-        pc = 0;
         ram.fill(0);
         stack = &ram[0x100];
-        a = x = y = 0;
-        sr = 0x30;
-        result = 0;
         for (int i = 0; i < 256; i++) {
             rbank.at(i) = wbank.at(i) = &ram[(i * 256) % POLICY::MemSize];
             rcallbacks.at(i) = &read_bank;
@@ -106,15 +104,15 @@ struct Machine
             wcbdata.at(i) = this;
         }
         set_cpu(false);
-        jumpTable = &jumpTable_normal[0];
+        jumpTable = jumpTable_normal.data();
     }
 
     void set_cpu(bool cpu6502)
     {
 
         for (int i = 0; i < 256; i++) {
-            jumpTable_normal[i] = illgal_opcode;
-            jumpTable_bcd[i] = illgal_opcode;
+            jumpTable_normal[i] = illegal_opcode;
+            jumpTable_bcd[i] = illegal_opcode;
         }
         for (const auto& i : getInstructions<false>(cpu6502)) {
             for (const auto& o : i.opcodes)
@@ -126,10 +124,12 @@ struct Machine
         }
     }
 
+    POLICY p;
+
     POLICY& policy()
     {
-        static POLICY policy(*this);
-        return policy;
+        //static POLICY policy(*this);
+        return p;
     }
 
     // Access ram directly
@@ -162,11 +162,15 @@ struct Machine
             data[i] = ram[org + i];
     }
 
-    uint8_t read_ram(uint16_t org) const { return ram[org]; }
+    uint8_t read_ram(uint16_t org) const {
+        return ram[org];
+    }
 
     // Access memory through bank mapping
 
-    uint8_t read_mem(uint16_t org) const { return rbank[org >> 8][org & 0xff]; }
+    uint8_t read_mem(uint16_t org) const {
+        return Read(org);
+    }
 
     void read_mem(uint16_t org, uint8_t* data, int size) const
     {
@@ -208,6 +212,7 @@ struct Machine
         stack[sp] = pc >> 8;
         stack[sp - 1] = pc & 0xff;
         stack[sp - 2] = get_SR();
+        sr |= 4;
         sp -= 3;
         pc = adr;
     }
@@ -252,29 +257,21 @@ struct Machine
     auto regs() const { return std::make_tuple(a, x, y, sr, sp, pc); }
     auto regs() { return std::tie(a, x, y, sr, sp, pc); }
 
-    using BreakFn = void (*)(int, void*);
-
-    void set_break_function(BreakFn const& fn, void* data)
-    {
-        breakData = data;
-        breakFunction = fn;
-    }
-
 private:
     // The 6502 registers
-    unsigned pc;
-    unsigned a;
-    unsigned x;
-    unsigned y;
+    unsigned pc{0};
+    unsigned a{0};
+    unsigned x{0};
+    unsigned y{0};
 
     // Status Register _except_for S and Z flags
-    unsigned sr;
+    unsigned sr{0x30};
     // Result of last operation; Used for S and Z flags.
     // result & 0xff == 0 => Z flag is set
     // result & 0x280 != 0 => S flag is set
-    unsigned result;
+    unsigned result{0};
 
-    uint8_t sp;
+    uint8_t sp{0xff};
 
     uint32_t cycles = 0;
     uint32_t realCycles = 0;
@@ -288,8 +285,8 @@ private:
     // 6502 RAM
     std::array<Word, POLICY::MemSize> ram;
 
-    BreakFn breakFunction = nullptr;
-    void* breakData = nullptr;
+    //BreakFn breakFunction = nullptr;
+    //void* breakData = nullptr;
 
     // Banks normally point to corresponding ram
     std::array<const Word*, 256> rbank{};
@@ -379,9 +376,9 @@ private:
     void setDec()
     {
         if constexpr (DEC)
-            jumpTable = &jumpTable_bcd[0];
+            jumpTable = jumpTable_bcd.data();
         else
-            jumpTable = &jumpTable_normal[0];
+            jumpTable = jumpTable_normal.data();
     }
 
     void set_SR(uint8_t s)
@@ -1057,7 +1054,13 @@ private:
 
             { "brk", {
                 { 0x00, 7, Mode::NONE, [](Machine& m) {
-                    m.ReadPC();
+                    auto n = m.ReadPC();
+                  if (POLICY::breakFn(m.policy(), n)) {
+                      m.realCycles = m.cycles;
+                      m.cycles = std::numeric_limits<decltype(m.cycles)>::max()-32;
+                      return;
+                  }
+
                     m.stack[m.sp] = m.pc >> 8;
                     m.stack[m.sp-1] = m.pc & 0xff;
                     m.stack[m.sp-2] = m.get_SR();
@@ -1066,15 +1069,16 @@ private:
                 } },
                 { 0x00, 7, Mode::IMM, [](Machine& m) {
                     auto what = m.ReadPC();
-                    if(m.breakFunction != nullptr) {
-                        m.breakFunction(what, m.breakData);
-                    } else {
-                        m.stack[m.sp] = m.pc >> 8;
-                        m.stack[m.sp-1] = m.pc & 0xff;
-                        m.stack[m.sp-2] = m.get_SR();
-                        m.sp -= 3;
-                        m.pc = m.Read16(m.to_adr(0xfe, 0xff));
+                    if (POLICY::breakFn(m.policy(), what)) {
+                        m.realCycles = m.cycles;
+                        m.cycles = std::numeric_limits<decltype(m.cycles)>::max()-32;
+                        return;
                     }
+                    m.stack[m.sp] = m.pc >> 8;
+                    m.stack[m.sp-1] = m.pc & 0xff;
+                    m.stack[m.sp-2] = m.get_SR();
+                    m.sp -= 3;
+                    m.pc = m.Read16(m.to_adr(0xfe, 0xff));
                 } }
             } },
 
@@ -1107,6 +1111,13 @@ private:
                     m.stack[m.sp-1] = (m.pc+1) & 0xff;
                     m.sp -= 2;
                     m.pc = m.ReadPC16();
+                    if ((m.pc & POLICY::jsrMask) != 0) {
+                        if (POLICY::jsrFn(m.policy(), m.pc)) {
+                            // jsr was overriden
+                            m.pc = (m.stack[m.sp+1] | (m.stack[m.sp+2]<<8))+1;
+                            m.sp += 2;
+                        }
+                    }
                 } }
             } },
 

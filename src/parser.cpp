@@ -44,6 +44,11 @@ size_t SemanticValues::size() const
     return ast->v.size();
 }
 
+std::string const& SemanticValues::file_name() const
+{
+    return ast->path;
+}
+
 std::string_view SemanticValues::name() const
 {
     return ast->name;

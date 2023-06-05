@@ -60,8 +60,6 @@ enum SectionFlags
     NoStorage = 1, // May not contain data (non leaf)
     WriteToDisk = 2,
     ReadOnly = 4,
-    KeepFirst = 8,   // Keep first even if new First section is added
-    KeepLast = 16,   // Keep last when new sections are added
     FixedStart = 32, // Section may not moved (specified with Start)
     FixedSize = 64,  // Specified with size
     Compressed = 128,
@@ -96,6 +94,11 @@ struct Section
         }
         pc = s;
         return *this;
+    }
+
+    int32_t get_size() const
+    {
+        return size >= 0 ? size : (int32_t)data.size();
     }
 
     std::string name;
@@ -135,7 +138,7 @@ public:
     uint32_t writeByte(uint8_t b);
     uint32_t writeChar(uint8_t b);
     AsmResult assemble(Instruction const& instr);
-    std::string disassemble(uint32_t* pc);
+    static std::string disassemble(sixfive::Machine<EmuPolicy>& m, uint32_t* pc);
 
     Section& addSection(Section const& s);
 
@@ -157,18 +160,28 @@ public:
     void writeListFile(std::string_view name);
 
     uint8_t readRam(uint16_t offset) const;
+    uint8_t readMem(uint16_t adr) const;
     void writeRam(uint16_t offset, uint8_t val);
+    void writeRam(uint16_t org, const uint8_t* data, size_t size);
 
     uint32_t run(uint16_t pc);
     uint32_t go(uint16_t pc);
+
+    void setPC(uint32_t pc);
+    bool runCycles(uint32_t cycles);
+
     std::pair<uint32_t, uint32_t> runSetup();
     std::vector<uint8_t> getRam();
 
     unsigned getReg(sixfive::Reg reg);
     void setReg(sixfive::Reg reg, unsigned v);
     void setRegs(RegState const& regs);
+    void doIrq(uint16_t adr);
 
-    //void setBreakFunction(uint8_t what, std::function<void(uint8_t)> const& fn);
+    void addJsrFunction(uint32_t address, std::function<void(uint32_t)> const& fn);
+
+    void mapFile(const std::string& name, uint8_t bank);
+
     void addIntercept(uint32_t address, std::function<bool(uint32_t)> const& fn);
 
     static void bankWriteFunction(uint16_t adr, uint8_t val, void* data);
@@ -189,6 +202,8 @@ public:
     void setCpu(CPU cpu);
 
     std::map<uint32_t, std::string> dis;
+
+    void SetTracing(bool b);
 
 private:
 

@@ -147,7 +147,7 @@ Atom <- _ (Star / Unary / Unary2 / Number / String /
 
 Star <- '*'
 
-ArrayLiteral <- '[' Expression (',' Expression)* ']'
+ArrayLiteral <- '[' EndOfLine? Expression (',' EndOfLine? Expression)* EndOfLine? ']'
 
 Index <- Indexable '[' Expression? (IndexSep Expression?)? ']'
 

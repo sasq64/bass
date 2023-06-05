@@ -5,6 +5,7 @@
     Line = $0400+24*40
 
     Border(LightBlue)
+    !log "LOOP"
 loop:
     !rept 39 {
         lda Line+i+1
