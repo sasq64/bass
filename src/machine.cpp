@@ -1,7 +1,7 @@
-#include "machine.h"
 #include "cart.h"
 #include "defines.h"
 #include "emulator.h"
+#include "machine.h"
 
 #include <coreutils/algorithm.h>
 #include <coreutils/file.h>
@@ -825,7 +825,7 @@ void Machine::setBankRead(int hi_adr, int len,
 void Machine::setBankRead(int hi_adr, int len, int bank)
 {
     Section const* bankSection = nullptr;
-    int32_t adr = (bank << 16) | (hi_adr << 8);
+    int32_t const adr = (bank << 16) | (hi_adr << 8);
     for (auto const& section : sections) {
         if (section.start == adr) {
             bankSection = &section;
@@ -839,7 +839,7 @@ void Machine::setBankRead(int hi_adr, int len, int bank)
 std::vector<uint8_t> Machine::getRam()
 {
     std::vector<uint8_t> data(0x10000);
-    machine->read_ram(0, &data[0], data.size());
+    machine->read_ram(0, data.data(), data.size());
     return data;
 }
 

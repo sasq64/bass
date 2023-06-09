@@ -1,18 +1,19 @@
 #include "pet100.h"
 
-#include <ansi/console.h>
-#include <ansi/terminal.h>
-#include <coreutils/algorithm.h>
-#include <coreutils/utf8.h>
-#include <coreutils/log.h>
-#include <thread>
-
 #include "emulator.h"
 #include "machine.h"
 #include "petscii.h"
 
+#include <ansi/console.h>
+#include <ansi/terminal.h>
+#include <coreutils/algorithm.h>
+#include <coreutils/log.h>
+#include <coreutils/utf8.h>
+
+
 #include <array>
 #include <chrono>
+#include <thread>
 
 using namespace std::chrono_literals;
 static constexpr std::array<uint8_t, 16 * 3> c64pal = {
@@ -36,8 +37,8 @@ static constexpr std::array<uint8_t, 16 * 3> c64pal = {
 
 std::string translate(uint8_t c)
 {
-    char32_t u = sc2uni_up(c);
-    std::u32string s = {u};
+    char32_t const u = sc2uni_up(c);
+    std::u32string const s = {u};
     return utils::utf8_encode(s);
 }
 

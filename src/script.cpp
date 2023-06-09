@@ -99,17 +99,17 @@ bool Scripting::hasFunction(std::string_view name)
 std::any Scripting::to_any(sol::object const& obj)
 {
     if (obj.is<Number>()) {
-        return std::any(obj.as<Number>());
+        return obj.as<Number>();
     }
     if (obj.is<std::string>()) {
         auto s = obj.as<std::string>();
         std::string_view sv = s;
         persist(sv);
-        return std::any(sv);
+        return sv;
     }
 
     if (obj.is<sol::table>()) {
-        sol::table t = obj.as<sol::table>();
+        auto t = obj.as<sol::table>();
         AnyMap syms;
         std::vector<uint8_t> vec;
         bool isVec = false;
@@ -136,7 +136,7 @@ std::any Scripting::to_any(sol::object const& obj)
         // TODO: If table was empty it will become symbols
         return isVec ? std::any(vec) : std::any(syms);
     }
-    return std::any();
+    return {};
 }
 
 sol::object Scripting::to_object(std::any const& a)

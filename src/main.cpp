@@ -262,6 +262,7 @@ int main(int argc, char** argv)
                     }
                 } catch (fs::filesystem_error&) {
                 }
+                i++;
             }
         }
         if (recompile) {

@@ -1,4 +1,5 @@
 #pragma once
+#include <stdint.h>
 
 enum ChipType : uint16_t
 {

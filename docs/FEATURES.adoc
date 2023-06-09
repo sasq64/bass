@@ -3,14 +3,14 @@
 
 === Unit Tests
 
-You can pop a `!test` line in front of any subroutine
+You can pop a `!test` line in front of any subroutine,
 and it will be executed in the bass emulator as part of
 the build process.
 
 You can also use `!check` to verify register contents,
 or even execute lua code during the test run.
 
-This wont affect code generation.
+This won't affect code generation.
 
 
 [source,ca65]
@@ -25,6 +25,34 @@ add_axy:
     adc $02
     !check A == 12
     rts
+----
+
+
+=== Functional programming
+
+Bass uses the traditional support in assemblers to allow you
+to evaluate expresssions wherever constants are used and takes
+it further.
+
+You can think of it like a bass specific language that can
+be used whenever expressions can be evaluated.
+
+There are also no special types of variables, everything is
+stored in the symbol table.
+
+Symbols can take on non-numeric values, such as arrays, strings, lambdas and maps, and there are functions that can operate on and transform these values.
+
+A lot of logic can therefore be performed directly in assembly
+using functions.
+
+[source,ca65]
+----
+load_adress = be_word(load("some.prg")[0:2])
+
+!rept 100 { label[my_fun(i)]:
+              lda #(i + other_fn(i))
+              !fill some_array[i*10:i*10+10]
+           }
 ----
 
 === Indexed Labels
@@ -67,27 +95,6 @@ load_address = be_word(data[0:2])
 Lua is fully integrated in the assembler. Lua code can be used to
 generate data, or even be called from 6502 code during testing.
 
-
-
-=== Functional programming
-
-There are no special types of variables, everything is
-stored in the symbol table.
-
-A lot of logic can be performed directly in assembly using
-functions.
-
-Symbols can take on non numeric values, such as arrays or strings.
-
-[source,ca65]
-----
-load_adress = be_word(load("some.prg")[0:2])
-
-!rept 100 { label[my_fun(i)]:
-              lda #(i + other_fn(i))
-              !fill some_array[i*10:i*10+10]
-           }
-----
 
 === $-variable
 

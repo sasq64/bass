@@ -1,7 +1,7 @@
 
 
-
+poop:
 !rept 4 {
-    .hello:
+    .hello[i]:
         nop
 }

@@ -144,7 +144,7 @@ inline Number num(T const& v)
 template <typename T>
 inline std::any any_num(T const& v)
 {
-    return std::any(static_cast<Number>(v));
+    return static_cast<Number>(v);
 }
 
 class assert_error : public std::exception

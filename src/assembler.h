@@ -14,6 +14,7 @@
 
 class Machine;
 
+using AsmValue = std::variant<Number, std::string_view, std::vector<uint8_t>, std::vector<Number>>;
 
 inline void Check(bool v, std::string const& txt)
 {
@@ -104,6 +105,7 @@ public:
         std::string text;
         std::string_view name;
         std::vector<std::any> args;
+        std::vector<AsmValue> vargs;
         std::vector<Block> blocks;
         size_t line = 0;
     };
@@ -143,6 +145,7 @@ public:
     void addLog(std::string_view text, size_t line);
     void addRunnable(std::string_view text, size_t line);
 
+    void evaluateCode(std::string const& source, std::string const& name);
     fs::path evaluatePath(std::string_view name);
     std::string_view getLastLabel() const { return lastLabel; }
     void setLastLabel(std::string_view l) { lastLabel = l; }
@@ -155,6 +158,8 @@ public:
     void useCache(bool on);
 
     std::vector<std::pair<std::string, int>> const& getLines() const { return lines; }
+
+    Assembler::MetaFn getMetaFn(const std::string& name);
 
 private:
     template <typename T>
