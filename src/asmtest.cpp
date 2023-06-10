@@ -86,7 +86,8 @@ TEST_CASE("png.remap")
 TEST_CASE("png.layout")
 {
     auto get = [&](auto const& vec, int n) -> uint16_t {
-        return vec[n * 2] | (vec[n * 2 + 1] << 8);
+        return (int)vec[n];
+        //return vec[n * 2] | (vec[n * 2 + 1] << 8);
    };
 
     Image image = loadPng((projDir() / "data" / "test.png").string());
@@ -111,7 +112,7 @@ TEST_CASE("png.layout")
     pixels = tiles;
     auto indexes = indexTiles(tiles, 8 * 8);
     for (auto&& i : indexes) {
-        fmt::print("{:02x} ", i);
+        fmt::print("{:02x} ", (int)i);
     }
 
     REQUIRE(get(indexes, 0) == get(indexes, 15));
