@@ -5,8 +5,11 @@
 
 === Part 3
 
-In part 2 we saw how to use macros to set up a C64 graphics screen, `!section` to
-locate the graphics in memory, and some code to copy it to the right place.
+In part 2 we saw how to
+
+* Use macros to set up a C64 graphics screen.
+* Use `!section` to locate the graphics in memory.
+* Using arrays and slicing to parse a koala image file at compile time.
 
 Now let's add a sprite!.
 
@@ -38,12 +41,15 @@ spriteData:
 The `!rept` command is used to repeat any block of statements a given number
 of times. Here we use it to create a solid rectangle as out sprite.
 
-But of course we want to generate something more nice looking.
+But a solid color is not very interesting. What if we want to
+generate some graphics for our sprite, like a geometric shape?
+
 For this it's time to turn to _lua_ scripting;
 
 [source]
 ----
 %{
+-- Set a pixel at (x,y) in the given target bitmap
 function setPixel(target, width, x, y)
     offs = width * y + (x>>3) + 1 -- 1-Indexed arrays :(
     if offs >=1 and offs <= #target then
@@ -51,6 +57,7 @@ function setPixel(target, width, x, y)
     end
 end
 
+-- Draw a circly into target bitmap
 function circle(target, width, xp, yp, r)
     for y=-r,r, 1 do
         for x=-r,r, 1 do
@@ -67,6 +74,8 @@ end
 You can use `%{` / `}%` at any time to switch to script mode and write
 LUA code, and functions defined in LUA will be callable from the Assembler.
 
+You can also put _lua_ code in a _lua_ file and pass it as a script on the command line.
+
 The code above will give us a `circle()` function that renders a circle into a vector of bits (the format used by monochrome sprites).
 
 We can now use this function to generate a ball sprite instead of our ugly rectangle:
@@ -79,7 +88,7 @@ spriteData:
     !fill circle_sprite
 ----
 
-The LUA function will take an array as input, and return an array
+The _lua_ function will take an array as input, and return an array
 with the rendered circle. Just like we did with the graphics and music
 earlier, we can use the `!fill` command to put it into memory.
 

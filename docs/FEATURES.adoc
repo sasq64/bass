@@ -31,7 +31,7 @@ add_axy:
 === Functional programming
 
 Bass uses the traditional support in assemblers to allow you
-to evaluate expresssions wherever constants are used and takes
+to evaluate expressions wherever constants are used and takes
 it further.
 
 You can think of it like a bass specific language that can
@@ -54,6 +54,18 @@ load_adress = be_word(load("some.prg")[0:2])
               !fill some_array[i*10:i*10+10]
            }
 ----
+
+=== Graphics Conversion ===
+
+There are usually only a few fundamental image operations you need to convert your artwork into
+the specific format you need for your platform.
+
+You need to be able to convert your _pixels_ to the right format, and you need to _lay out_ the image in memory the right way.
+
+The work horse function for image layout is called (of course) _layout_image()_. It takes an image and a tile size (width * height) and splits the image into tiles of that size and lays the out after each other.
+
+*TBD*
+
 
 === Indexed Labels
 

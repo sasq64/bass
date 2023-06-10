@@ -511,9 +511,9 @@ A do_op(std::string_view ope, A const& a, B const& b)
     return {};
 }
 
-AsmValue voperation(std::string_view ope, AsmValue const& a, AsmValue const& b)
+AsmValue operation(std::string_view ope, AsmValue const& a, AsmValue const& b)
 {
-    return std::visit([&](auto&& a0, auto&&b0) -> AsmValue {
+    return std::visit([&](auto&& a0, auto&& b0) -> AsmValue {
         using A = std::decay_t<decltype(a0)>;
         using B = std::decay_t<decltype(b0)>;
         if constexpr (std::is_same_v<A, B>) {
@@ -521,13 +521,13 @@ AsmValue voperation(std::string_view ope, AsmValue const& a, AsmValue const& b)
                 return static_cast<A>(do_op(ope, Num(a0), Num(b0)));
             } else {
                 if (ope == "+") return a0 + b0;
-                if (ope == "==") return (Number)(a0 == b0);
-                if (ope == "!=") return (Number)(a0 != b0);
+                if (ope == "==") return static_cast<Number>(a0 == b0);
+                if (ope == "!=") return static_cast<Number>(a0 != b0);
             }
         } else if constexpr (std::is_arithmetic_v<B> && !std::is_same_v<A, std::string_view>) {
             if (ope == "*") {
                 A res;
-                for(int i=0; i<(int)b0; i++) {
+                for(int i=0; i<b0; i++) {
                     res.insert(res.end(), a0.begin(), a0.end());
                 }
                 return res;
@@ -535,38 +535,6 @@ AsmValue voperation(std::string_view ope, AsmValue const& a, AsmValue const& b)
         }
         return {};
         }, a, b);
-}
-
-template <typename A, typename B>
-std::variant<A, bool> operation(std::string_view ope, A const& a, B const& b)
-{
-    // clang-format off
-    if (ope == "+") return a + b;
-    if (ope == "==") return a == b;
-    if (ope == "!=") return a != b;
-    if constexpr ((std::is_same_v<A, Num> || std::is_arithmetic_v<A>) &&
-                  (std::is_same_v<B, Num> || std::is_arithmetic_v<B>)) {
-        if (ope == "-") return a - b;
-        if (ope == "*") return a * b;
-        if (ope == "/") return a / b;
-        if (ope == "%") return a % b;
-        if (ope == ">>") return a >> b;
-        if (ope == "<<") return a << b;
-        if (ope == "&") return a & b;
-        if (ope == "|") return a | b;
-        if (ope == "^") return a ^ b;
-        if (ope == "&&") return a && b;
-        if (ope == "||") return a || b;
-        if (ope == "<") return a < b;
-        if (ope == ">") return a > b;
-        if (ope == "<=") return a <= b;
-        if (ope == ">=") return a >= b;
-        if (ope == "\\") return div(a, b);
-        if (ope == ":") return (a<<16) | b;
-    }
-    // clang-format on
-    throw parse_error{fmt::format("Unhandled: {} {} {}", typeid(A).name(), ope,
-                                  typeid(B).name())};
 }
 
 void Assembler::setSym(std::string_view sym, std::any val)
@@ -584,19 +552,19 @@ void Assembler::setSym(std::string_view sym, std::any val)
 
 AsmValue to_variant(std::any const& a)
 {
-    if (auto* n = std::any_cast<Number>(&a))
+    if (auto const* n = std::any_cast<Number>(&a))
     {
         return *n;
     }
-    if (auto* sv = std::any_cast<std::string_view>(&a))
+    if (auto const* sv = std::any_cast<std::string_view>(&a))
     {
         return *sv;
     }
-    if (auto* v8 = std::any_cast<std::vector<uint8_t>>(&a))
+    if (auto const* v8 = std::any_cast<std::vector<uint8_t>>(&a))
     {
         return *v8;
     }
-    if (auto* vn = std::any_cast<std::vector<Number>>(&a))
+    if (auto const* vn = std::any_cast<std::vector<Number>>(&a))
     {
         return *vn;
     }
@@ -1133,7 +1101,7 @@ void Assembler::setupRules()
         auto arg2 = to_variant(sv[2]);
 
       try {
-          auto res = voperation(ope, arg1, arg2);
+          auto res = operation(ope, arg1, arg2);
           return std::visit([&](auto&& r) { return std::any(r); }, res);
       } catch (std::out_of_range&) {
           if (isFinalPass()) {

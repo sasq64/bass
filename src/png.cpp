@@ -46,6 +46,7 @@ std::vector<uint8_t> change_bpp(std::vector<uint8_t> const& pixels, int old_bpp,
     size_t cpb = 8 / new_bpp;
 
     std::vector<uint8_t> out;
+    out.reserve(pixels.size() * new_bpp / old_bpp);
 
     for_all_pixels(pixels, old_bpp, [&](uint8_t px) {
         block.push_back(px);
@@ -155,7 +156,7 @@ Image loadPng(std::string_view name)
     if (error != 0) {
         return {};
     }
-    std::unique_ptr<unsigned char, decltype(&free)> out{o, &free};
+    std::unique_ptr<unsigned char, decltype(&free)> const out{o, &free};
 
     auto numColors = state.info_png.color.palettesize;
     auto* pal = state.info_png.color.palette;
@@ -174,7 +175,7 @@ Image loadPng(std::string_view name)
     memcpy(result.pixels.data(), out.get(), result.pixels.size());
     if (pal == nullptr) {
         for (size_t i = 0; i < numColors; i++) {
-            unsigned c = 255 * i / (numColors - 1);
+            unsigned const c = 255 * i / (numColors - 1);
             result.colors[i] = (c << 16) | (c << 8) | c;
         }
 
@@ -266,10 +267,10 @@ std::vector<uint8_t> layoutTiles(std::vector<uint8_t> const& pixels, unsigned st
     return result;
 }
 
-std::vector<uint8_t> indexTiles(std::vector<uint8_t>& pixels, int size)
+std::vector<double> indexTiles(std::vector<uint8_t>& pixels, int size)
 {
     std::unordered_map<uint32_t, int> tiles_crc{};
-    std::vector<uint8_t> indexes;
+    std::vector<double> indexes;
     std::vector<uint8_t> tiles;
     tiles.resize(8 * 8, 0);
 
@@ -289,8 +290,8 @@ std::vector<uint8_t> indexTiles(std::vector<uint8_t>& pixels, int size)
             std::copy(it + size, pixels.end(), it);
             pixels.resize(pixels.size() - size);
         }
-        indexes.push_back(index & 0xff);
-        indexes.push_back((index >> 8) & 0x3);
+        indexes.push_back(index);
+        //indexes.push_back((index >> 8) & 0x3);
     }
     return indexes;
 }

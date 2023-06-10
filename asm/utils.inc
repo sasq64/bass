@@ -1,7 +1,7 @@
 
-!macro BasicStart() {
+!macro BasicStart(text) {
     !assert * == $0801
-    !byte $0b,$08,$01,$00,$9e,str(.start),$00,$00,$00
+    !byte $0b,$08,$01,$00,$9e,str(.start), text,$00,$00,$00
 .start
 }
 
@@ -58,6 +58,55 @@
         dex
         bne .b
     }
+}
+
+!macro MemCpyGap(dest, src, lines, width, stride) {
+
+    lda #dest>>8
+    sta $17
+    lda #dest&0xff
+    sta $16
+
+    lda #src>>8
+    sta $19
+    lda #src&0xff
+    sta $18
+
+    ldx #lines
+.l2
+    ldy #0
+.l    
+    lda ($18),y
+    sta ($16),y
+    ;!run { fmt("TO: {:04x}", mem_read(0x16) + mem_read(0x17) * 256 + reg_y()) }
+    ;!run { fmt("FROM: {:04x}", mem_read(0x18) + mem_read(0x19) * 256 + reg_y()) }
+    iny
+    cpy #width
+    bne .l
+
+    !if stride > 255 {
+        lda $19
+        clc
+        adc #(stride>>8)
+        sta $19
+    }
+
+    lda $18
+    clc
+    adc #(stride&0xff)
+    sta $18
+    bcc .b0
+    inc $19
+    clc
+.b0
+    lda $16
+    adc #width
+    sta $16
+    bcc .b1
+    inc $17
+.b1
+    dex
+    bne .l2
 }
 
 !macro MemCpyForward(dest, src, len) {

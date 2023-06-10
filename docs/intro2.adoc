@@ -72,6 +72,8 @@ screen:
 
 Here we use array slicing again to extract all the parts.
 
+Remember that loading data an manipulating arrays only happens at compile time, it doesn't affect the program in any way. We need the `!fill` command to place data in memory.
+
 The bitmap is placed directly at `$6000` using a `!section` command, but
 the screen and color data needs to be copied.
 

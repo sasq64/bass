@@ -25,15 +25,13 @@ my_code:
 
 Tests works like this:
 
-Any `!test` clause like the one above will be assembled into a special test section,
-_after_ all other code has been placed into memory.
+Any `!test` clause like the one above will cause that program location to be saved as a _test_.
 
 Each test will be executed in the internal bass 6502 emulator, and the state of the
 emulator will be saved to a set of symbols for the specific test.
 
-`!assert` commands can then be used to verify the result, both my checking registers and
+`!assert` commands can then be used to verify the result, both by checking registers and
 reading _RAM_.
-
 
 Now let's dive into the example targeting the X16 Commander:
 

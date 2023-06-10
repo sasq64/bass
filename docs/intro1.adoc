@@ -31,7 +31,9 @@ start:
     sta $d020
 ----
 
-What happens here? Well the `!byte` meta command accepts both numbers
+What happens here? Well first we use the `!section` command instead of `!org!`. Sections are more powerful in that you can control layout of memory in different ways (but we wont get into that here).
+
+Then, the `!byte` meta command accepts both numbers
 and strings, and for strings it inserts each character one by one.
 
 The `str()` function takes a value and converts it to a string. So this
@@ -62,8 +64,8 @@ start:
 ----
 
 This is a short program that waits for a certain scan line, calls a music routine,
-and loops. The music is expected to reside in the file "music.raw" and must
-be placed at address $1000.
+and loops. The music is expected to reside in the file `music.raw` and must
+be placed at address _$1000_.
 
 But what if music is a PRG with 2 bytes load address first. Or a sid file?
 
@@ -77,13 +79,14 @@ can do:
     !fill data[2:]
 ----
 
-A few new things here, the `data` symbol now refers to a byte array, and we use
-the `!fill` meta command to insert it into memory.
+Now we no longer use `!incbin` to include data, instead we load it into a byte array and store it in the symbol table, just like any symbol.
+
+Then to actually place it in memory, we use the `!fill` meta command.
 
 The `[2:]` part is called _slicing_. To extract a range from a byte array you use
-it like: `data[start:end]` (where start is inclusive and end exclusive).
+it like: `data[start:end]` (where start is inclusive and end exclusive). So in this case we skip the first 2 bytes (the load address) and keep the rest of the array.
 
-So what about the load address, can we use it? Sure;
+So what about the load address, can we actually use it? Sure;
 
 [source,ca65]
 ----
@@ -93,7 +96,8 @@ music:
     !fill data[2:]
 ----
 
-As you may have figured out, the `word()` function decodes a little endian 16-bit word from an array.
+As you may have figured out, the `word()` function decodes a little endian 16-bit word from an array. We could have also done this using just math operations; `data[0] | (data[1]<<8)`.
+
 
 Except what if the load address is not compatible with our layout? If we load another song at a different address it will probably break our code.
 

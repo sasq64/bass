@@ -67,7 +67,8 @@ Turns a string into a number.
 
 === load_png(filename)
 
-Load the png image into memory. Returns:
+Load the png image into memory. Returns an image structure
+looking like this;
 
 `{ pixels, colors, width, height, bpp }`
 
@@ -87,7 +88,7 @@ Save image to disk. Useful for debugging image conversion.
 
 === image_remap(img, colors)
 
-Remap an image according to the given palette.
+Remap an image according to the given palette. Palette is an array of RGB colors.
 
 === image_layout(img, tile_width, tile_height, gap)
 
@@ -101,7 +102,7 @@ machine.
 
 === image_change_depth(img, new_bpp)
 
-Change depth. Legal values are 1,2,4 and 8.
+Change depth. Legal values are 1,2,4 and 8. No remapping is performed, so colors should match before doing this.
 
 [source,ca65]
 ----
@@ -111,6 +112,26 @@ Change depth. Legal values are 1,2,4 and 8.
 mc_logo:
     !fill img.pixels
 ----
+
+== index_tiles(pixels, size)
+
+Used to generate indexes for an image of tiles, and remove all
+duplicate tiles.
+
+
+Input is a byte array of pixels, assumed to contain tiles
+where each tile is `size` bytes.
+
+Returns `{ indexes, tiles }`
+
+Where `indexes` contains len(pixels) / size indexes, and tiles
+contains max(indexes) tiles.
+
+For instance, a blank image would return just one tile, and the
+index `0` repeated for each tile in the input data, whereas a
+complex image with no similar tiles would return `{0,1,2,3 ...}`
+and the original image.
+
 
 === pixels_layout(pixels, stride, byte_width, byte_height, gap)
 
@@ -123,6 +144,36 @@ mc_logo:
 == LUA Functions
 
 These functions can only be called from LUA.
+
+=== register_meta(name, meta_fn) ===
+
+Register a new meta command that will call `meta_fn(meta)` when
+encountered.
+
+
+=== get_meta_fn(name) ===
+
+Get an existing meta function. Useful when patching existing
+meta commands to add behavour before or after the actual
+implementation.
+
+[source,lua]
+----
+    inc_fn = get_meta_fn("include")
+    register_meta("include", function(meta)
+        file_name = meta.args[1]
+        new_file = find(extra_path, file_name)
+        if new_file then
+        end
+        inc_fn(meta)
+    end)
+----
+
+=== assemble(source) ===
+
+Assemble the given code at the current position.
+
+
 
 === reg_a(), reg_x(), reg_y()
 

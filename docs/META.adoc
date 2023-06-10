@@ -153,6 +153,12 @@ Insert 16bit words into memory.
 
 Insert 24bit words into memory. Useful for C64 sprites.
 
+=== !ds
+
+`!ds [<size>]`
+
+Declare a section of _size_ bytes
+
 === !text
 
 `!text <string> [,<string>]`
@@ -223,6 +229,17 @@ prefixed with `name.`.
 Assignments must take the form `symbol = <number>` or just `symbol`, and must
 be placed on separate lines.
 
+==== Example
+[source,ca65]
+----
+    !enum Monster {
+        health,
+        movement,
+        meta_data = 10
+    }
+
+    !assert Monster.movement == 1
+----
 === !if
 
 1. `!if <expression> { <statements...> } [ else { <statements...>} ]`
@@ -326,7 +343,7 @@ between braces (`+{A}+`, `+{X}+`, `+{Y}+` etc).
 * `!check <expression>`
 
 This is similar to assert, except it happens _runtime_ during the execution of
-tests.Symbols `A`, `X`, `Y`, `SP`, `SR` and `RAM[]` are available in expressions.
+tests. Symbols `A`, `X`, `Y`, `SP`, `SR` and `RAM[]` are available in expressions.
 
 ==== Example
 [source,ca65]

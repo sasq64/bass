@@ -51,7 +51,7 @@ be zero and flagged as "undefined".
 
 If an existing symbol gets assigned a new value, it is also flagged
 as "undefined", since we need to make another pass to make sure all
-it's previous references are resolved to the correct value.
+its previous references are resolved to the correct value.
 This happens when code size changes, as subsequent labels are moved
 to new locations.
 
@@ -60,7 +60,7 @@ When all source code is parsed, the undefined list is checked;
 * If it is empty we are done.
 * If all entries now also exist in the symbol table, we clear
 the undefined list and make another pass.
-* Otherwise we have an error, and report the undefined symbols.
+* Otherwise, we have an error, and report the undefined symbols.
 
 A _branch_ instruction to an undefined or incorrect label may
 temporarily be too long. This error must be postponed until all
@@ -80,4 +80,7 @@ The symbol table supports the following types:
 * String (`std::string_view`)
 * Byte Array (`std::vector<uint8_t>`)
 * Number Array (`std::vector<double>`)
+* Objects (`std::unordered_map<std::string, std::any>`)
+* Lambdas (`Macro`)
+
 
