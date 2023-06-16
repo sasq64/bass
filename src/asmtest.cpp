@@ -59,6 +59,7 @@ bool checkErrors(std::vector<Error> errs)
         if (checkFile(e)) {
             it = errs.erase(it);
         } else {
+            LOGE("Remaining error at %s:%d:%d", e.file, e.line, e.column);
             it++;
         }
     }
