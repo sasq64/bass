@@ -446,8 +446,8 @@ void Assembler::handleLabel(std::any const& lbl)
             lastLabel = std::any_cast<std::string_view>(lbl);
         }
     }
-    ::Check(syms.is_redefinable(label),
-            fmt::format("already defined label '{}'", label));
+    //::Check(syms.is_redefinable(label),
+    //        fmt::format("already defined label '{}'", label));
     // LOGI("Label %s=%x", label, mach->getPC());
     syms.set(label, static_cast<Number>(mach->getPC()));
     syms.set_final(label);
@@ -541,13 +541,13 @@ void Assembler::setSym(std::string_view sym, std::any val)
 {
     if (sym[0] == '.') {
         syms.set(std::string(lastLabel) + sym, val);
-    } else
-    if (!scopes.empty()) {
+    } else if (!scopes.empty()) {
         syms.set(std::string(scopes.back()) + "." + sym, val);
         // LOGI("Prefixed to %s", sym);
     } else {
         syms.set(sym, val);
     }
+    syms.set_final(sym);
 }
 
 AsmValue to_variant(std::any const& a)

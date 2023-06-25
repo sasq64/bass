@@ -40,37 +40,40 @@ struct Symbol
 
 };
 
+// Marks the symbol as a root of an `AnyMap`
+struct Root {};
+
 struct SymbolTable
 {
+private:
     std::unordered_map<std::string, Symbol> syms;
+    // Symbols that was accessed _and_ did not exist in syms this pass
     std::unordered_set<std::string> undefined;
+    // Symbols accessed this pass
     std::unordered_set<std::string> accessed;
-    bool trace = false;
     bool undef_ok = true;
+public:
+    bool trace = false;
 
+    // Only false during final pass
     void accept_undefined(bool ok) { undef_ok = ok; }
-
-    bool is_accessed(std::string_view name) const
-    {
-        return accessed.find(std::string(name)) != accessed.end();
-    }
 
     bool is_defined(std::string_view name) const
     {
         // A symbol is defined when contained in the "syms" list
         // and *not* contained in the "undefined" set
-        std::string s {name};
+        std::string const s {name};
         bool defined = undefined.count(s) == 0;
         defined &= syms.count(s) > 0;
         return defined;
     }
 
     bool is_redefinable(std::string_view name) const {
-        std::string s {name};
+        std::string const s {name};
         auto const it = syms.find(s);
         if (it != syms.end() && it->second.final) {
             // symbol exists and marked final
-            return undefined.count(s) > 0;
+            return false; //undefined.count(s) > 0;
         }
 
         return true;
@@ -87,6 +90,7 @@ struct SymbolTable
                 set(key, p.second);
             }
         }
+        set(name, std::any{Root{}});
     }
 
     void set_sym(std::string_view name, Symbol const& sym)
@@ -102,18 +106,15 @@ struct SymbolTable
 
     void set(std::string_view name, std::any const& val)
     {
+        if (!is_redefinable(name)) {
+            throw sym_error(fmt::format("Symbol '{}' already defined", name));
+        }
         if (val.type() == typeid(AnyMap)) {
             set_sym(name, std::any_cast<AnyMap>(val));
         } else if (val.type() == typeid(double)) {
             set(name, std::any_cast<double>(val));
         } else {
             auto s = std::string(name);
-            /* if (accessed.count(s) > 0) { */
-            /*     throw sym_error( */
-            /*         fmt::format("Can not redefine generic any type {} ({})",
-             * s, */
-            /*                     val.type().name())); */
-            /* } */
             if (trace && undefined.find(s) != undefined.end()) {
                 fmt::print("Defined {}\n", s);
             }
@@ -124,24 +125,14 @@ struct SymbolTable
     template <typename T>
     void set(std::string_view name, T const& val)
     {
+        if (!is_redefinable(name)) {
+            throw sym_error(fmt::format("Symbol '{}' already defined", name));
+        }
         auto s = std::string(name);
         if constexpr (std::is_same_v<T, AnyMap>) {
             set_sym(s, static_cast<AnyMap>(val));
             return;
         } else {
-//            auto it = syms.find(std::string(name));
-//            if (it != syms.end()) {
-//                if (it->second.defined) {
-//                    if (it->second.value.type() == typeid(T) &&
-//                        val == std::any_cast<T>(it->second.value)) {
-//                        fmt::print("Warning: '{}' redefined to same value\n",
-//                                   name);
-//                    } else {
-//                        throw sym_error(fmt::format(
-//                            "'{}' already defined (as different value)", name));
-//                    }
-//                }
-//            }
             if (accessed.count(s) > 0) {
                 LOGD("%s has been accessed", s);
                 auto it = syms.find(s);
@@ -207,25 +198,12 @@ struct SymbolTable
         static std::any temp;
         static T empty;
         static std::any zero(0.0);
-        static AnyMap cres;
+        static AnyMap anyMap;
         accessed.insert(std::string(name));
-        if constexpr (std::is_same_v<T, AnyMap>) {
-            auto s = std::string(name);
-            cres = collect(s);
-            return cres;
-        }
         auto s = std::string(name);
         auto it = syms.find(s);
         if (it == syms.end()) {
-
-            if constexpr (std::is_same_v<T, std::any>) {
-                auto m = collect(name);
-                if (!m.empty()) {
-                    // TODO: Can cause problems if reference is kept
-                    temp = m;
-                    return temp;
-                }
-            }
+            // Handle symbol undefined
 
             if (!undef_ok) {
                 throw sym_error("Undefined symbol '" + std::string(name) + "'");
@@ -240,6 +218,20 @@ struct SymbolTable
             }
             LOGD("Returning default (%s)", typeid(T{}).name());
             return empty;
+        }
+
+        if (it->second.value.type() == typeid(Root)) {
+            // We found a map
+            anyMap = collect(name);
+            if constexpr (std::is_same_v<T, AnyMap>) {
+                return anyMap;
+            }
+            if constexpr (std::is_same_v<T, std::any>) {
+                temp = std::any{anyMap};
+                return temp;
+            } else {
+                throw sym_error("Can not read map '" + std::string(name) + "'");
+            }
         }
         if (it->second.value.type() == typeid(AnyMap)) {
             LOGE("MAP %s in table!!", name);
@@ -277,7 +269,7 @@ struct SymbolTable
 
     Accessor<std::any> operator[](std::string_view name)
     {
-        return Accessor<std::any>(*this, name);
+        return {*this, name};
     }
 
     template <typename FN>
