@@ -1,4 +1,4 @@
 
 same_label
-;!error already
+;!error already defined
 same_label
