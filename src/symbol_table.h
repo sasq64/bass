@@ -118,7 +118,6 @@ struct SymbolTable
                 fmt::print("Defined {}\n", s);
             }
             syms[s].value = val;
-            syms[s].final = true;
         }
     }
 
@@ -173,9 +172,13 @@ struct SymbolTable
             } else {
                 syms[s].value = std::any(val);
             }
-
-            syms[s].final = true;
         }
+    }
+
+    void set_final(std::string_view name)
+    {
+        std::string s {name};
+        syms[s].final = true;
     }
 
     // Return a map containing all symbols beginning with
