@@ -14,8 +14,6 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-// using Number = double;
-
 // Update string view so contents is stored persistently
 inline std::string const& persist(std::string_view& sv)
 {
