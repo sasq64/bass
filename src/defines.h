@@ -1,10 +1,10 @@
 #pragma once
 
 #include "6502.h"
-#include "symbol_table.h"
 
 #include <any>
 #include <coreutils/file.h>
+#include <fmt/format.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
