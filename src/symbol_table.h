@@ -60,23 +60,15 @@ public:
 
     bool is_defined(std::string_view name) const
     {
-        // A symbol is defined when contained in the "syms" list
-        // and *not* contained in the "undefined" set
         std::string const s {name};
-        bool defined = undefined.count(s) == 0;
-        defined &= syms.count(s) > 0;
-        return defined;
+        return syms.count(s) > 0;
     }
 
-    bool is_redefinable(std::string_view name) const {
+    bool is_redefinable(std::string_view name) const
+    {
         std::string const s {name};
         auto const it = syms.find(s);
-        if (it != syms.end() && it->second.final) {
-            // symbol exists and marked final
-            return false; //undefined.count(s) > 0;
-        }
-
-        return true;
+        return !(it != syms.end() && it->second.final);
     }
 
     void set_sym(std::string_view name, AnyMap const& symbols)
@@ -134,7 +126,7 @@ public:
             return;
         } else {
             if (accessed.count(s) > 0) {
-                LOGD("%s has been accessed", s);
+                if(trace) {fmt::print("{} has been accessed\n", s);}
                 auto it = syms.find(s);
                 if (it != syms.end()) {
                     if (std::any_cast<T>(it->second.value) != val) {
@@ -153,7 +145,9 @@ public:
                     }
                 } else {
                     if (trace) {
-                        fmt::print("Defined {}\n", s);
+                        if constexpr (std::is_arithmetic_v<T>) {
+                            fmt::print("Defined {}={}\n", s, val);
+                        }
                     }
                 }
             }
