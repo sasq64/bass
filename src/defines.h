@@ -1,10 +1,10 @@
 #pragma once
 
 #include "6502.h"
-#include "symbol_table.h"
 
 #include <any>
 #include <coreutils/file.h>
+#include <fmt/format.h>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -13,8 +13,6 @@
 
 #include <filesystem>
 namespace fs = std::filesystem;
-
-// using Number = double;
 
 // Update string view so contents is stored persistently
 inline std::string const& persist(std::string_view& sv)

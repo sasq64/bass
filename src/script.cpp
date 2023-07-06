@@ -1,5 +1,6 @@
 #include "script.h"
 #include "defines.h"
+#include "symbol_table.h"
 
 #include <cstdio>
 #include <map>

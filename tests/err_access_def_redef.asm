@@ -5,6 +5,6 @@ testlabel:
     nop
     rts
 
-;!error already
+;!error already defined
 testlabel:
     rts

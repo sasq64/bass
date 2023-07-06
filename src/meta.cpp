@@ -52,7 +52,7 @@ Section parseArgs(std::vector<std::any> const& args)
             if (i == 0) {
                 result.name = std::any_cast<std::string_view>(arg);
             } else if (i == 1) {
-                result.start = number<uint32_t>(arg);
+                result.start = number<int32_t>(arg);
             } else if (i == 2) {
                 auto res = number<uint64_t>(arg);
                 if (res >= 0x1'0000'0000) {
