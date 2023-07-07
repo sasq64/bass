@@ -1,3 +1,3 @@
 X = 1
-;!error already
+;!error already defined
 X = X + 1

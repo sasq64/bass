@@ -1,5 +1,7 @@
 #pragma once
 
+#include "defines.h"
+
 #include <coreutils/log.h>
 #include <coreutils/text.h>
 
@@ -233,7 +235,7 @@ public:
     {
         static std::any temp;
         static T empty;
-        static std::any zero(0.0);
+        static std::any zero(Number{});
         static AnyMap anyMap;
         accessed.insert(std::string(name));
 
