@@ -15,6 +15,8 @@
 
 #include <cassert>
 
+using namespace std::string_literals;
+
 using AnyMap = std::unordered_map<std::string, std::any>;
 
 class sym_error : public std::exception
@@ -37,52 +39,73 @@ struct Symbol
 
     // This symbol is constant and may only be set once.
     bool final{false};
-
 };
 
 // Marks the symbol as a root of an `AnyMap`
-struct Root {};
+struct Root
+{};
 
 struct SymbolTable
 {
+
+    struct string_hash
+    {
+        using hash_type = std::hash<std::string_view>;
+        using is_transparent = void;
+
+        std::size_t operator()(const char* str) const
+        {
+            return hash_type{}(str);
+        }
+        std::size_t operator()(std::string_view str) const
+        {
+            return hash_type{}(str);
+        }
+        std::size_t operator()(std::string const& str) const
+        {
+            return hash_type{}(str);
+        }
+    };
+
 private:
-    std::unordered_map<std::string, Symbol> syms;
+    std::unordered_map<std::string, Symbol, string_hash, std::equal_to<>> syms;
     // Symbols that was accessed _and_ did not exist in syms this pass
-    std::unordered_set<std::string> undefined;
+    std::unordered_set<std::string, string_hash, std::equal_to<>> undefined;
     // Symbols accessed this pass
-    std::unordered_set<std::string> accessed;
+    std::unordered_set<std::string, string_hash, std::equal_to<>> accessed;
     bool undef_ok = true;
+
 public:
     bool trace = false;
 
     // Only false during final pass
     void accept_undefined(bool ok) { undef_ok = ok; }
 
-    bool is_defined(std::string_view name) const
-    {
-        std::string const s {name};
-        return syms.count(s) > 0;
-    }
+    bool is_defined(std::string_view name) const { return syms.contains(name); }
 
     bool is_redefinable(std::string_view name) const
     {
-        std::string const s {name};
-        auto const it = syms.find(s);
+        auto const it = syms.find(name);
         return !(it != syms.end() && it->second.final);
     }
 
     void set_sym(std::string_view name, AnyMap const& symbols)
     {
-        auto s = std::string(name);
         for (auto const& p : symbols) {
+            auto key = fmt::format("{}.{}", name, p.first);
+
             if (p.second.type() == typeid(AnyMap{})) {
-                set_sym(s + "." + p.first, std::any_cast<AnyMap>(p.second));
+                set_sym(key, std::any_cast<AnyMap>(p.second));
             } else {
-                auto key = s + "." + p.first;
                 set(key, p.second);
             }
         }
         set(name, std::any{Root{}});
+    }
+
+    void set_sym(std::string name, Symbol const& sym)
+    {
+        syms[name] = sym;
     }
 
     void set_sym(std::string_view name, Symbol const& sym)
@@ -90,13 +113,24 @@ public:
         syms[std::string(name)] = sym;
     }
 
+
     std::optional<Symbol> get_sym(std::string_view name) const
     {
-        auto it = syms.find(std::string(name));
+        auto it = syms.find(name);
         return it != syms.end() ? std::optional(it->second) : std::nullopt;
     }
 
+    void set(const char* name, std::any const& val)
+    {
+        set((std::string const&)name, val);
+    }
+
     void set(std::string_view name, std::any const& val)
+    {
+        set(std::string{name}, val);
+    }
+
+    void set(std::string const& name, std::any const& val)
     {
         if (!is_redefinable(name)) {
             throw sym_error(fmt::format("Symbol '{}' already defined", name));
@@ -115,55 +149,62 @@ public:
     }
 
     template <typename T>
-    void set(std::string_view name, T const& val)
+    void set(const char* name, T const& val)
+    {
+        set(static_cast<std::string const&>(name), val);
+    }
+
+    template <typename T>
+    void set(std::string const& name, T const& val)
     {
         if (!is_redefinable(name)) {
             throw sym_error(fmt::format("Symbol '{}' already defined", name));
         }
-        auto s = std::string(name);
         if constexpr (std::is_same_v<T, AnyMap>) {
-            set_sym(s, static_cast<AnyMap>(val));
+            set_sym(name, static_cast<AnyMap>(val));
             return;
         } else {
-            if (accessed.count(s) > 0) {
-                if(trace) {fmt::print("{} has been accessed\n", s);}
-                auto it = syms.find(s);
+            if (accessed.contains(name)) {
+                if (trace) {
+                    fmt::print("{} has been accessed\n", name);
+                }
+                auto it = syms.find(name);
                 if (it != syms.end()) {
-                    if (std::any_cast<T>(it->second.value) != val) {
+                    auto const& t = std::any_cast<T>(it->second.value);
+                    if (t != val) {
                         if (trace) {
                             if constexpr (std::is_arithmetic_v<T>) {
                                 fmt::print(
                                     "Redefined {} from {} "
                                     "to {}\n",
-                                    s, std::any_cast<double>(it->second.value),
+                                    name, std::any_cast<double>(it->second.value),
                                     val);
                             } else {
-                                fmt::print("Redefined {} \n", s);
+                                fmt::print("Redefined {} \n", name);
                             }
                         }
-                        undefined.insert(s);
+                        undefined.insert(name);
                     }
                 } else {
                     if (trace) {
                         if constexpr (std::is_arithmetic_v<T>) {
-                            fmt::print("Defined {}={}\n", s, val);
+                            fmt::print("Defined {}={}\n", name, val);
                         }
                     }
                 }
             }
 
             if constexpr (std::is_arithmetic_v<T>) {
-                syms[s].value = std::any((double)val);
+                syms[name].value = std::any((double)val);
             } else {
-                syms[s].value = std::any(val);
+                syms[name].value = std::any(val);
             }
         }
     }
 
     void set_final(std::string_view name)
     {
-        std::string s {name};
-        syms[s].final = true;
+        syms[std::string{name}].final = true;
     }
 
     // Return a map containing all symbols beginning with
@@ -194,19 +235,18 @@ public:
         static std::any zero(0.0);
         static AnyMap anyMap;
         accessed.insert(std::string(name));
-        auto s = std::string(name);
-        auto it = syms.find(s);
+        auto it = syms.find(name);
         if (it == syms.end()) {
             // Handle symbol undefined
 
             if (!undef_ok) {
-                throw sym_error("Undefined symbol '" + std::string(name) + "'");
+                throw sym_error(fmt::format("Undefined symbol '{}'", name));
             }
             LOGD("%s is undefined", name);
             if (trace) {
                 fmt::print("Access undefined '{}'\n", name);
             }
-            undefined.insert(s);
+            undefined.insert(std::string{name});
             if constexpr (std::is_same_v<T, std::any>) {
                 return zero;
             }
@@ -224,7 +264,7 @@ public:
                 temp = std::any{anyMap};
                 return temp;
             } else {
-                throw sym_error("Can not read map '" + std::string(name) + "'");
+                throw sym_error(fmt::format("Can not read map '{}'", name));
             }
         }
         if (it->second.value.type() == typeid(AnyMap)) {
@@ -244,7 +284,8 @@ public:
 
         Accessor(SymbolTable& st_, std::string_view name_)
             : st(st_), name(name_)
-        {}
+        {
+        }
 
         Accessor& operator=(T const& val)
         {
@@ -321,7 +362,7 @@ public:
 
     bool done() const { return undefined.empty(); }
 
-    std::unordered_set<std::string> const& get_undefined() const
+    auto const& get_undefined() const
     {
         return undefined;
     }
