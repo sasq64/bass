@@ -78,7 +78,7 @@ public:
 
     fs::path getCurrentPath() const { return currentPath; }
     void setCurrentPath(fs::path const& p) { currentPath = p; }
-    SymbolTable& getSymbols();
+    SymbolTable<double>& getSymbols();
     Machine& getMachine();
     void printSymbols();
     void writeSymbols(fs::path const& p);
@@ -225,7 +225,7 @@ private:
     std::deque<std::string> stored_includes;
     std::shared_ptr<Machine> mach;
     std::unordered_map<std::string_view, Macro> macros;
-    SymbolTable syms;
+    SymbolTable<double> syms;
     std::string_view lastLabel;
     bool finalPass{false};
     bool needsFinalPass{false};

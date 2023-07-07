@@ -54,15 +54,14 @@ std::string_view SemanticValues::name() const
     return ast->name;
 }
 
-Parser::Parser(const char* s) : p(std::make_unique<peg::parser>(s))
+Parser::Parser(const char* grammar) : p(std::make_unique<peg::parser>(grammar))
 {
     if (useCache) {
-        SHA512(reinterpret_cast<const uint8_t*>(s), strlen(s),
+        SHA512(reinterpret_cast<const uint8_t*>(grammar), strlen(grammar),
                grammarSHA.data());
     }
     if (!(*p)) {
-        fprintf(stderr, "Error:: Illegal grammar\n");
-        exit(0);
+        throw parser_error("Illegal grammar");
     }
     p->enable_ast<peg::AstBase<BassNode>>();
     p->log = [this](size_t line, size_t, std::string const& msg) {
@@ -105,16 +104,6 @@ void forAllNodesTop(AstNode const& root, FN const& fn)
         forAllNodesTop(node, fn);
     }
 }
-
-// template <typename FN>
-// void save(AstNode const& root, FN const& fn)
-//{
-//    std::vector<uint8_t> data;
-//    for (auto const& node : root->nodes) {
-//        save(node, fn);
-//    }
-//    fn(root);
-//}
 
 void write(utils::File& f, uint32_t const& t)
 {
@@ -197,8 +186,7 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
             utils::File f{target.string()};
             auto id = f.read<uint32_t>();
             if (id != 0xba55a570) {
-                fmt::print(stderr, "**Error: Broken AST\n");
-                exit(1);
+                throw parser_error("Broken AST");
             }
             std::array<uint8_t, 32> gs; //NOLINT
             f.read(gs.data(), 32);
@@ -250,10 +238,6 @@ AstNode Parser::parse(std::string_view source, std::string_view file)
 
 std::any Parser::evaluate(AstNode const& node)
 {
-    // LOGI("Evaluate %s", node->name);
-    std::string const spaces{
-        "                                                        "};
-
     std::function<std::any(AstNode const&, int)> const eval =
         [this, &eval](AstNode const& ast, int indent) -> std::any {
         bool descend = true;

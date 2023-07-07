@@ -32,7 +32,7 @@ using namespace std::string_literals;
  */
 TEST_CASE("symbol_table.basic")
 {
-    SymbolTable st;
+    SymbolTable<int> st;
     using std::any_cast;
 
     st.set("a", 3);
@@ -40,9 +40,9 @@ TEST_CASE("symbol_table.basic")
     int res = st.get<int>("a");
     REQUIRE(res == 3);
 
-    REQUIRE(st.undefined.empty());
+    REQUIRE(st.get_undefined().empty());
     REQUIRE(st.get<float>("not_here") == 0.0);
-    REQUIRE(!st.undefined.empty());
+    REQUIRE(!st.get_undefined().empty());
 
     //REQUIRE(st.is_constant("not_here"));
 
@@ -77,9 +77,9 @@ TEST_CASE("symbol_table.basic")
 
     REQUIRE(!st.ok());
 
-    REQUIRE(st.undefined.size() == 1);
+    REQUIRE(st.get_undefined().size() == 1);
     st.set("a", 9);
-    REQUIRE(st.undefined.size() == 2);
+    REQUIRE(st.get_undefined().size() == 2);
 
     st.at<int>("not_here") = 5;
 

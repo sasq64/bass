@@ -45,6 +45,7 @@ struct Symbol
 struct Root
 {};
 
+template <typename NUM = double>
 struct SymbolTable
 {
 
@@ -137,8 +138,8 @@ public:
         }
         if (val.type() == typeid(AnyMap)) {
             set_sym(name, std::any_cast<AnyMap>(val));
-        } else if (val.type() == typeid(double)) {
-            set(name, std::any_cast<double>(val));
+        } else if (val.type() == typeid(NUM)) {
+            set(name, std::any_cast<NUM>(val));
         } else {
             auto s = std::string(name);
             if (trace && undefined.find(s) != undefined.end()) {
@@ -177,7 +178,7 @@ public:
                                 fmt::print(
                                     "Redefined {} from {} "
                                     "to {}\n",
-                                    name, std::any_cast<double>(it->second.value),
+                                    name, std::any_cast<NUM>(it->second.value),
                                     val);
                             } else {
                                 fmt::print("Redefined {} \n", name);
@@ -195,7 +196,7 @@ public:
             }
 
             if constexpr (std::is_arithmetic_v<T>) {
-                syms[name].value = std::any((double)val);
+                syms[name].value = std::any((NUM)val);
             } else {
                 syms[name].value = std::any(val);
             }
@@ -235,7 +236,14 @@ public:
         static std::any zero(0.0);
         static AnyMap anyMap;
         accessed.insert(std::string(name));
+
+        if constexpr (std::is_same_v<T, AnyMap>) {
+            anyMap = collect(name);
+            return anyMap;
+        }
+
         auto it = syms.find(name);
+
         if (it == syms.end()) {
             // Handle symbol undefined
 
@@ -256,11 +264,8 @@ public:
 
         if (it->second.value.type() == typeid(Root)) {
             // We found a map
-            anyMap = collect(name);
-            if constexpr (std::is_same_v<T, AnyMap>) {
-                return anyMap;
-            }
             if constexpr (std::is_same_v<T, std::any>) {
+                anyMap = collect(name);
                 temp = std::any{anyMap};
                 return temp;
             } else {

@@ -40,6 +40,17 @@ inline std::string hex_encode(C const& c, int len = 0)
     return result;
 }
 
+class parser_error : public std::exception
+{
+public:
+    explicit parser_error(std::string m = "Parser error") : msg(std::move(m))
+    {}
+    const char* what() const noexcept override { return msg.c_str(); }
+
+private:
+    std::string msg;
+};
+
 class SemanticValues
 {
     std::shared_ptr<peg::AstBase<BassNode>> const& ast;

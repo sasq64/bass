@@ -1384,10 +1384,11 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
     return true;
 }
 
-SymbolTable& Assembler::getSymbols()
+SymbolTable<double>& Assembler::getSymbols()
 {
     return syms;
 }
+
 Machine& Assembler::getMachine()
 {
     return *mach;

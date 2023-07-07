@@ -44,9 +44,12 @@ struct DefaultPolicy
 
     static constexpr int MemSize = 65536;
 
-    static constexpr bool breakFn(DefaultPolicy&, int n) { return false; }
+    static constexpr bool breakFn(DefaultPolicy&, int /*n*/) { return false; }
     static constexpr uint32_t jsrMask = 0;
-    static constexpr bool jsrFn(DefaultPolicy&, uint32_t target) { return false; }
+    static constexpr bool jsrFn(DefaultPolicy&, uint32_t /*target*/)
+    {
+        return false;
+    }
 
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
@@ -65,7 +68,8 @@ struct Machine
         Opcode() = default;
         Opcode(uint8_t code, int cycles, Mode mode, OpFunc op)
             : code(code), cycles(cycles), mode(mode), op(op)
-        {}
+        {
+        }
         uint8_t code = 0;
         uint8_t cycles = 0;
         Mode mode = Mode::NONE;
@@ -76,7 +80,8 @@ struct Machine
     {
         Instruction(const char* name, std::vector<Opcode> ov)
             : name(name), opcodes(std::move(ov))
-        {}
+        {
+        }
         const char* name;
         std::vector<Opcode> opcodes;
     };
@@ -85,12 +90,13 @@ struct Machine
     Machine(Machine&& op) noexcept = default;
     Machine& operator=(Machine&& op) noexcept = default;
 
-    Opcode illegal_opcode = {
-        0xff, 0, Mode::IMM, [](Machine& m) {
-            //fmt::print("** Illegal opcode at {:04x}\n", m.regPC());
-            m.realCycles = m.cycles;
-            m.cycles = std::numeric_limits<uint32_t>::max() - 32;
-        }};
+    Opcode illegal_opcode = {0xff, 0, Mode::IMM, [](Machine& m) {
+                                 // fmt::print("** Illegal opcode at {:04x}\n",
+                                 // m.regPC());
+                                 m.realCycles = m.cycles;
+                                 m.cycles =
+                                     std::numeric_limits<uint32_t>::max() - 32;
+                             }};
 
     Machine() : p{*this}
     {
@@ -128,7 +134,7 @@ struct Machine
 
     POLICY& policy()
     {
-        //static POLICY policy(*this);
+        // static POLICY policy(*this);
         return p;
     }
 
@@ -138,11 +144,7 @@ struct Machine
 
     void write_ram(uint16_t org, const Word data) { ram[org] = data; }
 
-    void clear_ram()
-    {
-        std::fill(ram.begin(), ram.end(), 0);
-    }
-
+    void clear_ram() { std::fill(ram.begin(), ram.end(), 0); }
 
     void write_ram(uint16_t org, const uint8_t* data, size_t size)
     {
@@ -162,15 +164,11 @@ struct Machine
             data[i] = ram[org + i];
     }
 
-    uint8_t read_ram(uint16_t org) const {
-        return ram[org];
-    }
+    uint8_t read_ram(uint16_t org) const { return ram[org]; }
 
     // Access memory through bank mapping
 
-    uint8_t read_mem(uint16_t org) const {
-        return Read(org);
-    }
+    uint8_t read_mem(uint16_t org) const { return Read(org); }
 
     void read_mem(uint16_t org, uint8_t* data, int size) const
     {
@@ -189,7 +187,7 @@ struct Machine
     }
 
     void map_read_callback(uint8_t bank, int len, void* data,
-                         uint8_t (*cb)(uint16_t, void*))
+                           uint8_t (*cb)(uint16_t, void*))
     {
         while (len > 0) {
             rcallbacks[bank] = cb;  // NOLINT
@@ -198,7 +196,7 @@ struct Machine
         }
     }
     void map_write_callback(uint8_t bank, int len, void* data,
-                          void (*cb)(uint16_t, uint8_t, void*))
+                            void (*cb)(uint16_t, uint8_t, void*))
     {
         while (len > 0) {
             wcallbacks[bank] = cb;  // NOLINT
@@ -248,8 +246,8 @@ struct Machine
         if (realCycles != 0) {
             cycles = realCycles;
             realCycles = 0;
-        } //else
-          //  return 0;
+        } // else
+          //   return 0;
 
         return cycles;
     }
@@ -285,8 +283,8 @@ private:
     // 6502 RAM
     std::array<Word, POLICY::MemSize> ram;
 
-    //BreakFn breakFunction = nullptr;
-    //void* breakData = nullptr;
+    // BreakFn breakFunction = nullptr;
+    // void* breakData = nullptr;
 
     // Banks normally point to corresponding ram
     std::array<const Word*, 256> rbank{};
