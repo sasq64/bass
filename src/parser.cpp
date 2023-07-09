@@ -263,10 +263,10 @@ std::any Parser::evaluate(AstNode const& node)
                            sv.name(), ast->line, sv.token_view());
                 for (size_t i = 0; i < sv.size(); i++) {
                     std::any const v = sv[i];
-                    fmt::print("  {}: {}\n", i, any_to_string(v));
+                    fmt::print("  {}: {}\n", i, any_to_string(v, sv.name()));
                 }
                 auto ret = callAction(sv, *ast->action);
-                fmt::print(">>  {}\n", any_to_string(ret));
+                fmt::print(">>  {}\n", any_to_string(ret, sv.name()));
                 return ret;
             }
             return callAction(sv, *ast->action);

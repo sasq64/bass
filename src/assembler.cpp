@@ -49,8 +49,11 @@ Number to_number(std::string_view txt, Base base, int skip = 0)
     return static_cast<Number>(result);
 }
 
-std::string any_to_string(std::any const& val)
+std::string any_to_string(std::any const& val, std::string_view name)
 {
+    if (!val.has_value()) {
+        throw parse_error(fmt::format("Cannot convert 'None' value from Symbol {} to std::string", name));
+    }
     if (auto const* n = std::any_cast<Number>(&val)) {
         auto in = static_cast<int64_t>(*n);
         if (*n == static_cast<double>(in)) return fmt::format("${:x}", in);
@@ -547,8 +550,11 @@ void Assembler::setSym(std::string_view sym, std::any val)
     syms.set_final(sym);
 }
 
-AsmValue to_variant(std::any const& a)
+AsmValue to_variant(std::any const& a, std::string_view identifier)
 {
+    if (!a.has_value()) {
+        throw parse_error(fmt::format("Cannot convert a 'None' {} value to AsmValue", identifier));
+    }
     if (auto const* n = std::any_cast<Number>(&a))
     {
         return *n;
@@ -565,7 +571,12 @@ AsmValue to_variant(std::any const& a)
     {
         return *vn;
     }
-    return {};
+
+    // not implemented
+    static_assert(std::variant_size<AsmValue>() == 4);
+    //throw parse_error(fmt::format("No variant conversion available for type {}", a.type().name()));
+    auto s_err = fmt::format("No AsmValue conversion available for type {} (context: {})", a.type().name(), identifier);
+    return persist(s_err);
 }
 
 void Assembler::setupRules()
@@ -732,8 +743,21 @@ void Assembler::setupRules()
         }
 
         for(auto&& a : meta.args) {
-            auto v = to_variant(a);
-            meta.vargs.push_back(v);
+            auto identifier = fmt::format("MetaBlock::{} -> arg[{}]", meta.name, meta.vargs.size());
+            if (a.has_value()) {
+                auto v = to_variant(a, identifier);
+                meta.vargs.push_back(v);
+                if (auto strv = std::get_if<std::string_view>(&v)) {
+                    if (strv->starts_with("No AsmValue conversion")) {
+                        LOGD(fmt::format("{}\n", *strv));
+                    }
+                }
+            } else {
+                // FIXME: keeps existing code intact (can we leave out such values?)
+                AsmValue v_default;
+                LOGD(fmt::format("AsmValue cannot hold a 'None' value -> creating value {} (context: {}))", std::get<0>(v_default), identifier));
+                meta.vargs.push_back(v_default);
+            }
         }
 
 
@@ -969,7 +993,7 @@ void Assembler::setupRules()
     auto buildArg = [](SV& sv) -> std::any {
         auto mode = modeMap.at(std::string(sv.name()));
         return Instruction{"", mode,
-                           mode == Mode::ACC ? 0 : any_cast<Number>(sv[0])};
+                           mode == Mode::ACC ? 0 : number<int32_t>(sv[0])};
     };
     for (auto const& [name, _] : modeMap) {
         parser.after(name.c_str(), buildArg);
@@ -978,7 +1002,7 @@ void Assembler::setupRules()
     parser.after("ZRel", [](SV& sv) -> Instruction {
         auto v = (number<int32_t>(sv[1]) << 24) |
                  (number<int32_t>(sv[0]) << 16) | number<int32_t>(sv[2]);
-        return {"", Mode::ZP_REL, static_cast<Number>(v)};
+        return {"", Mode::ZP_REL, v};
     });
 
     parser.after("LabelRef", [this](SV& sv) {
@@ -1099,8 +1123,8 @@ void Assembler::setupRules()
         }
 
         auto ope = any_cast<std::string_view>(sv[1]);
-        auto arg1 = to_variant(sv[0]);
-        auto arg2 = to_variant(sv[2]);
+        auto arg1 = to_variant(sv[0], fmt::format("Expression2 -> arg[{}]", 0));
+        auto arg2 = to_variant(sv[2], fmt::format("Expression2 -> arg[{}]", 2));
 
       try {
           auto res = operation(ope, arg1, arg2);
@@ -1400,7 +1424,7 @@ void Assembler::printSymbols()
 {
     syms.forAll([](std::string const& name, std::any const& val) {
         if (!utils::startsWith(name, "__"))
-            fmt::print("{} == {}\n", name, any_to_string(val));
+            fmt::print("{} == {}\n", name, any_to_string(val, name));
     });
 }
 
@@ -1411,7 +1435,7 @@ void Assembler::writeSymbols(fs::path const& p)
         if (!utils::startsWith(name, "__") &&
             (name.find('.') == std::string::npos) &&
             val.type() == typeid(Number))
-            fmt::print(f.filePointer(), "{} = {}\n", name, any_to_string(val));
+            fmt::print(f.filePointer(), "{} = {}\n", name, any_to_string(val, name));
     });
 }
 
