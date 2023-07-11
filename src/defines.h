@@ -161,7 +161,7 @@ struct Instruction
     Instruction(std::string_view op, sixfive::Mode m, double v)
         : opcode(op), mode(m), val(static_cast<int32_t>(v))
     {}
-    std::string_view opcode;
+    std::string opcode;
     sixfive::Mode mode;
     int32_t val;
 };

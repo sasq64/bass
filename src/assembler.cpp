@@ -904,6 +904,8 @@ void Assembler::setupRules()
     });
     parser.after("StringContents", [](SV& sv) { return sv.token_view(); });
 
+    parser.after("Suffix", [](SV& sv) { return sv.token_view(); });
+
     parser.after("OpLine", [this](SV& sv) {
         for (size_t n = 0; n < sv.size(); n++) {
             auto arg = sv[n];
@@ -946,8 +948,11 @@ void Assembler::setupRules()
         Instruction instruction{opcode, Mode::NONE, 0};
         if (sv.size() > 1) {
             auto arg = any_cast<Instruction>(sv[1]);
-            if (arg.mode == sixfive::Mode::ABS && suffix == ".b") {
+            if (arg.mode == sixfive::Mode::ADR && suffix == "b") {
                 arg.mode = sixfive::Mode::ZP;
+            }
+            if (arg.mode == sixfive::Mode::ADR && suffix == "w") {
+                arg.mode = sixfive::Mode::ABS;
             }
             instruction.mode = arg.mode;
             instruction.val = arg.val;
@@ -957,7 +962,7 @@ void Assembler::setupRules()
 
     // Set up the 'Instruction' parsing rules
     static const std::unordered_map<std::string, Mode> modeMap = {
-        {"Abs", Mode::ABS}, {"AbsX", Mode::ABSX}, {"AbsY", Mode::ABSY},
+        {"Abs", Mode::ADR}, {"AbsX", Mode::ADRX}, {"AbsY", Mode::ADRY},
         {"Ind", Mode::IND}, {"IndX", Mode::INDX}, {"IndY", Mode::INDY},
         {"Acc", Mode::ACC}, {"Imm", Mode::IMM},
     };

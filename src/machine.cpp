@@ -676,57 +676,75 @@ std::string Machine::disassemble(sixfive::Machine<EmuPolicy>& m, uint32_t* pc)
     return fmt::format("{} {}", name, argstr);
 }
 
+// Check if ourMode can be converted to targetMode, given that the opcode argument
+// is either 8 bit (small = true) or 16 bit (small = false).
+bool Machine::modeMatches(sixfive::Mode ourMode, sixfive::Mode targetMode, bool small)
+{
+    using sixfive::Mode;
+    if (targetMode == ourMode) { return true; }
+    if((ourMode == Mode::ABS || ourMode == Mode::ADR) &&
+            targetMode == Mode::REL) {
+        return true;
+    }
+    if (small) {
+        if (ourMode == Mode::IND && targetMode == Mode::INDZ) {
+            return true;
+        }
+        if (ourMode == Mode::ADR && targetMode == Mode::ZP) {
+            return true;
+        }
+        if (ourMode == Mode::ADRX && targetMode == Mode::ZPX) {
+            return true;
+        }
+        if (ourMode == Mode::ADRY && targetMode == Mode::ZPY) {
+            return true;
+        }
+    }
+    if (ourMode == Mode::ADR && targetMode == Mode::ABS) {
+        return true;
+    }
+    if (ourMode == Mode::ADRX && targetMode == Mode::ABSX) {
+        return true;
+    }
+    if (ourMode == Mode::ADRY && targetMode == Mode::ABSY) {
+        return true;
+    }
+    return false;
+}
+
 AsmResult Machine::assemble(Instruction const& instr)
 {
     using sixfive::Mode;
 
     auto arg = instr;
-    std::string opcode = utils::toLower(std::string(instr.opcode));
+    arg.opcode = utils::toLower(std::string(instr.opcode));
 
     auto const& instructions =
         sixfive::Machine<EmuPolicy>::getInstructions(cpu65C02);
 
+    auto small = (arg.val >= 0 && arg.val <= 0xff);
+
     if (arg.mode == Mode::ZP_REL) {
+        // Handle 65c02 bbrX & rmbX opcodes
         auto bit = arg.val >> 24;
         arg.val &= 0xffffff;
-        opcode = persist(std::string(opcode) + std::to_string(bit));
+        arg.opcode = arg.opcode + std::to_string(bit);
     }
 
     // Find a matching opcode
     auto it_ins = utils::find_if(
-        instructions, [&](auto const& i) { return i.name == opcode; });
+        instructions, [&](auto const& i) { return i.name == arg.opcode; });
 
     if (it_ins == instructions.end()) {
         return AsmResult::NoSuchOpcode;
     }
 
-    auto modeMatches = [&](auto const& opcode, auto const& instruction) {
-        if (instruction.mode == opcode.mode) {
-            return true;
-        }
-
-        // Addressing mode did not match directly. See if we can
-        // 'optimize it' depending on the instruction value
-
-        static std::unordered_map<Mode, Mode> conv{{Mode::INDZ, Mode::IND},
-                                                   {Mode::ZPX, Mode::ABSX},
-                                                   {Mode::ZPY, Mode::ABSY},
-                                                   {Mode::ZP, Mode::ABS}};
-
-        if (instruction.val >= 0 && instruction.val <= 0xff) {
-            auto it = conv.find(opcode.mode);
-            if (it != conv.end() && it->second == instruction.mode) {
-                return true;
-            }
-        }
-
-        return (instruction.mode == Mode::ABS && opcode.mode == Mode::REL);
-    };
-
     // Find a matching addressing mode
     auto it_op =
         std::find_if(it_ins->opcodes.begin(), it_ins->opcodes.end(),
-                     [&](auto const& o) { return modeMatches(o, arg); });
+                     [&](auto const& o) { 
+                        return modeMatches(arg.mode, o.mode, small);
+                     });
 
     if (it_op == it_ins->opcodes.end()) {
         return AsmResult::IllegalAdressingMode;

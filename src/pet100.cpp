@@ -49,11 +49,11 @@ char32_t trans_char(uint8_t c)
 
 void Pet100::set_color(uint8_t col)
 {
-    int b = (col & 0xf) * 3;
-    int f = ((col >> 4) + 16) * 3;
-    uint32_t fg =
+    auto b = (col & 0xf) * 3;
+    auto f = ((col >> 4) + 16) * 3;
+    uint32_t const fg =
         (palette[f] << 24) | (palette[f + 1] << 16) | (palette[f + 2] << 8);
-    uint32_t bg =
+    uint32_t const bg =
         (palette[b] << 24) | (palette[b + 1] << 16) | (palette[b + 2] << 8);
     console->set_color(fg, bg);
 }
@@ -63,16 +63,16 @@ void Pet100::writeChar(uint16_t adr, uint8_t t)
     if (regs[RealW] == 0 || regs[RealH] == 0) {
         return;
     }
-    unsigned offset = adr - (regs[TextPtr] * 256);
+    unsigned const offset = adr - (regs[TextPtr] * 256);
     // textRam[offset] = t;
 
-    auto x = (offset % regs[WinW] + regs[WinX]) % regs[RealW];
-    auto y = (offset / regs[WinW] + regs[WinY]) % regs[RealH];
+    auto x = static_cast<int>(offset % regs[WinW] + regs[WinX]) % regs[RealW];
+    auto y = static_cast<int>(offset / regs[WinW] + regs[WinY]) % regs[RealH];
 
     if (offset >= textRam.size()) { return; }
     textRam[offset] = t;
 
-    uint16_t flags = (t & 0x80) != 0 ? 1 : 0;
+    uint16_t const flags = (t & 0x80) != 0 ? 1 : 0;
     console->put_char(x, y, trans_char(t), flags);
 }
 

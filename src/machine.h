@@ -207,6 +207,8 @@ public:
 
 private:
 
+    static bool modeMatches(sixfive::Mode ourMode, sixfive::Mode targetMode, bool small);
+
     bool cpu65C02 = true;
 
     std::deque<Section*> savedSections;
