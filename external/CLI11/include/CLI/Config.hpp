@@ -1,73 +1,48 @@
+// Copyright (c) 2017-2023, University of Cincinnati, developed by Henry Schreiner
+// under NSF AWARD 1414736 and by the respective contributors.
+// All rights reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
 #pragma once
 
-// Distributed under the 3-Clause BSD License.  See accompanying
-// file LICENSE or https://github.com/CLIUtils/CLI11 for details.
-
+// [CLI11:public_includes:set]
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <utility>
+#include <vector>
+// [CLI11:public_includes:end]
 
-#include "CLI/App.hpp"
-#include "CLI/ConfigFwd.hpp"
-#include "CLI/StringTools.hpp"
+#include "App.hpp"
+#include "ConfigFwd.hpp"
+#include "StringTools.hpp"
 
 namespace CLI {
+// [CLI11:config_hpp:verbatim]
+namespace detail {
 
-inline std::string
-ConfigINI::to_config(const App *app, bool default_also, bool write_description, std::string prefix) const {
-    std::stringstream out;
-    for(const Option *opt : app->get_options({})) {
+std::string convert_arg_for_ini(const std::string &arg, char stringQuote = '"', char characterQuote = '\'');
 
-        // Only process option with a long-name and configurable
-        if(!opt->get_lnames().empty() && opt->get_configurable()) {
-            std::string name = prefix + opt->get_lnames()[0];
-            std::string value;
+/// Comma separated join, adds quotes if needed
+std::string ini_join(const std::vector<std::string> &args,
+                     char sepChar = ',',
+                     char arrayStart = '[',
+                     char arrayEnd = ']',
+                     char stringQuote = '"',
+                     char characterQuote = '\'');
 
-            // Non-flags
-            if(opt->get_type_size() != 0) {
+std::vector<std::string> generate_parents(const std::string &section, std::string &name, char parentSeparator);
 
-                // If the option was found on command line
-                if(opt->count() > 0)
-                    value = detail::ini_join(opt->results());
+/// assuming non default segments do a check on the close and open of the segments in a configItem structure
+void checkParentSegments(std::vector<ConfigItem> &output, const std::string &currentSection, char parentSeparator);
+}  // namespace detail
 
-                // If the option has a default and is requested by optional argument
-                else if(default_also && !opt->get_default_str().empty())
-                    value = opt->get_default_str();
-                // Flag, one passed
-            } else if(opt->count() == 1) {
-                value = "true";
+// [CLI11:config_hpp:end]
+}  // namespace CLI
 
-                // Flag, multiple passed
-            } else if(opt->count() > 1) {
-                value = std::to_string(opt->count());
-
-                // Flag, not present
-            } else if(opt->count() == 0 && default_also) {
-                value = "false";
-            }
-
-            if(!value.empty()) {
-                if(write_description && opt->has_description()) {
-                    if(static_cast<int>(out.tellp()) != 0) {
-                        out << std::endl;
-                    }
-                    out << "; " << detail::fix_newlines("; ", opt->get_description()) << std::endl;
-                }
-
-                // Don't try to quote anything that is not size 1
-                if(opt->get_items_expected() != 1)
-                    out << name << "=" << value << std::endl;
-                else
-                    out << name << "=" << detail::add_quotes_if_needed(value) << std::endl;
-            }
-        }
-    }
-
-    for(const App *subcom : app->get_subcommands({}))
-        out << to_config(subcom, default_also, write_description, prefix + subcom->get_name() + ".");
-
-    return out.str();
-}
-
-} // namespace CLI
+#ifndef CLI11_COMPILE
+#include "impl/Config_inl.hpp"
+#endif

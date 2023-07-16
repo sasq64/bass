@@ -6,20 +6,20 @@
 
 #pragma once
 
-// [CLI11:public_includes:set]
-#include <algorithm>
-#include <string>
-#include <vector>
-// [CLI11:public_includes:end]
-
-#include "App.hpp"
-#include "FormatterFwd.hpp"
+#include <CLI/Macros.hpp>
 
 namespace CLI {
-// [CLI11:formatter_hpp:verbatim]
-// [CLI11:formatter_hpp:end]
+// [CLI11:argv_hpp:verbatim]
+
+/// argc as passed in to this executable.
+CLI11_INLINE int argc();
+
+/// argv as passed in to this executable, converted to utf-8 on Windows.
+CLI11_INLINE const char *const *argv();
+
+// [CLI11:argv_hpp:end]
 }  // namespace CLI
 
 #ifndef CLI11_COMPILE
-#include "impl/Formatter_inl.hpp"
+#include "impl/Argv_inl.hpp"
 #endif

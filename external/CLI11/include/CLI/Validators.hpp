@@ -1,25 +1,42 @@
+// Copyright (c) 2017-2023, University of Cincinnati, developed by Henry Schreiner
+// under NSF AWARD 1414736 and by the respective contributors.
+// All rights reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
 #pragma once
-// Distributed under the 3-Clause BSD License.  See accompanying
-// file LICENSE or https://github.com/CLIUtils/CLI11 for details.
 
-#include "CLI/StringTools.hpp"
-#include "CLI/TypeTools.hpp"
+#include "Error.hpp"
+#include "Macros.hpp"
+#include "StringTools.hpp"
+#include "TypeTools.hpp"
 
+// [CLI11:public_includes:set]
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <iostream>
 #include <limits>
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
+// [CLI11:public_includes:end]
 
-// C standard library
-// Only needed for existence checking
-// Could be swapped for filesystem in C++17
+// [CLI11:validators_hpp_filesystem:verbatim]
+
+#if defined CLI11_HAS_FILESYSTEM && CLI11_HAS_FILESYSTEM > 0
+#include <filesystem>  // NOLINT(build/include)
+#else
 #include <sys/stat.h>
 #include <sys/types.h>
+#endif
+
+// [CLI11:validators_hpp_filesystem:end]
 
 namespace CLI {
+// [CLI11:validators_hpp:verbatim]
 
 class Option;
 
@@ -38,17 +55,20 @@ class Validator {
     /// This is the description function, if empty the description_ will be used
     std::function<std::string()> desc_function_{[]() { return std::string{}; }};
 
-    /// This it the base function that is to be called.
+    /// This is the base function that is to be called.
     /// Returns a string error message if validation fails.
     std::function<std::string(std::string &)> func_{[](std::string &) { return std::string{}; }};
     /// The name for search purposes of the Validator
-    std::string name_;
+    std::string name_{};
     /// A Validator will only apply to an indexed value (-1 is all elements)
     int application_index_ = -1;
     /// Enable for Validator to allow it to be disabled if need be
     bool active_{true};
     /// specify that a validator should not modify the input
     bool non_modifying_{false};
+
+    Validator(std::string validator_desc, std::function<std::string(std::string &)> func)
+        : desc_function_([validator_desc]() { return validator_desc; }), func_(std::move(func)) {}
 
   public:
     Validator() = default;
@@ -65,25 +85,14 @@ class Validator {
     }
     /// This is the required operator for a Validator - provided to help
     /// users (CLI11 uses the member `func` directly)
-    std::string operator()(std::string &str) const {
-        std::string retstring;
-        if(active_) {
-            if(non_modifying_) {
-                std::string value = str;
-                retstring = func_(value);
-            } else {
-                retstring = func_(str);
-            }
-        }
-        return retstring;
-    };
+    std::string operator()(std::string &str) const;
 
     /// This is the required operator for a Validator - provided to help
     /// users (CLI11 uses the member `func` directly)
     std::string operator()(const std::string &str) const {
         std::string value = str;
         return (active_) ? func_(value) : std::string{};
-    };
+    }
 
     /// Specify the type string
     Validator &description(std::string validator_desc) {
@@ -91,13 +100,10 @@ class Validator {
         return *this;
     }
     /// Specify the type string
-    Validator description(std::string validator_desc) const {
-        Validator newval(*this);
-        newval.desc_function_ = [validator_desc]() { return validator_desc; };
-        return newval;
-    }
+    CLI11_NODISCARD Validator description(std::string validator_desc) const;
+
     /// Generate type description information for the Validator
-    std::string get_description() const {
+    CLI11_NODISCARD std::string get_description() const {
         if(active_) {
             return desc_function_();
         }
@@ -109,20 +115,20 @@ class Validator {
         return *this;
     }
     /// Specify the type string
-    Validator name(std::string validator_name) const {
+    CLI11_NODISCARD Validator name(std::string validator_name) const {
         Validator newval(*this);
         newval.name_ = std::move(validator_name);
         return newval;
     }
     /// Get the name of the Validator
-    const std::string &get_name() const { return name_; }
+    CLI11_NODISCARD const std::string &get_name() const { return name_; }
     /// Specify whether the Validator is active or not
     Validator &active(bool active_val = true) {
         active_ = active_val;
         return *this;
     }
     /// Specify whether the Validator is active or not
-    Validator active(bool active_val = true) const {
+    CLI11_NODISCARD Validator active(bool active_val = true) const {
         Validator newval(*this);
         newval.active_ = active_val;
         return newval;
@@ -137,109 +143,35 @@ class Validator {
     Validator &application_index(int app_index) {
         application_index_ = app_index;
         return *this;
-    };
+    }
     /// Specify the application index of a validator
-    Validator application_index(int app_index) const {
+    CLI11_NODISCARD Validator application_index(int app_index) const {
         Validator newval(*this);
         newval.application_index_ = app_index;
         return newval;
-    };
+    }
     /// Get the current value of the application index
-    int get_application_index() const { return application_index_; }
+    CLI11_NODISCARD int get_application_index() const { return application_index_; }
     /// Get a boolean if the validator is active
-    bool get_active() const { return active_; }
+    CLI11_NODISCARD bool get_active() const { return active_; }
 
     /// Get a boolean if the validator is allowed to modify the input returns true if it can modify the input
-    bool get_modifying() const { return !non_modifying_; }
+    CLI11_NODISCARD bool get_modifying() const { return !non_modifying_; }
 
     /// Combining validators is a new validator. Type comes from left validator if function, otherwise only set if the
     /// same.
-    Validator operator&(const Validator &other) const {
-        Validator newval;
-
-        newval._merge_description(*this, other, " AND ");
-
-        // Give references (will make a copy in lambda function)
-        const std::function<std::string(std::string & filename)> &f1 = func_;
-        const std::function<std::string(std::string & filename)> &f2 = other.func_;
-
-        newval.func_ = [f1, f2](std::string &input) {
-            std::string s1 = f1(input);
-            std::string s2 = f2(input);
-            if(!s1.empty() && !s2.empty())
-                return std::string("(") + s1 + ") AND (" + s2 + ")";
-            else
-                return s1 + s2;
-        };
-
-        newval.active_ = (active_ & other.active_);
-        newval.application_index_ = application_index_;
-        return newval;
-    }
+    Validator operator&(const Validator &other) const;
 
     /// Combining validators is a new validator. Type comes from left validator if function, otherwise only set if the
     /// same.
-    Validator operator|(const Validator &other) const {
-        Validator newval;
-
-        newval._merge_description(*this, other, " OR ");
-
-        // Give references (will make a copy in lambda function)
-        const std::function<std::string(std::string &)> &f1 = func_;
-        const std::function<std::string(std::string &)> &f2 = other.func_;
-
-        newval.func_ = [f1, f2](std::string &input) {
-            std::string s1 = f1(input);
-            std::string s2 = f2(input);
-            if(s1.empty() || s2.empty())
-                return std::string();
-
-            return std::string("(") + s1 + ") OR (" + s2 + ")";
-        };
-        newval.active_ = (active_ & other.active_);
-        newval.application_index_ = application_index_;
-        return newval;
-    }
+    Validator operator|(const Validator &other) const;
 
     /// Create a validator that fails when a given validator succeeds
-    Validator operator!() const {
-        Validator newval;
-        const std::function<std::string()> &dfunc1 = desc_function_;
-        newval.desc_function_ = [dfunc1]() {
-            auto str = dfunc1();
-            return (!str.empty()) ? std::string("NOT ") + str : std::string{};
-        };
-        // Give references (will make a copy in lambda function)
-        const std::function<std::string(std::string & res)> &f1 = func_;
-
-        newval.func_ = [f1, dfunc1](std::string &test) -> std::string {
-            std::string s1 = f1(test);
-            if(s1.empty()) {
-                return std::string("check ") + dfunc1() + " succeeded improperly";
-            }
-            return std::string{};
-        };
-        newval.active_ = active_;
-        newval.application_index_ = application_index_;
-        return newval;
-    }
+    Validator operator!() const;
 
   private:
-    void _merge_description(const Validator &val1, const Validator &val2, const std::string &merger) {
-
-        const std::function<std::string()> &dfunc1 = val1.desc_function_;
-        const std::function<std::string()> &dfunc2 = val2.desc_function_;
-
-        desc_function_ = [=]() {
-            std::string f1 = dfunc1();
-            std::string f2 = dfunc2();
-            if((f1.empty()) || (f2.empty())) {
-                return f1 + f2;
-            }
-            return std::string(1, '(') + f1 + ')' + merger + '(' + f2 + ')';
-        };
-    }
-}; // namespace CLI
+    void _merge_description(const Validator &val1, const Validator &val2, const std::string &merger);
+};
 
 /// Class wrapping some of the accessors of Validator
 class CustomValidator : public Validator {
@@ -250,131 +182,43 @@ class CustomValidator : public Validator {
 // Therefore, this is in detail.
 namespace detail {
 
+/// CLI enumeration of different file types
+enum class path_type { nonexistent, file, directory };
+
+/// get the type of the path from a file name
+CLI11_INLINE path_type check_path(const char *file) noexcept;
+
 /// Check for an existing file (returns error message if check fails)
 class ExistingFileValidator : public Validator {
   public:
-    ExistingFileValidator() : Validator("FILE") {
-        func_ = [](std::string &filename) {
-            struct stat buffer;
-            bool exist = stat(filename.c_str(), &buffer) == 0;
-            bool is_dir = (buffer.st_mode & S_IFDIR) != 0;
-            if(!exist) {
-                return "File does not exist: " + filename;
-            }
-            if(is_dir) {
-                return "File is actually a directory: " + filename;
-            }
-            return std::string();
-        };
-    }
+    ExistingFileValidator();
 };
 
 /// Check for an existing directory (returns error message if check fails)
 class ExistingDirectoryValidator : public Validator {
   public:
-    ExistingDirectoryValidator() : Validator("DIR") {
-        func_ = [](std::string &filename) {
-            struct stat buffer;
-            bool exist = stat(filename.c_str(), &buffer) == 0;
-            bool is_dir = (buffer.st_mode & S_IFDIR) != 0;
-            if(!exist) {
-                return "Directory does not exist: " + filename;
-            }
-            if(!is_dir) {
-                return "Directory is actually a file: " + filename;
-            }
-            return std::string();
-        };
-    }
+    ExistingDirectoryValidator();
 };
 
 /// Check for an existing path
 class ExistingPathValidator : public Validator {
   public:
-    ExistingPathValidator() : Validator("PATH(existing)") {
-        func_ = [](std::string &filename) {
-            struct stat buffer;
-            bool const exist = stat(filename.c_str(), &buffer) == 0;
-            if(!exist) {
-                return "Path does not exist: " + filename;
-            }
-            return std::string();
-        };
-    }
+    ExistingPathValidator();
 };
 
 /// Check for an non-existing path
 class NonexistentPathValidator : public Validator {
   public:
-    NonexistentPathValidator() : Validator("PATH(non-existing)") {
-        func_ = [](std::string &filename) {
-            struct stat buffer;
-            bool exist = stat(filename.c_str(), &buffer) == 0;
-            if(exist) {
-                return "Path already exists: " + filename;
-            }
-            return std::string();
-        };
-    }
+    NonexistentPathValidator();
 };
 
 /// Validate the given string is a legal ipv4 address
 class IPV4Validator : public Validator {
   public:
-    IPV4Validator() : Validator("IPV4") {
-        func_ = [](std::string &ip_addr) {
-            auto result = CLI::detail::split(ip_addr, '.');
-            if(result.size() != 4) {
-                return "Invalid IPV4 address must have four parts " + ip_addr;
-            }
-            int num;
-            bool retval = true;
-            for(const auto &var : result) {
-                retval &= detail::lexical_cast(var, num);
-                if(!retval) {
-                    return "Failed parsing number " + var;
-                }
-                if(num < 0 || num > 255) {
-                    return "Each IP number must be between 0 and 255 " + var;
-                }
-            }
-            return std::string();
-        };
-    }
+    IPV4Validator();
 };
 
-/// Validate the argument is a number and greater than or equal to 0
-class PositiveNumber : public Validator {
-  public:
-    PositiveNumber() : Validator("POSITIVE") {
-        func_ = [](std::string &number_str) {
-            int number;
-            if(!detail::lexical_cast(number_str, number)) {
-                return "Failed parsing number " + number_str;
-            }
-            if(number < 0) {
-                return "Number less then 0 " + number_str;
-            }
-            return std::string();
-        };
-    }
-};
-
-/// Validate the argument is a number and greater than or equal to 0
-class Number : public Validator {
-  public:
-    Number() : Validator("NUMBER") {
-        func_ = [](std::string &number_str) {
-            double number;
-            if(!detail::lexical_cast(number_str, number)) {
-                return "Failed parsing as a number " + number_str;
-            }
-            return std::string();
-        };
-    }
-};
-
-} // namespace detail
+}  // namespace detail
 
 // Static is not needed here, because global const implies static.
 
@@ -393,11 +237,30 @@ const detail::NonexistentPathValidator NonexistentPath;
 /// Check for an IP4 address
 const detail::IPV4Validator ValidIPV4;
 
-/// Check for a positive number
-const detail::PositiveNumber PositiveNumber;
+/// Validate the input as a particular type
+template <typename DesiredType> class TypeValidator : public Validator {
+  public:
+    explicit TypeValidator(const std::string &validator_name)
+        : Validator(validator_name, [](std::string &input_string) {
+              using CLI::detail::lexical_cast;
+              auto val = DesiredType();
+              if(!lexical_cast(input_string, val)) {
+                  return std::string("Failed parsing ") + input_string + " as a " + detail::type_name<DesiredType>();
+              }
+              return std::string();
+          }) {}
+    TypeValidator() : TypeValidator(detail::type_name<DesiredType>()) {}
+};
 
 /// Check for a number
-const detail::Number Number;
+const TypeValidator<double> Number("NUMBER");
+
+/// Modify a path if the file is a particular default location, can be used as Check or transform
+/// with the error return optionally disabled
+class FileOnDefaultPath : public Validator {
+  public:
+    explicit FileOnDefaultPath(std::string default_path, bool enableErrorReturn = true);
+};
 
 /// Produce a range (factory). Min and max are inclusive.
 class Range : public Validator {
@@ -406,24 +269,39 @@ class Range : public Validator {
     ///
     /// Note that the constructor is templated, but the struct is not, so C++17 is not
     /// needed to provide nice syntax for Range(a,b).
-    template <typename T> Range(T min, T max) {
-        std::stringstream out;
-        out << detail::type_name<T>() << " in [" << min << " - " << max << "]";
-        description(out.str());
+    template <typename T>
+    Range(T min_val, T max_val, const std::string &validator_name = std::string{}) : Validator(validator_name) {
+        if(validator_name.empty()) {
+            std::stringstream out;
+            out << detail::type_name<T>() << " in [" << min_val << " - " << max_val << "]";
+            description(out.str());
+        }
 
-        func_ = [min, max](std::string &input) {
+        func_ = [min_val, max_val](std::string &input) {
+            using CLI::detail::lexical_cast;
             T val;
-            bool converted = detail::lexical_cast(input, val);
-            if((!converted) || (val < min || val > max))
-                return "Value " + input + " not in range " + std::to_string(min) + " to " + std::to_string(max);
-
-            return std::string();
+            bool converted = lexical_cast(input, val);
+            if((!converted) || (val < min_val || val > max_val)) {
+                std::stringstream out;
+                out << "Value " << input << " not in range [";
+                out << min_val << " - " << max_val << "]";
+                return out.str();
+            }
+            return std::string{};
         };
     }
 
     /// Range of one value is 0 to value
-    template <typename T> explicit Range(T max) : Range(static_cast<T>(0), max) {}
+    template <typename T>
+    explicit Range(T max_val, const std::string &validator_name = std::string{})
+        : Range(static_cast<T>(0), max_val, validator_name) {}
 };
+
+/// Check for a non negative number
+const Range NonNegativeNumber((std::numeric_limits<double>::max)(), "NONNEGATIVE");
+
+/// Check for a positive valued number (val>0.0), <double>::min  here is the smallest positive number
+const Range PositiveNumber((std::numeric_limits<double>::min)(), (std::numeric_limits<double>::max)(), "POSITIVE");
 
 /// Produce a bounded range (factory). Min and max are inclusive.
 class Bound : public Validator {
@@ -432,28 +310,29 @@ class Bound : public Validator {
     ///
     /// Note that the constructor is templated, but the struct is not, so C++17 is not
     /// needed to provide nice syntax for Range(a,b).
-    template <typename T> Bound(T min, T max) {
+    template <typename T> Bound(T min_val, T max_val) {
         std::stringstream out;
-        out << detail::type_name<T>() << " bounded to [" << min << " - " << max << "]";
+        out << detail::type_name<T>() << " bounded to [" << min_val << " - " << max_val << "]";
         description(out.str());
 
-        func_ = [min, max](std::string &input) {
+        func_ = [min_val, max_val](std::string &input) {
+            using CLI::detail::lexical_cast;
             T val;
-            bool converted = detail::lexical_cast(input, val);
+            bool converted = lexical_cast(input, val);
             if(!converted) {
-                return "Value " + input + " could not be converted";
+                return std::string("Value ") + input + " could not be converted";
             }
-            if(val < min)
-                input = detail::to_string(min);
-            else if(val > max)
-                input = detail::to_string(max);
+            if(val < min_val)
+                input = detail::to_string(min_val);
+            else if(val > max_val)
+                input = detail::to_string(max_val);
 
             return std::string{};
         };
     }
 
     /// Range of one value is 0 to value
-    template <typename T> explicit Bound(T max) : Bound(static_cast<T>(0), max) {}
+    template <typename T> explicit Bound(T max_val) : Bound(static_cast<T>(0), max_val) {}
 };
 
 namespace detail {
@@ -472,11 +351,12 @@ typename std::remove_reference<T>::type &smart_deref(T &value) {
 /// Generate a string representation of a set
 template <typename T> std::string generate_set(const T &set) {
     using element_t = typename detail::element_type<T>::type;
-    using iteration_type_t = typename detail::pair_adaptor<element_t>::value_type; // the type of the object pair
+    using iteration_type_t = typename detail::pair_adaptor<element_t>::value_type;  // the type of the object pair
     std::string out(1, '{');
-    out.append(detail::join(detail::smart_deref(set),
-                            [](const iteration_type_t &v) { return detail::pair_adaptor<element_t>::first(v); },
-                            ","));
+    out.append(detail::join(
+        detail::smart_deref(set),
+        [](const iteration_type_t &v) { return detail::pair_adaptor<element_t>::first(v); },
+        ","));
     out.push_back('}');
     return out;
 }
@@ -484,19 +364,20 @@ template <typename T> std::string generate_set(const T &set) {
 /// Generate a string representation of a map
 template <typename T> std::string generate_map(const T &map, bool key_only = false) {
     using element_t = typename detail::element_type<T>::type;
-    using iteration_type_t = typename detail::pair_adaptor<element_t>::value_type; // the type of the object pair
+    using iteration_type_t = typename detail::pair_adaptor<element_t>::value_type;  // the type of the object pair
     std::string out(1, '{');
-    out.append(detail::join(detail::smart_deref(map),
-                            [key_only](const iteration_type_t &v) {
-                                std::string res{detail::to_string(detail::pair_adaptor<element_t>::first(v))};
+    out.append(detail::join(
+        detail::smart_deref(map),
+        [key_only](const iteration_type_t &v) {
+            std::string res{detail::to_string(detail::pair_adaptor<element_t>::first(v))};
 
-                                if(!key_only) {
-                                    res.append("->");
-                                    res += detail::to_string(detail::pair_adaptor<element_t>::second(v));
-                                }
-                                return res;
-                            },
-                            ","));
+            if(!key_only) {
+                res.append("->");
+                res += detail::to_string(detail::pair_adaptor<element_t>::second(v));
+            }
+            return res;
+        },
+        ","));
     out.push_back('}');
     return out;
 }
@@ -557,9 +438,8 @@ template <typename T>
 inline typename std::enable_if<std::is_signed<T>::value, T>::type overflowCheck(const T &a, const T &b) {
     if((a > 0) == (b > 0)) {
         return ((std::numeric_limits<T>::max)() / (std::abs)(a) < (std::abs)(b));
-    } else {
-        return ((std::numeric_limits<T>::min)() / (std::abs)(a) > -(std::abs)(b));
     }
+    return ((std::numeric_limits<T>::min)() / (std::abs)(a) > -(std::abs)(b));
 }
 /// Do a check for overflow on unsigned numbers
 template <typename T>
@@ -594,7 +474,7 @@ typename std::enable_if<std::is_floating_point<T>::value, bool>::type checked_mu
     return true;
 }
 
-} // namespace detail
+}  // namespace detail
 /// Verify items are in a set
 class IsMember : public Validator {
   public:
@@ -602,7 +482,7 @@ class IsMember : public Validator {
 
     /// This allows in-place construction using an initializer list
     template <typename T, typename... Args>
-    explicit IsMember(std::initializer_list<T> values, Args &&... args)
+    IsMember(std::initializer_list<T> values, Args &&...args)
         : IsMember(std::vector<T>(values), std::forward<Args>(args)...) {}
 
     /// This checks to see if an item is in a set (empty function)
@@ -614,11 +494,11 @@ class IsMember : public Validator {
 
         // Get the type of the contained item - requires a container have ::value_type
         // if the type does not have first_type and second_type, these are both value_type
-        using element_t = typename detail::element_type<T>::type;            // Removes (smart) pointers if needed
-        using item_t = typename detail::pair_adaptor<element_t>::first_type; // Is value_type if not a map
+        using element_t = typename detail::element_type<T>::type;             // Removes (smart) pointers if needed
+        using item_t = typename detail::pair_adaptor<element_t>::first_type;  // Is value_type if not a map
 
-        using local_item_t = typename IsMemberType<item_t>::type; // This will convert bad types to good ones
-                                                                  // (const char * to std::string)
+        using local_item_t = typename IsMemberType<item_t>::type;  // This will convert bad types to good ones
+                                                                   // (const char * to std::string)
 
         // Make a local copy of the filter function, using a std::function if not one already
         std::function<local_item_t(local_item_t)> filter_fn = filter_function;
@@ -629,9 +509,10 @@ class IsMember : public Validator {
         // This is the function that validates
         // It stores a copy of the set pointer-like, so shared_ptr will stay alive
         func_ = [set, filter_fn](std::string &input) {
+            using CLI::detail::lexical_cast;
             local_item_t b;
-            if(!detail::lexical_cast(input, b)) {
-                throw ValidationError(input); // name is added later
+            if(!lexical_cast(input, b)) {
+                throw ValidationError(input);  // name is added later
             }
             if(filter_fn) {
                 b = filter_fn(b);
@@ -640,7 +521,7 @@ class IsMember : public Validator {
             if(res.first) {
                 // Make sure the version in the input string is identical to the one in the set
                 if(filter_fn) {
-                    input = detail::to_string(detail::pair_adaptor<element_t>::first(*(res.second)));
+                    input = detail::value_string(detail::pair_adaptor<element_t>::first(*(res.second)));
                 }
 
                 // Return empty error string (success)
@@ -648,18 +529,17 @@ class IsMember : public Validator {
             }
 
             // If you reach this point, the result was not found
-            std::string out(" not in ");
-            out += detail::generate_set(detail::smart_deref(set));
-            return out;
+            return input + " not in " + detail::generate_set(detail::smart_deref(set));
         };
     }
 
     /// You can pass in as many filter functions as you like, they nest (string only currently)
     template <typename T, typename... Args>
-    IsMember(T &&set, filter_fn_t filter_fn_1, filter_fn_t filter_fn_2, Args &&... other)
-        : IsMember(std::forward<T>(set),
-                   [filter_fn_1, filter_fn_2](std::string a) { return filter_fn_2(filter_fn_1(a)); },
-                   other...) {}
+    IsMember(T &&set, filter_fn_t filter_fn_1, filter_fn_t filter_fn_2, Args &&...other)
+        : IsMember(
+              std::forward<T>(set),
+              [filter_fn_1, filter_fn_2](std::string a) { return filter_fn_2(filter_fn_1(a)); },
+              other...) {}
 };
 
 /// definition of the default transformation object
@@ -672,7 +552,7 @@ class Transformer : public Validator {
 
     /// This allows in-place construction
     template <typename... Args>
-    explicit Transformer(std::initializer_list<std::pair<std::string, std::string>> values, Args &&... args)
+    Transformer(std::initializer_list<std::pair<std::string, std::string>> values, Args &&...args)
         : Transformer(TransformPairs<std::string>(values), std::forward<Args>(args)...) {}
 
     /// direct map of std::string to std::string
@@ -686,10 +566,10 @@ class Transformer : public Validator {
                       "mapping must produce value pairs");
         // Get the type of the contained item - requires a container have ::value_type
         // if the type does not have first_type and second_type, these are both value_type
-        using element_t = typename detail::element_type<T>::type;            // Removes (smart) pointers if needed
-        using item_t = typename detail::pair_adaptor<element_t>::first_type; // Is value_type if not a map
-        using local_item_t = typename IsMemberType<item_t>::type;            // This will convert bad types to good ones
-                                                                             // (const char * to std::string)
+        using element_t = typename detail::element_type<T>::type;             // Removes (smart) pointers if needed
+        using item_t = typename detail::pair_adaptor<element_t>::first_type;  // Is value_type if not a map
+        using local_item_t = typename IsMemberType<item_t>::type;             // Will convert bad types to good ones
+                                                                              // (const char * to std::string)
 
         // Make a local copy of the filter function, using a std::function if not one already
         std::function<local_item_t(local_item_t)> filter_fn = filter_function;
@@ -698,8 +578,9 @@ class Transformer : public Validator {
         desc_function_ = [mapping]() { return detail::generate_map(detail::smart_deref(mapping)); };
 
         func_ = [mapping, filter_fn](std::string &input) {
+            using CLI::detail::lexical_cast;
             local_item_t b;
-            if(!detail::lexical_cast(input, b)) {
+            if(!lexical_cast(input, b)) {
                 return std::string();
                 // there is no possible way we can match anything in the mapping if we can't convert so just return
             }
@@ -708,7 +589,7 @@ class Transformer : public Validator {
             }
             auto res = detail::search(mapping, b, filter_fn);
             if(res.first) {
-                input = detail::to_string(detail::pair_adaptor<element_t>::second(*res.second));
+                input = detail::value_string(detail::pair_adaptor<element_t>::second(*res.second));
             }
             return std::string{};
         };
@@ -716,10 +597,11 @@ class Transformer : public Validator {
 
     /// You can pass in as many filter functions as you like, they nest
     template <typename T, typename... Args>
-    Transformer(T &&mapping, filter_fn_t filter_fn_1, filter_fn_t filter_fn_2, Args &&... other)
-        : Transformer(std::forward<T>(mapping),
-                      [filter_fn_1, filter_fn_2](std::string a) { return filter_fn_2(filter_fn_1(a)); },
-                      other...) {}
+    Transformer(T &&mapping, filter_fn_t filter_fn_1, filter_fn_t filter_fn_2, Args &&...other)
+        : Transformer(
+              std::forward<T>(mapping),
+              [filter_fn_1, filter_fn_2](std::string a) { return filter_fn_2(filter_fn_1(a)); },
+              other...) {}
 };
 
 /// translate named items to other or a value set
@@ -729,7 +611,7 @@ class CheckedTransformer : public Validator {
 
     /// This allows in-place construction
     template <typename... Args>
-    explicit CheckedTransformer(std::initializer_list<std::pair<std::string, std::string>> values, Args &&... args)
+    CheckedTransformer(std::initializer_list<std::pair<std::string, std::string>> values, Args &&...args)
         : CheckedTransformer(TransformPairs<std::string>(values), std::forward<Args>(args)...) {}
 
     /// direct map of std::string to std::string
@@ -743,12 +625,11 @@ class CheckedTransformer : public Validator {
                       "mapping must produce value pairs");
         // Get the type of the contained item - requires a container have ::value_type
         // if the type does not have first_type and second_type, these are both value_type
-        using element_t = typename detail::element_type<T>::type;            // Removes (smart) pointers if needed
-        using item_t = typename detail::pair_adaptor<element_t>::first_type; // Is value_type if not a map
-        using local_item_t = typename IsMemberType<item_t>::type;            // This will convert bad types to good ones
-                                                                             // (const char * to std::string)
-        using iteration_type_t = typename detail::pair_adaptor<element_t>::value_type; // the type of the object pair //
-                                                                                       // the type of the object pair
+        using element_t = typename detail::element_type<T>::type;             // Removes (smart) pointers if needed
+        using item_t = typename detail::pair_adaptor<element_t>::first_type;  // Is value_type if not a map
+        using local_item_t = typename IsMemberType<item_t>::type;             // Will convert bad types to good ones
+                                                                              // (const char * to std::string)
+        using iteration_type_t = typename detail::pair_adaptor<element_t>::value_type;  // the type of the object pair
 
         // Make a local copy of the filter function, using a std::function if not one already
         std::function<local_item_t(local_item_t)> filter_fn = filter_function;
@@ -767,20 +648,21 @@ class CheckedTransformer : public Validator {
         desc_function_ = tfunc;
 
         func_ = [mapping, tfunc, filter_fn](std::string &input) {
+            using CLI::detail::lexical_cast;
             local_item_t b;
-            bool converted = detail::lexical_cast(input, b);
+            bool converted = lexical_cast(input, b);
             if(converted) {
                 if(filter_fn) {
                     b = filter_fn(b);
                 }
                 auto res = detail::search(mapping, b, filter_fn);
                 if(res.first) {
-                    input = detail::to_string(detail::pair_adaptor<element_t>::second(*res.second));
+                    input = detail::value_string(detail::pair_adaptor<element_t>::second(*res.second));
                     return std::string{};
                 }
             }
             for(const auto &v : detail::smart_deref(mapping)) {
-                auto output_string = detail::to_string(detail::pair_adaptor<element_t>::second(v));
+                auto output_string = detail::value_string(detail::pair_adaptor<element_t>::second(v));
                 if(output_string == input) {
                     return std::string();
                 }
@@ -792,10 +674,11 @@ class CheckedTransformer : public Validator {
 
     /// You can pass in as many filter functions as you like, they nest
     template <typename T, typename... Args>
-    CheckedTransformer(T &&mapping, filter_fn_t filter_fn_1, filter_fn_t filter_fn_2, Args &&... other)
-        : CheckedTransformer(std::forward<T>(mapping),
-                             [filter_fn_1, filter_fn_2](std::string a) { return filter_fn_2(filter_fn_1(a)); },
-                             other...) {}
+    CheckedTransformer(T &&mapping, filter_fn_t filter_fn_1, filter_fn_t filter_fn_2, Args &&...other)
+        : CheckedTransformer(
+              std::forward<T>(mapping),
+              [filter_fn_1, filter_fn_2](std::string a) { return filter_fn_2(filter_fn_1(a)); },
+              other...) {}
 };
 
 /// Helper function to allow ignore_case to be passed to IsMember or Transform
@@ -845,7 +728,7 @@ class AsNumberWithUnit : public Validator {
 
         // transform function
         func_ = [mapping, opts](std::string &input) -> std::string {
-            Number num;
+            Number num{};
 
             detail::rtrim(input);
             if(input.empty()) {
@@ -859,7 +742,7 @@ class AsNumberWithUnit : public Validator {
             }
 
             std::string unit{unit_begin, input.end()};
-            input.resize(static_cast<size_t>(std::distance(input.begin(), unit_begin)));
+            input.resize(static_cast<std::size_t>(std::distance(input.begin(), unit_begin)));
             detail::trim(input);
 
             if(opts & UNIT_REQUIRED && unit.empty()) {
@@ -868,13 +751,12 @@ class AsNumberWithUnit : public Validator {
             if(opts & CASE_INSENSITIVE) {
                 unit = detail::to_lower(unit);
             }
-
-            bool converted = detail::lexical_cast(input, num);
-            if(!converted) {
-                throw ValidationError("Value " + input + " could not be converted to " + detail::type_name<Number>());
-            }
-
             if(unit.empty()) {
+                using CLI::detail::lexical_cast;
+                if(!lexical_cast(input, num)) {
+                    throw ValidationError(std::string("Value ") + input + " could not be converted to " +
+                                          detail::type_name<Number>());
+                }
                 // No need to modify input if no unit passed
                 return {};
             }
@@ -888,12 +770,23 @@ class AsNumberWithUnit : public Validator {
                                       detail::generate_map(mapping, true));
             }
 
-            // perform safe multiplication
-            bool ok = detail::checked_multiply(num, it->second);
-            if(!ok) {
-                throw ValidationError(detail::to_string(num) + " multiplied by " + unit +
-                                      " factor would cause number overflow. Use smaller value.");
+            if(!input.empty()) {
+                using CLI::detail::lexical_cast;
+                bool converted = lexical_cast(input, num);
+                if(!converted) {
+                    throw ValidationError(std::string("Value ") + input + " could not be converted to " +
+                                          detail::type_name<Number>());
+                }
+                // perform safe multiplication
+                bool ok = detail::checked_multiply(num, it->second);
+                if(!ok) {
+                    throw ValidationError(detail::to_string(num) + " multiplied by " + unit +
+                                          " factor would cause number overflow. Use smaller value.");
+                }
+            } else {
+                num = static_cast<Number>(it->second);
             }
+
             input = detail::to_string(num);
 
             return {};
@@ -919,7 +812,8 @@ class AsNumberWithUnit : public Validator {
             for(auto &kv : mapping) {
                 auto s = detail::to_lower(kv.first);
                 if(lower_mapping.count(s)) {
-                    throw ValidationError("Several matching lowercase unit representations are found: " + s);
+                    throw ValidationError(std::string("Several matching lowercase unit representations are found: ") +
+                                          s);
                 }
                 lower_mapping[detail::to_lower(kv.first)] = kv.second;
             }
@@ -940,6 +834,10 @@ class AsNumberWithUnit : public Validator {
     }
 };
 
+inline AsNumberWithUnit::Options operator|(const AsNumberWithUnit::Options &a, const AsNumberWithUnit::Options &b) {
+    return static_cast<AsNumberWithUnit::Options>(static_cast<int>(a) | static_cast<int>(b));
+}
+
 /// Converts a human-readable size string (with unit literal) to uin64_t size.
 /// Example:
 ///   "100" => 100
@@ -953,7 +851,7 @@ class AsNumberWithUnit : public Validator {
 ///   "2 EiB" => 2^61 // Units up to exibyte are supported
 class AsSizeValue : public AsNumberWithUnit {
   public:
-    using result_t = uint64_t;
+    using result_t = std::uint64_t;
 
     /// If kb_is_1000 is true,
     /// interpret 'kb', 'k' as 1000 and 'kib', 'ki' as 1024
@@ -962,44 +860,14 @@ class AsSizeValue : public AsNumberWithUnit {
     /// The first option is formally correct, but
     /// the second interpretation is more wide-spread
     /// (see https://en.wikipedia.org/wiki/Binary_prefix).
-    explicit AsSizeValue(bool kb_is_1000) : AsNumberWithUnit(get_mapping(kb_is_1000)) {
-        if(kb_is_1000) {
-            description("SIZE [b, kb(=1000b), kib(=1024b), ...]");
-        } else {
-            description("SIZE [b, kb(=1024b), ...]");
-        }
-    }
+    explicit AsSizeValue(bool kb_is_1000);
 
   private:
     /// Get <size unit, factor> mapping
-    static std::map<std::string, result_t> init_mapping(bool kb_is_1000) {
-        std::map<std::string, result_t> m;
-        result_t k_factor = kb_is_1000 ? 1000 : 1024;
-        result_t ki_factor = 1024;
-        result_t k = 1;
-        result_t ki = 1;
-        m["b"] = 1;
-        for(std::string p : {"k", "m", "g", "t", "p", "e"}) {
-            k *= k_factor;
-            ki *= ki_factor;
-            m[p] = k;
-            m[p + "b"] = k;
-            m[p + "i"] = ki;
-            m[p + "ib"] = ki;
-        }
-        return m;
-    }
+    static std::map<std::string, result_t> init_mapping(bool kb_is_1000);
 
     /// Cache calculated mapping
-    static std::map<std::string, result_t> get_mapping(bool kb_is_1000) {
-        if(kb_is_1000) {
-            static auto m = init_mapping(true);
-            return m;
-        } else {
-            static auto m = init_mapping(false);
-            return m;
-        }
-    }
+    static std::map<std::string, result_t> get_mapping(bool kb_is_1000);
 };
 
 namespace detail {
@@ -1007,29 +875,14 @@ namespace detail {
 /// the string is assumed to contain a file name followed by other arguments
 /// the return value contains is a pair with the first argument containing the program name and the second
 /// everything else.
-inline std::pair<std::string, std::string> split_program_name(std::string commandline) {
-    // try to determine the programName
-    std::pair<std::string, std::string> vals;
-    trim(commandline);
-    auto esp = commandline.find_first_of(' ', 1);
-    while(!ExistingFile(commandline.substr(0, esp)).empty()) {
-        esp = commandline.find_first_of(' ', esp + 1);
-        if(esp == std::string::npos) {
-            // if we have reached the end and haven't found a valid file just assume the first argument is the
-            // program name
-            esp = commandline.find_first_of(' ', 1);
-            break;
-        }
-    }
-    vals.first = commandline.substr(0, esp);
-    rtrim(vals.first);
-    // strip the program name
-    vals.second = (esp != std::string::npos) ? commandline.substr(esp + 1) : std::string{};
-    ltrim(vals.second);
-    return vals;
-}
+CLI11_INLINE std::pair<std::string, std::string> split_program_name(std::string commandline);
 
-} // namespace detail
+}  // namespace detail
 /// @}
 
-} // namespace CLI
+// [CLI11:validators_hpp:end]
+}  // namespace CLI
+
+#ifndef CLI11_COMPILE
+#include "impl/Validators_inl.hpp"
+#endif

@@ -1,17 +1,25 @@
+// Copyright (c) 2017-2023, University of Cincinnati, developed by Henry Schreiner
+// under NSF AWARD 1414736 and by the respective contributors.
+// All rights reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
 #pragma once
 
-// Distributed under the 3-Clause BSD License.  See accompanying
-// file LICENSE or https://github.com/CLIUtils/CLI11 for details.
-
+// [CLI11:public_includes:set]
 #include <exception>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
+// [CLI11:public_includes:end]
 
 // CLI library includes
-#include "CLI/StringTools.hpp"
+#include "Macros.hpp"
+#include "StringTools.hpp"
 
 namespace CLI {
+// [CLI11:error_hpp:verbatim]
 
 // Use one of these on all error classes.
 // These are temporary and are undef'd at the end of this file.
@@ -65,9 +73,9 @@ class Error : public std::runtime_error {
     std::string error_name{"Error"};
 
   public:
-    int get_exit_code() const { return actual_exit_code; }
+    CLI11_NODISCARD int get_exit_code() const { return actual_exit_code; }
 
-    std::string get_name() const { return error_name; }
+    CLI11_NODISCARD std::string get_name() const { return error_name; }
 
     Error(std::string name, std::string msg, int exit_code = static_cast<int>(ExitCodes::BaseClass))
         : runtime_error(msg), actual_exit_code(exit_code), error_name(std::move(name)) {}
@@ -115,6 +123,9 @@ class BadNameString : public ConstructionError {
     CLI11_ERROR_DEF(ConstructionError, BadNameString)
     CLI11_ERROR_SIMPLE(BadNameString)
     static BadNameString OneCharName(std::string name) { return BadNameString("Invalid one char name: " + name); }
+    static BadNameString MissingDash(std::string name) {
+        return BadNameString("Long names strings require 2 dashes " + name);
+    }
     static BadNameString BadLongName(std::string name) { return BadNameString("Bad long name: " + name); }
     static BadNameString DashesOnly(std::string name) {
         return BadNameString("Must have a name, not just dashes: " + name);
@@ -130,10 +141,10 @@ class OptionAlreadyAdded : public ConstructionError {
     explicit OptionAlreadyAdded(std::string name)
         : OptionAlreadyAdded(name + " is already added", ExitCodes::OptionAlreadyAdded) {}
     static OptionAlreadyAdded Requires(std::string name, std::string other) {
-        return OptionAlreadyAdded(name + " requires " + other, ExitCodes::OptionAlreadyAdded);
+        return {name + " requires " + other, ExitCodes::OptionAlreadyAdded};
     }
     static OptionAlreadyAdded Excludes(std::string name, std::string other) {
-        return OptionAlreadyAdded(name + " excludes " + other, ExitCodes::OptionAlreadyAdded);
+        return {name + " excludes " + other, ExitCodes::OptionAlreadyAdded};
     }
 };
 
@@ -153,19 +164,26 @@ class Success : public ParseError {
 };
 
 /// -h or --help on command line
-class CallForHelp : public ParseError {
-    CLI11_ERROR_DEF(ParseError, CallForHelp)
+class CallForHelp : public Success {
+    CLI11_ERROR_DEF(Success, CallForHelp)
     CallForHelp() : CallForHelp("This should be caught in your main function, see examples", ExitCodes::Success) {}
 };
 
 /// Usually something like --help-all on command line
-class CallForAllHelp : public ParseError {
-    CLI11_ERROR_DEF(ParseError, CallForAllHelp)
+class CallForAllHelp : public Success {
+    CLI11_ERROR_DEF(Success, CallForAllHelp)
     CallForAllHelp()
         : CallForAllHelp("This should be caught in your main function, see examples", ExitCodes::Success) {}
 };
 
-/// Does not output a diagnostic in CLI11_PARSE, but allows to return from main() with a specific error code.
+/// -v or --version on command line
+class CallForVersion : public Success {
+    CLI11_ERROR_DEF(Success, CallForVersion)
+    CallForVersion()
+        : CallForVersion("This should be caught in your main function, see examples", ExitCodes::Success) {}
+};
+
+/// Does not output a diagnostic in CLI11_PARSE, but allows main() to return with a specific error code.
 class RuntimeError : public ParseError {
     CLI11_ERROR_DEF(ParseError, RuntimeError)
     explicit RuntimeError(int exit_code = 1) : RuntimeError("Runtime error", exit_code) {}
@@ -205,33 +223,34 @@ class ValidationError : public ParseError {
 class RequiredError : public ParseError {
     CLI11_ERROR_DEF(ParseError, RequiredError)
     explicit RequiredError(std::string name) : RequiredError(name + " is required", ExitCodes::RequiredError) {}
-    static RequiredError Subcommand(size_t min_subcom) {
+    static RequiredError Subcommand(std::size_t min_subcom) {
         if(min_subcom == 1) {
             return RequiredError("A subcommand");
         }
-        return RequiredError("Requires at least " + std::to_string(min_subcom) + " subcommands",
-                             ExitCodes::RequiredError);
+        return {"Requires at least " + std::to_string(min_subcom) + " subcommands", ExitCodes::RequiredError};
     }
-    static RequiredError Option(size_t min_option, size_t max_option, size_t used, const std::string &option_list) {
+    static RequiredError
+    Option(std::size_t min_option, std::size_t max_option, std::size_t used, const std::string &option_list) {
         if((min_option == 1) && (max_option == 1) && (used == 0))
             return RequiredError("Exactly 1 option from [" + option_list + "]");
-        if((min_option == 1) && (max_option == 1) && (used > 1))
-            return RequiredError("Exactly 1 option from [" + option_list + "] is required and " + std::to_string(used) +
-                                     " were given",
-                                 ExitCodes::RequiredError);
+        if((min_option == 1) && (max_option == 1) && (used > 1)) {
+            return {"Exactly 1 option from [" + option_list + "] is required and " + std::to_string(used) +
+                        " were given",
+                    ExitCodes::RequiredError};
+        }
         if((min_option == 1) && (used == 0))
             return RequiredError("At least 1 option from [" + option_list + "]");
-        if(used < min_option)
-            return RequiredError("Requires at least " + std::to_string(min_option) + " options used and only " +
-                                     std::to_string(used) + "were given from [" + option_list + "]",
-                                 ExitCodes::RequiredError);
+        if(used < min_option) {
+            return {"Requires at least " + std::to_string(min_option) + " options used and only " +
+                        std::to_string(used) + "were given from [" + option_list + "]",
+                    ExitCodes::RequiredError};
+        }
         if(max_option == 1)
-            return RequiredError("Requires at most 1 options be given from [" + option_list + "]",
-                                 ExitCodes::RequiredError);
+            return {"Requires at most 1 options be given from [" + option_list + "]", ExitCodes::RequiredError};
 
-        return RequiredError("Requires at most " + std::to_string(max_option) + " options be used and " +
-                                 std::to_string(used) + "were given from [" + option_list + "]",
-                             ExitCodes::RequiredError);
+        return {"Requires at most " + std::to_string(max_option) + " options be used and " + std::to_string(used) +
+                    "were given from [" + option_list + "]",
+                ExitCodes::RequiredError};
     }
 };
 
@@ -239,21 +258,30 @@ class RequiredError : public ParseError {
 class ArgumentMismatch : public ParseError {
     CLI11_ERROR_DEF(ParseError, ArgumentMismatch)
     CLI11_ERROR_SIMPLE(ArgumentMismatch)
-    ArgumentMismatch(std::string name, int expected, size_t recieved)
+    ArgumentMismatch(std::string name, int expected, std::size_t received)
         : ArgumentMismatch(expected > 0 ? ("Expected exactly " + std::to_string(expected) + " arguments to " + name +
-                                           ", got " + std::to_string(recieved))
+                                           ", got " + std::to_string(received))
                                         : ("Expected at least " + std::to_string(-expected) + " arguments to " + name +
-                                           ", got " + std::to_string(recieved)),
+                                           ", got " + std::to_string(received)),
                            ExitCodes::ArgumentMismatch) {}
 
-    static ArgumentMismatch AtLeast(std::string name, int num) {
-        return ArgumentMismatch(name + ": At least " + std::to_string(num) + " required");
+    static ArgumentMismatch AtLeast(std::string name, int num, std::size_t received) {
+        return ArgumentMismatch(name + ": At least " + std::to_string(num) + " required but received " +
+                                std::to_string(received));
+    }
+    static ArgumentMismatch AtMost(std::string name, int num, std::size_t received) {
+        return ArgumentMismatch(name + ": At Most " + std::to_string(num) + " required but received " +
+                                std::to_string(received));
     }
     static ArgumentMismatch TypedAtLeast(std::string name, int num, std::string type) {
         return ArgumentMismatch(name + ": " + std::to_string(num) + " required " + type + " missing");
     }
     static ArgumentMismatch FlagOverride(std::string name) {
         return ArgumentMismatch(name + " was given a disallowed flag override");
+    }
+    static ArgumentMismatch PartialType(std::string name, int num, std::string type) {
+        return ArgumentMismatch(name + ": " + type + " only partially specified: " + std::to_string(num) +
+                                " required for each element");
     }
 };
 
@@ -325,4 +353,5 @@ class OptionNotFound : public Error {
 
 /// @}
 
-} // namespace CLI
+// [CLI11:error_hpp:end]
+}  // namespace CLI

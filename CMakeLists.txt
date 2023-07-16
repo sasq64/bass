@@ -68,7 +68,10 @@ add_library(lzsa STATIC ${LZSA_SRC})
 target_include_directories(lzsa PUBLIC ${LZSA} ${LZSA}/libdivsufsort/include)
 
 add_subdirectory(external/fmt)
-add_subdirectory(external/CLI11)
+
+add_library(CLI11 INTERFACE)
+target_include_directories(CLI11 INTERFACE external/CLI11/include)
+
 add_subdirectory(external/coreutils)
 add_subdirectory(external/lua)
 add_subdirectory(external/sol3)
@@ -100,12 +103,12 @@ if(FUZZ)
 else()
     add_executable(bass src/main.cpp src/pet100.cpp)
     target_link_options(bass PRIVATE ${THREAD_OPTIONS})
-    target_link_libraries(bass PRIVATE badlib CLI11::CLI11 ansi)
+    target_link_libraries(bass PRIVATE badlib CLI11 ansi)
 
     add_executable(gtest src/gtest.cpp src/grammar.cpp)
     target_link_options(gtest PRIVATE ${THREAD_OPTIONS})
     target_include_directories(gtest PRIVATE external/peglib)
-    target_link_libraries(gtest PRIVATE coreutils CLI11::CLI11 ${THREAD_LIB})
+    target_link_libraries(gtest PRIVATE coreutils CLI11 ${THREAD_LIB})
 
 
     add_executable(sectiontest EXCLUDE_FROM_ALL src/testmain.cpp

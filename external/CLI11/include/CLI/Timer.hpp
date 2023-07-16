@@ -1,13 +1,18 @@
-#pragma once
+// Copyright (c) 2017-2023, University of Cincinnati, developed by Henry Schreiner
+// under NSF AWARD 1414736 and by the respective contributors.
+// All rights reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
-// Distributed under the 3-Clause BSD License.  See accompanying
-// file LICENSE or https://github.com/CLIUtils/CLI11 for details.
+#pragma once
 
 // On GCC < 4.8, the following define is often missing. Due to the
 // fact that this library only uses sleep_for, this should be safe
 #if defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 5 && __GNUC_MINOR__ < 8
 #define _GLIBCXX_USE_NANOSLEEP
 #endif
+
+#include <cmath>
 
 #include <array>
 #include <chrono>
@@ -40,7 +45,7 @@ class Timer {
     time_point start_;
 
     /// This is the number of times cycles (print divides by this number)
-    size_t cycles{1};
+    std::size_t cycles{1};
 
   public:
     /// Standard print function, this one is set by default
@@ -54,16 +59,16 @@ class Timer {
 
   public:
     /// Standard constructor, can set title and print function
-    Timer(std::string title = "Timer", time_print_t time_print = Simple)
+    explicit Timer(std::string title = "Timer", time_print_t time_print = Simple)
         : title_(std::move(title)), time_print_(std::move(time_print)), start_(clock::now()) {}
 
     /// Time a function by running it multiple times. Target time is the len to target.
     std::string time_it(std::function<void()> f, double target_time = 1) {
         time_point start = start_;
-        double total_time;
+        double total_time = NAN;
 
         start_ = clock::now();
-        size_t n = 0;
+        std::size_t n = 0;
         do {
             f();
             std::chrono::duration<double> elapsed = clock::now() - start_;
@@ -76,7 +81,7 @@ class Timer {
     }
 
     /// This formats the numerical value for the time string
-    std::string make_time_str() const {
+    std::string make_time_str() const {  // NOLINT(modernize-use-nodiscard)
         time_point stop = clock::now();
         std::chrono::duration<double> elapsed = stop - start_;
         double time = elapsed.count() / static_cast<double>(cycles);
@@ -85,29 +90,29 @@ class Timer {
 
     // LCOV_EXCL_START
     /// This prints out a time string from a time
-    std::string make_time_str(double time) const {
+    std::string make_time_str(double time) const {  // NOLINT(modernize-use-nodiscard)
         auto print_it = [](double x, std::string unit) {
-            std::array<char, 50> buffer;
-            std::snprintf(buffer.data(), 50, "%.5g", x);
+            const unsigned int buffer_length = 50;
+            std::array<char, buffer_length> buffer;
+            std::snprintf(buffer.data(), buffer_length, "%.5g", x);
             return buffer.data() + std::string(" ") + unit;
         };
 
         if(time < .000001)
             return print_it(time * 1000000000, "ns");
-        else if(time < .001)
+        if(time < .001)
             return print_it(time * 1000000, "us");
-        else if(time < 1)
+        if(time < 1)
             return print_it(time * 1000, "ms");
-        else
-            return print_it(time, "s");
+        return print_it(time, "s");
     }
-    // LCOV_EXCL_END
+    // LCOV_EXCL_STOP
 
     /// This is the main function, it creates a string
-    std::string to_string() const { return time_print_(title_, make_time_str()); }
+    std::string to_string() const { return time_print_(title_, make_time_str()); }  // NOLINT(modernize-use-nodiscard)
 
     /// Division sets the number of cycles to divide by (no graphical change)
-    Timer &operator/(size_t val) {
+    Timer &operator/(std::size_t val) {
         cycles = val;
         return *this;
     }
@@ -117,14 +122,14 @@ class Timer {
 class AutoTimer : public Timer {
   public:
     /// Reimplementing the constructor is required in GCC 4.7
-    AutoTimer(std::string title = "Timer", time_print_t time_print = Simple) : Timer(title, time_print) {}
+    explicit AutoTimer(std::string title = "Timer", time_print_t time_print = Simple) : Timer(title, time_print) {}
     // GCC 4.7 does not support using inheriting constructors.
 
     /// This destructor prints the string
     ~AutoTimer() { std::cout << to_string() << std::endl; }
 };
 
-} // namespace CLI
+}  // namespace CLI
 
 /// This prints out the time if shifted into a std::cout like stream.
 inline std::ostream &operator<<(std::ostream &in, const CLI::Timer &timer) { return in << timer.to_string(); }
