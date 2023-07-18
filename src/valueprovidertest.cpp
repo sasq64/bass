@@ -33,6 +33,23 @@ TEST_CASE("multivalueprovider.fails_with_unregistered_value")
         );
 }
 
+TEST_CASE("multivalueprovider.fails_with_already_registered_value")
+{
+    MultiValueProvider mvp_first("TestMultiValueProvider_first"s);
+    MultiValueProvider mvp_secnd("TestMultiValueProvider_secnd"s);
+
+    mvp_first.setupValues({
+        "valueprovider.example.value_1"s,
+        "valueprovider.example.value_2"s,
+    });
+
+
+    REQUIRE_THROWS(
+        mvp_secnd.setupValues({
+            "valueprovider.example.value_2"s,  // whoopsie (registered by mvp_first)
+        }));
+}
+
 TEST_CASE("multivalueprovider.insert_runtime_value")
 {
     MultiValueProvider mvp("TestMultiValueProvider"s);
