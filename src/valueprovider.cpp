@@ -25,7 +25,7 @@ void MultiValueProvider::setupValues(std::vector<std::string> const& identifiers
         if (mvp != this) {
             //assert(inserted == false);
             throw std::runtime_error(
-                fmt::format("{} cannot register an already registered identifier '{}' which is already registered by {})",
+                fmt::format("{} cannot register identifier '{}' which is already registered by {})",
                             (*this).__owner_classname__,
                             it->first,
                             (*it->second).__owner_classname__)

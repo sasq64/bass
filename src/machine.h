@@ -1,6 +1,9 @@
 #pragma once
 
 #include "defines.h"
+#ifdef USE_BASS_VALUEPROVIDER
+#   include "valueprovider.h"
+#endif
 #include "parser.h"
 
 #include <coreutils/file.h>
@@ -66,6 +69,107 @@ enum SectionFlags
     Backwards = 256,
 };
 
+#ifdef USE_BASS_VALUEPROVIDER
+struct Section
+{
+    Section()
+        : mvp("None Section")
+    {
+        setup({});
+    }
+    Section(std::string const& n, std::optional<int32_t> const& s = {})
+        : name(n)
+        , mvp(n.empty() ? "Anonymous Section" : n)
+    {
+        setup(s);
+    }
+    Section(std::string const& name_, std::string const& parent_)
+        : name(name_)
+        , parent(parent_)
+        , mvp(name_.empty() ? "Anonymous Section" : name_)
+    {
+        setup({});
+    }
+    ~Section() = default;
+
+    Section& addByte(uint8_t b)
+    {
+        data.push_back(b);
+        pc++;
+        return *this;
+    }
+
+    Section& setStart(int32_t s)
+    {
+        start = s;
+        return *this;
+    }
+
+    Section& setPC(int32_t s)
+    {
+        if (start == pc) {
+            start = s;
+        }
+        pc = s;
+        return *this;
+    }
+
+    int32_t get_size() const
+    {
+        return size >= 0 ? size : (int32_t)data.size();
+    }
+
+    inline void setup(std::optional<int32_t> const& s)
+    {
+        if (name.empty()) {
+            start.getter = []{ return -1; };
+            start.setter = [](auto const&) { throw std::runtime_error("Cannot set start of invalid section!"); };
+            return;
+        }
+
+        auto prefix{fmt::format("section.{}", name)};
+
+        start = ValueSerializer<int32_t>(fmt::format("{}.start", prefix));
+        start.getter = [&]() {
+            auto result = mvp.getOptional<int32_t>(start.identifier);
+            // TODO: return result;
+            if (result.has_value()) {
+                return result.value();
+            } else {
+                return -1;
+            }
+        };
+        start.setter = [&](auto const& val) {
+            mvp.setValue<int32_t>(start.identifier, val);
+        };
+
+        mvp.setupValues({
+                          start.identifier,
+                          fmt::format("{}.end", prefix),
+                          fmt::format("{}.data", prefix),
+
+                          });
+
+        if (s.has_value()) {
+            start = s.value();
+            pc = s.value();
+        }
+    }
+
+    std::string name;
+    std::string parent;
+    std::vector<std::string> children;
+    ValueSerializer<int32_t> start;
+    int32_t pc = -1;
+    int32_t size = -1;
+    uint32_t flags{};
+    std::vector<uint8_t> data;
+    bool valid{true};
+
+//private:  // FIXME: "Error: cannot decompose private member…"
+    MultiValueProvider mvp;
+};
+#else
 struct Section
 {
     Section() = default;
@@ -111,6 +215,7 @@ struct Section
     std::vector<uint8_t> data;
     bool valid{true};
 };
+#endif
 
 enum class OutFmt
 {

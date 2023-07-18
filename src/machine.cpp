@@ -133,7 +133,11 @@ Machine::~Machine() = default;
 
 Section& Machine::addSection(Section const& s)
 {
+#if USE_BASS_VALUEPROVIDER
+    auto [name, in, children, start, pc, size, flags, data, valid, mvp] = s;
+#else
     auto [name, in, children, start, pc, size, flags, data, valid] = s;
+#endif
 
     if (name.empty()) {
         name = "__anon_" + std::to_string(anonSection++);

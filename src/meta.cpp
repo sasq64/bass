@@ -445,7 +445,7 @@ void initMeta(Assembler& assem)
                 section.data = packed;
             }
             syms.set(p + ".data", section.data);
-            syms.set(p + ".start", section.start);
+            syms.set(p + ".start", int32_t{section.start});
             syms.set(p + ".pc", pc);
             syms.set(p + ".size", section.data.size());
             mach.popSection();

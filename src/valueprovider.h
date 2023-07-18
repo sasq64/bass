@@ -100,11 +100,10 @@ class MultiValueProvider
 {
 protected:
     ValueMap vals;
+    std::string_view __owner_classname__;
 
 public:
     using Map = std::unordered_map<std::string, MultiValueProvider*>;
-
-    const std::string_view __owner_classname__;
 
     MultiValueProvider() = delete;
     explicit MultiValueProvider(std::string const& owner_classname);
