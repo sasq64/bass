@@ -177,6 +177,29 @@ public:
         }
         throw std::runtime_error(fmt::format("Invalid conversion to type {} (\"{}\" is 'None')", typeid(T).name(), this->__owner_classname__));
     }
+
+    template <typename T>
+    inline std::optional<T> getOptional(std::string_view key) const
+    {
+        // NOTE: prevent (accidental) nested std::optional's (as good as possible)
+        // TODO: std::optional is a class template (requires our own Optional implementation)
+        static_assert(false == std::is_same_v<T, std::optional<T>>);
+
+        // TODO: std::variant is a class template (requires our own Variant implementation for RTTI)
+        static_assert(false == std::is_same_v<T, AsmValue>);
+
+        std::string s{key};
+        auto it = vals.find(s);
+        if (it == vals.end()) {
+            throw std::runtime_error(fmt::format("{} does not register value identifier '{}'", __owner_classname__, key));
+        }
+        auto const& val = it->second;
+        if (val.has_value()) {
+            return std::any_cast<T>(val);
+        }
+
+        return {};
+    }
 };
 
 
