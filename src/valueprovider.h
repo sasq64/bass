@@ -158,7 +158,7 @@ public:
     }
 
     template <typename T>
-    inline T getValue(std::string_view key)
+    inline T getValue(std::string_view key) const
     {
         // NOTE: prevent (accidental) nested std::optional's (as good as possible)
         // TODO: std::optional is a class template (requires our own Optional implementation)
@@ -168,12 +168,48 @@ public:
         static_assert(false == std::is_same_v<T, AsmValue>);
 
         std::string s{key};
-        auto const& val = vals[s];
+        auto it = vals.find(s);
+        if (it == vals.end()) {
+            throw std::runtime_error(fmt::format("{} does not register value identifier '{}'", __owner_classname__, key));
+        }
+        auto const& val = it->second;
         if (val.has_value()) {
             return std::any_cast<T>(val);
         }
         throw std::runtime_error(fmt::format("Invalid conversion to type {} (\"{}\" is 'None')", typeid(T).name(), this->__owner_classname__));
     }
 };
+
+
+template <typename T>
+struct ValueSerializer
+{
+    using GetFunc = std::function<T ()>;
+    using SetFunc = std::function<void (T const&)>;
+    //using SetOptFunc = std::function<void (std::optional<T> const&)>;
+
+    std::string identifier;
+
+    ValueSerializer() = default;
+    ValueSerializer(std::string const& identifier_)
+        : identifier{identifier_}
+    {}
+
+    inline operator T () const { return getter(); }
+    inline void operator=(T const& val) { setter(val); }
+    //inline void operator=(std::optional<T> const& opt_val) { opt_setter(opt_val); }
+    inline bool operator==(T val) const { return getter() == val; }
+    //inline bool operator<(ValueSerializer<T> const& other) const { return getter() < other.getter(); }
+    //inline bool operator==(std::optional<T> const& val) { return ; }
+    inline bool operator<(T const& val) const { return getter() < val; }
+    //inline bool operator<(ValueSerializer<T> const& other) const { return getter() < other.getter(); }
+    inline bool operator<=(T const& val) const { return getter() <= val; }
+    //inline bool operator<=(ValueSerializer<T> const& other) const { return getter() <= other.getter(); }
+
+    GetFunc getter;
+    SetFunc setter;
+    //SetOptFunc opt_setter;
+};
+
 
 #endif
