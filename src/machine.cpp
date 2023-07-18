@@ -118,7 +118,8 @@ inline void Check(bool v, std::string const& txt)
 Machine::Machine(uint32_t start)
 {
     machine = std::make_unique<sixfive::Machine<EmuPolicy>>();
-    addSection({"default", start});
+    auto default_section = sections.emplace_back("default", start);
+    addSection(default_section);
     setSection("default");
 }
 
