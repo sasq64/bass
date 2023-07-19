@@ -69,14 +69,34 @@ enum SectionFlags
     Backwards = 256,
 };
 
+
 #ifdef USE_BASS_VALUEPROVIDER
+
+// TODO: SectionInitializer is required for transition from SymbolTable!
+//       -> see "meta.h -> ::parseArgs"
+//          creates a temporary Section instance being used to
+//          create the actual section instance "Machine::addSection".
+struct SectionInitializer final {
+    SectionInitializer() = default;
+    SectionInitializer(std::string const& n, uint32_t s)
+        : name(n)
+        , start(s)
+    {}
+
+    std::string name;
+    std::string parent;
+    std::vector<std::string> children;
+    int32_t start = -1;  // TODO: std::optional<int32_t>
+    int32_t pc = -1;
+    int32_t size = -1;
+    uint32_t flags{};
+    std::vector<uint8_t> data;
+    bool valid{true};
+};
+
 struct Section
 {
-    Section()
-        : mvp("None Section")
-    {
-        setup({});
-    }
+    Section() = delete;
     Section(std::string const& n, std::optional<int32_t> const& s = {})
         : name(n)
         , mvp(n.empty() ? "Anonymous Section" : n)
@@ -123,8 +143,17 @@ struct Section
     {
         if (name.empty()) {
             start.getter = []{ return -1; };
-            start.setter = [](auto const&) { throw std::runtime_error("Cannot set start of invalid section!"); };
+            start.setter = [](auto const&) {
+                throw std::runtime_error("Cannot set start of uninitiialized section!");
+            };
             return;
+        }
+
+        if (initialized) {
+            auto err_msg = fmt::format("Section {} already initialized", name);
+            LOGD(err_msg);
+            throw std::runtime_error(err_msg);
+            //return;
         }
 
         auto prefix{fmt::format("section.{}", name)};
@@ -154,6 +183,8 @@ struct Section
             start = s.value();
             pc = s.value();
         }
+
+        initialized = true;
     }
 
     std::string name;
@@ -166,8 +197,9 @@ struct Section
     std::vector<uint8_t> data;
     bool valid{true};
 
-//private:  // FIXME: "Error: cannot decompose private member…"
+private:
     MultiValueProvider mvp;
+    bool initialized = false;
 };
 #else
 struct Section
@@ -215,6 +247,9 @@ struct Section
     std::vector<uint8_t> data;
     bool valid{true};
 };
+
+using SectionInitializer = Section;
+
 #endif
 
 enum class OutFmt
@@ -245,7 +280,7 @@ public:
     AsmResult assemble(Instruction const& instr);
     static std::string disassemble(sixfive::Machine<EmuPolicy>& m, uint32_t* pc);
 
-    Section& addSection(Section const& s);
+    Section& addSection(SectionInitializer const& s);
 
     void removeSection(std::string const& name);
     void setSection(std::string const& name);

@@ -118,8 +118,7 @@ inline void Check(bool v, std::string const& txt)
 Machine::Machine(uint32_t start)
 {
     machine = std::make_unique<sixfive::Machine<EmuPolicy>>();
-    auto default_section = sections.emplace_back("default", start);
-    addSection(default_section);
+    addSection({"default", start});
     setSection("default");
 }
 
@@ -131,13 +130,9 @@ void Machine::setCpu(CPU cpu)
 
 Machine::~Machine() = default;
 
-Section& Machine::addSection(Section const& s)
+Section& Machine::addSection(SectionInitializer const& s)
 {
-#if USE_BASS_VALUEPROVIDER
-    auto [name, in, children, start, pc, size, flags, data, valid, mvp] = s;
-#else
     auto [name, in, children, start, pc, size, flags, data, valid] = s;
-#endif
 
     if (name.empty()) {
         name = "__anon_" + std::to_string(anonSection++);

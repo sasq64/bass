@@ -18,9 +18,9 @@ using namespace std::string_literals;
 
 namespace {
 
-Section parseArgs(std::vector<std::any> const& args)
+SectionInitializer parseArgs(std::vector<std::any> const& args)
 {
-    Section result;
+    SectionInitializer result;
     int i = 0;
 
     if (args.empty()) {
