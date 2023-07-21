@@ -158,7 +158,7 @@ struct Section
 
         auto prefix{fmt::format("section.{}", name)};
 
-        start = ValueSerializer<int32_t>(fmt::format("{}.start", prefix));
+        start.identifier = fmt::format("{}.start", prefix);
         start.getter = [&]() {
             auto result = mvp.getOptional<int32_t>(start.identifier);
             // TODO: return result;
@@ -176,7 +176,6 @@ struct Section
                           start.identifier,
                           fmt::format("{}.end", prefix),
                           fmt::format("{}.data", prefix),
-
                           });
 
         if (s.has_value()) {

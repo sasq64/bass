@@ -131,18 +131,19 @@ public:
 
 
 template <typename T>
-struct ValueSerializer
+struct ValueSerializer final
 {
     using GetFunc = std::function<T ()>;
     using SetFunc = std::function<void (T const&)>;
     //using SetOptFunc = std::function<void (std::optional<T> const&)>;
 
     std::string identifier;
+    GetFunc getter;
+    SetFunc setter;
+    //SetOptFunc opt_setter;
 
     ValueSerializer() = default;
-    ValueSerializer(std::string const& identifier_)
-        : identifier{identifier_}
-    {}
+    ~ValueSerializer() = default;
 
     inline operator T () const { return getter(); }
     inline void operator=(T const& val) { setter(val); }
@@ -154,10 +155,6 @@ struct ValueSerializer
     //inline bool operator<(ValueSerializer<T> const& other) const { return getter() < other.getter(); }
     inline bool operator<=(T const& val) const { return getter() <= val; }
     //inline bool operator<=(ValueSerializer<T> const& other) const { return getter() <= other.getter(); }
-
-    GetFunc getter;
-    SetFunc setter;
-    //SetOptFunc opt_setter;
 };
 
 
