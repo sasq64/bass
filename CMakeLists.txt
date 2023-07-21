@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # bass feature toggle(s)
 add_definitions(
-#    -DUSE_BASS_VALUEPROVIDER
+    -DUSE_BASS_VALUEPROVIDER
 )
 
 if(WIN32)
