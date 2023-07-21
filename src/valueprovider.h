@@ -130,32 +130,4 @@ public:
 };
 
 
-template <typename T>
-struct ValueSerializer final
-{
-    using GetFunc = std::function<T ()>;
-    using SetFunc = std::function<void (T const&)>;
-    //using SetOptFunc = std::function<void (std::optional<T> const&)>;
-
-    std::string identifier;
-    GetFunc getter;
-    SetFunc setter;
-    //SetOptFunc opt_setter;
-
-    ValueSerializer() = default;
-    ~ValueSerializer() = default;
-
-    inline operator T () const { return getter(); }
-    inline void operator=(T const& val) { setter(val); }
-    //inline void operator=(std::optional<T> const& opt_val) { opt_setter(opt_val); }
-    inline bool operator==(T val) const { return getter() == val; }
-    //inline bool operator<(ValueSerializer<T> const& other) const { return getter() < other.getter(); }
-    //inline bool operator==(std::optional<T> const& val) { return ; }
-    inline bool operator<(T const& val) const { return getter() < val; }
-    //inline bool operator<(ValueSerializer<T> const& other) const { return getter() < other.getter(); }
-    inline bool operator<=(T const& val) const { return getter() <= val; }
-    //inline bool operator<=(ValueSerializer<T> const& other) const { return getter() <= other.getter(); }
-};
-
-
 #endif

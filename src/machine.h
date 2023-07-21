@@ -142,10 +142,6 @@ struct Section
     inline void setup(std::optional<int32_t> const& s)
     {
         if (name.empty()) {
-            start.getter = []{ return -1; };
-            start.setter = [](auto const&) {
-                throw std::runtime_error("Cannot set start of uninitiialized section!");
-            };
             return;
         }
 
@@ -153,30 +149,17 @@ struct Section
             auto err_msg = fmt::format("Section {} already initialized", name);
             LOGD(err_msg);
             throw std::runtime_error(err_msg);
-            //return;
         }
 
         auto prefix{fmt::format("section.{}", name)};
 
-        start.identifier = fmt::format("{}.start", prefix);
-        start.getter = [&]() {
-            auto result = mvp.getOptional<int32_t>(start.identifier);
-            // TODO: return result;
-            if (result.has_value()) {
-                return result.value();
-            } else {
-                return -1;
-            }
-        };
-        start.setter = [&](auto const& val) {
-            mvp.setValue<int32_t>(start.identifier, val);
-        };
-
         mvp.setupValues({
-                          start.identifier,
-                          fmt::format("{}.end", prefix),
-                          fmt::format("{}.data", prefix),
-                          });
+            fmt::format("{}.start", prefix),
+            fmt::format("{}.end", prefix),
+            fmt::format("{}.data", prefix),
+            fmt::format("{}.pc", prefix),
+            fmt::format("{}.size", prefix),
+        });
 
         if (s.has_value()) {
             start = s.value();
@@ -186,10 +169,24 @@ struct Section
         initialized = true;
     }
 
+    inline void storeSymbols() {
+        auto start_ = start > -1 ? std::optional{start} : std::nullopt;
+        auto end_   = start_.has_value() ? std::optional{int32_t(start + data.size())} : std::nullopt;
+        auto pc_    = pc > -1 ? std::optional{pc} : std::nullopt;
+        auto size_  = std::optional{int32_t(data.size())};
+
+        auto prefix{fmt::format("section.{}", name)};
+        mvp.setValue(fmt::format("{}.start", prefix), start_);
+        mvp.setValue(fmt::format("{}.end", prefix), end_);
+        mvp.setValue(fmt::format("{}.data", prefix), std::optional{data});
+        mvp.setValue(fmt::format("{}.pc", prefix), pc_);
+        mvp.setValue(fmt::format("{}.size", prefix), size_);
+    }
+
     std::string name;
     std::string parent;
     std::vector<std::string> children;
-    ValueSerializer<int32_t> start;
+    int32_t start = -1;
     int32_t pc = -1;
     int32_t size = -1;
     uint32_t flags{};

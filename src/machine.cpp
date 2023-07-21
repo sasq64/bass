@@ -255,6 +255,11 @@ int32_t Machine::layoutSection(int32_t start, Section& s)
     if (start - s.start > s.size) {
         throw machine_error(fmt::format("Section {} is too large", s.name));
     }
+
+#ifdef USE_BASS_VALUEPROVIDER
+    s.storeSymbols();
+#endif
+
     return s.start + s.size;
 }
 

@@ -448,6 +448,9 @@ void initMeta(Assembler& assem)
             syms.set(p + ".start", int32_t{section.start});
             syms.set(p + ".pc", pc);
             syms.set(p + ".size", section.data.size());
+#ifdef USE_BASS_VALUEPROVIDER
+            section.storeSymbols();
+#endif
             mach.popSection();
             return;
         }
