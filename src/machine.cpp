@@ -130,7 +130,7 @@ void Machine::setCpu(CPU cpu)
 
 Machine::~Machine() = default;
 
-Section& Machine::addSection(Section const& s)
+Section& Machine::addSection(SectionInitializer const& s)
 {
     auto [name, in, children, start, pc, size, flags, data, valid] = s;
 
@@ -255,6 +255,11 @@ int32_t Machine::layoutSection(int32_t start, Section& s)
     if (start - s.start > s.size) {
         throw machine_error(fmt::format("Section {} is too large", s.name));
     }
+
+#ifdef USE_BASS_VALUEPROVIDER
+    s.storeSymbols();
+#endif
+
     return s.start + s.size;
 }
 
