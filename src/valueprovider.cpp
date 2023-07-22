@@ -12,15 +12,15 @@ MultiValueProvider::MultiValueProvider(std::string const& owner_classname)
 
 MultiValueProvider::~MultiValueProvider()
 {
-    for (auto it : vals) {
+    for (auto const& it : vals) {
         bass_provided_values.erase(it.first);
     }
 }
 
 void MultiValueProvider::setupValues(std::vector<std::string> const& identifiers) {
-    for (auto s : identifiers) {
+    for (auto const& s : identifiers) {
         auto const [it, inserted] = bass_provided_values.insert({s, this});
-        auto const mvp = it->second;
+        auto const* mvp = it->second;
 
         if (mvp != this) {
             //assert(inserted == false);
@@ -40,7 +40,7 @@ void MultiValueProvider::setupValues(std::vector<std::string> const& identifiers
 void MultiValueProvider::setupRuntimeValue(std::string const& identifier)
 {
     auto const [it, inserted] = bass_provided_values.insert({identifier, this});
-    auto const mvp = it->second;
+    auto const* mvp = it->second;
 
     if (inserted) {
         // initialize value (always a 'None' value)
