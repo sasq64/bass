@@ -432,6 +432,9 @@ void initMeta(Assembler& assem)
             auto p = "sections."s + std::string(section.name);
             if ((section.flags & Compressed) != 0) {
                 LOGI("Packing %s", p.c_str());
+#ifdef USE_BASS_VALUEPROVIDER
+                section.storeOriginalSize();
+#endif
                 std::vector<uint8_t> packed(0x10000);
                 int flags = LZSA_FLAG_RAW_BLOCK;
                 if ((section.flags & Backwards) != 0) {

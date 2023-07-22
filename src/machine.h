@@ -158,8 +158,21 @@ struct Section
             fmt::format("{}.end", prefix),
             fmt::format("{}.data", prefix),
             fmt::format("{}.pc", prefix),
+            fmt::format("{}.original_size", prefix),  // uncompressed data size
             fmt::format("{}.size", prefix),
         });
+
+        { // FIXME: deprecated (see meta.cpp -> assem.registerMeta("section"))
+            auto prefix{fmt::format("sections.{}", name)};
+            mvp.setupValues({
+                fmt::format("{}.start", prefix),
+                fmt::format("{}.end", prefix),
+                fmt::format("{}.data", prefix),
+                fmt::format("{}.pc", prefix),
+                fmt::format("{}.original_size", prefix),  // uncompressed data size
+                fmt::format("{}.size", prefix),
+            });
+        }
 
         if (s.has_value()) {
             start = s.value();
@@ -169,7 +182,21 @@ struct Section
         initialized = true;
     }
 
-    inline void storeSymbols() {
+    void storeOriginalSize()
+    {
+        // NOTE: just stores the uncompressed section data size to MVP
+        // TODO: compress the section data here (see meta.cpp -> assem.registerMeta("section"))
+        auto prefix = fmt::format("section.{}", name);
+        mvp.setValue(fmt::format("{}.original_size", prefix), std::optional{int32_t(data.size())});
+
+        {  // deprecated (see meta.cpp -> assem.registerMeta("section"))
+            auto prefix = fmt::format("sections.{}", name);
+            mvp.setValue(fmt::format("{}.original_size", prefix), std::optional{int32_t(data.size())});
+        }
+    }
+
+    void storeSymbols()
+    {
         auto start_ = start > -1 ? std::optional{start} : std::nullopt;
         auto end_   = start_.has_value() ? std::optional{int32_t(start + data.size())} : std::nullopt;
         auto pc_    = pc > -1 ? std::optional{pc} : std::nullopt;
@@ -181,6 +208,23 @@ struct Section
         mvp.setValue(fmt::format("{}.data", prefix), std::optional{data});
         mvp.setValue(fmt::format("{}.pc", prefix), pc_);
         mvp.setValue(fmt::format("{}.size", prefix), size_);
+        auto original_size_key = fmt::format("{}.original_size", prefix);
+        if (!mvp.hasValue(original_size_key)) {
+            mvp.setValue(original_size_key, size_);
+        }
+
+        { // FIXME: deprecated (see meta.cpp -> assem.registerMeta("section"))
+            auto prefix{fmt::format("sections.{}", name)};
+            mvp.setValue(fmt::format("{}.start", prefix), start_);
+            mvp.setValue(fmt::format("{}.end", prefix), end_);
+            mvp.setValue(fmt::format("{}.data", prefix), std::optional{data});
+            mvp.setValue(fmt::format("{}.pc", prefix), pc_);
+            mvp.setValue(fmt::format("{}.size", prefix), size_);
+            auto original_size_key = fmt::format("{}.original_size", prefix);
+            if (!mvp.hasValue(original_size_key)) {
+                mvp.setValue(original_size_key, size_);
+            }
+        }
     }
 
     std::string name;
