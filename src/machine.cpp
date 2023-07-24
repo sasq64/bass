@@ -742,7 +742,7 @@ AsmResult Machine::assemble(Instruction const& instr)
     // Find a matching addressing mode
     auto it_op =
         std::find_if(it_ins->opcodes.begin(), it_ins->opcodes.end(),
-                     [&](auto const& o) { 
+                     [&](auto const& o) {
                         return modeMatches(arg.mode, o.mode, small);
                      });
 
