@@ -160,6 +160,10 @@ public:
     template <typename T>
     void set(std::string const& name, T const& val)
     {
+        // TODO: cannot check on optional template types (check the ones we use explicitly)
+        static_assert(false == std::is_same_v<Optional<int32_t>, T>);
+        static_assert(false == std::is_same_v<Optional<Number>, T>);
+
         if (!is_redefinable(name)) {
             throw sym_error(fmt::format("Symbol '{}' already defined", name));
         }

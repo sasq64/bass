@@ -1329,13 +1329,13 @@ bool Assembler::parse(std::string_view source, std::string const& fname)
         auto layoutOk = mach->layoutSections();
 
         for (auto const& s : mach->getSections()) {
-            LOGD("%s : %x -> %x (%d) [%x]\n", s.name, s.start, s.start + s.size,
+            LOGD("%s : %x -> %x (%d) [%x]\n", s.name, s.start.value(), s.start.value() + s.size.value(),
                  s.data.size(), s.flags);
 
             auto prefix = "section."s + std::string(s.name);
 
-            auto start = static_cast<Number>(s.start);
-            auto end = static_cast<Number>(s.start + s.data.size());
+            auto start = static_cast<Number>(s.start.value());
+            auto end = static_cast<Number>(s.start.value() + s.data.size());
 
             syms.set(prefix + ".start", start);
             syms.set(prefix + ".end", end);

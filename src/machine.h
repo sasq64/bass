@@ -77,7 +77,7 @@ struct Section
     Section& addByte(uint8_t b)
     {
         data.push_back(b);
-        pc++;
+        pc = pc.value() + 1;
         return *this;
     }
 
@@ -98,15 +98,15 @@ struct Section
 
     int32_t get_size() const
     {
-        return size >= 0 ? size : (int32_t)data.size();
+        return size >= 0 ? size.value() : (int32_t)data.size();
     }
 
     std::string name;
     std::string parent;
     std::vector<std::string> children;
-    int32_t start = -1;
-    int32_t pc = -1;
-    int32_t size = -1;
+    Optional<int32_t> start = -1;
+    Optional<int32_t> pc = -1;
+    Optional<int32_t> size = -1;
     uint32_t flags{};
     std::vector<uint8_t> data;
     bool valid{true};
@@ -129,7 +129,7 @@ public:
 
     void clear();
 
-    int32_t layoutSection(int32_t start, Section& s);
+    int32_t layoutSection(Optional<int32_t> const& o_start, Section& s);
     bool layoutSections();
     Error checkOverlap();
 
