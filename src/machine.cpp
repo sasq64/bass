@@ -155,14 +155,14 @@ Section& Machine::addSection(Section const& s)
         section.flags |= SectionFlags::FixedSize;
     }
 
-    if (start != -1) {
+    if (start.has_value()) {
         section.start = start;
         section.flags |= SectionFlags::FixedStart;
     }
 
     if (!in.empty()) {
         auto& parent = getSection(in);
-        LOGD("Parent %s at %x/%x", parent.name, parent.start, parent.pc);
+        LOGD("Parent %s at %x/%x", parent.name, parent.start.value(), parent.pc.value());
         Check(parent.data.empty(), "Parent section must contain no data");
 
         if (section.parent.empty()) {
@@ -174,8 +174,8 @@ Section& Machine::addSection(Section const& s)
             section.flags |= SectionFlags::ReadOnly;
         }
 
-        if (section.start == -1) {
-            LOGD("Setting start to %x", parent.pc);
+        if (!section.start.has_value()) {
+            LOGD("Setting start to %x", parent.pc.value());
             section.start = parent.pc;
         }
     }
@@ -184,7 +184,7 @@ Section& Machine::addSection(Section const& s)
         section.pc = section.start;
     }
 
-    Check(section.start != -1, "Section must have start");
+    Check(section.start.has_value(), "Section must have start");
 
     return section;
 }
@@ -226,7 +226,7 @@ int32_t Machine::layoutSection(int32_t start, Section& s)
     LOGD("Layout %s", s.name);
     if ((s.flags & FixedStart) == 0) {
         if (s.start != start) {
-            LOGD("%s: %x differs from %x", s.name, s.start, start);
+            LOGD("%s: %x differs from %x", s.name, s.start.value(), start);
             layoutOk = false;
         }
         s.start = start;
@@ -234,12 +234,12 @@ int32_t Machine::layoutSection(int32_t start, Section& s)
 
     Check(s.start >= start,
           fmt::format("Section {} starts at {:x} which is before {:x}", s.name,
-                      s.start, start));
+                      s.start.value(), start));
 
     if (!s.data.empty()) {
         Check(s.children.empty(), "Data section may not have children");
         // Leaf / data section
-        return s.start + static_cast<int32_t>(s.data.size());
+        return s.start.value() + static_cast<int32_t>(s.data.size());
     }
 
     if (!s.children.empty()) {
@@ -250,12 +250,12 @@ int32_t Machine::layoutSection(int32_t start, Section& s)
     }
     // Unless fixed size, update size to total of its children
     if ((s.flags & FixedSize) == 0) {
-        s.size = start - s.start;
+        s.size = start - s.start.value();
     }
-    if (start - s.start > s.size) {
+    if (start - s.start.value() > s.size) {
         throw machine_error(fmt::format("Section {} is too large", s.name));
     }
-    return s.start + s.size;
+    return s.start.value() + s.size.value();
 }
 
 bool Machine::layoutSections()
@@ -265,8 +265,13 @@ bool Machine::layoutSections()
     for (auto& s : sections) {
         if (s.parent.empty()) {
             // LOGI("Root %s at %x", s.name, s.start);
-            auto start = s.start;
-            layoutSection(start, s);
+            if (s.start.has_value()) {
+                auto start = s.start.value();
+                layoutSection(start, s);
+            } else {
+                LOGD(fmt::format("Start of section {} is undefined -> skipping layout", s.name));
+                layoutOk = false;
+            }
         }
     }
     return layoutOk;
@@ -279,9 +284,9 @@ Error Machine::checkOverlap()
             for (auto const& b : sections) {
                 if (&a != &b && !b.data.empty() &&
                     ((b.flags & NoStorage) == 0)) {
-                    auto as = a.start;
+                    auto as = a.start.value();
                     auto ae = as + static_cast<int32_t>(a.data.size());
-                    auto bs = b.start;
+                    auto bs = b.start.value();
                     auto be = bs + static_cast<int32_t>(b.data.size());
                     if (as >= bs && as < be) {
                         return {2, 0,
@@ -353,7 +358,7 @@ uint32_t Machine::getPC() const
     if (currentSection == nullptr) {
         return 0;
     }
-    return currentSection->pc;
+    return currentSection->pc.value();
 }
 
 // clang-format off
@@ -411,9 +416,9 @@ void Machine::writeCrt(utils::File const& outFile)
         if (section.data.empty()) {
             continue;
         }
-        LOGI("Start %x", section.start);
-        auto bank = section.start >> 16;
-        auto start = section.start & 0xffff;
+        LOGI("Start %x", section.start.value());
+        auto bank = section.start.value() >> 16;
+        auto start = section.start.value() & 0xffff;
         auto end = start + section.data.size();
         // bank : 01a000,01c000,01e000
         if (start < 0x8000 || end > 0xc000) {
@@ -493,8 +498,8 @@ void Machine::write(std::string_view name, OutFmt fmt)
 
     utils::File outFile = createFile(name);
 
-    auto start = non_empty.front().start;
-    auto end = non_empty.back().start +
+    auto start = non_empty.front().start.value();
+    auto end = non_empty.back().start.value() +
                static_cast<int32_t>(non_empty.back().data.size());
 
     if (end <= start) {
@@ -535,8 +540,8 @@ void Machine::write(std::string_view name, OutFmt fmt)
         }
         if ((section.flags & WriteToDisk) != 0) {
             auto of = createFile(section.name);
-            of.write<uint8_t>(section.start & 0xff);
-            of.write<uint8_t>(section.start >> 8);
+            of.write<uint8_t>(section.start.value() & 0xff);
+            of.write<uint8_t>(section.start.value() >> 8);
             of.write(section.data);
             of.close();
             continue;
@@ -554,7 +559,7 @@ void Machine::write(std::string_view name, OutFmt fmt)
                 fmt::format("Section {} overlaps previous", section.name));
         }
 
-        auto offset = section.start;
+        auto offset = section.start.value();
 
         if (last_end >= 0) {
             while (last_end < offset) {
@@ -613,12 +618,12 @@ std::pair<uint32_t, uint32_t> Machine::runSetup()
                 continue;
             }
             if (low == 0) {
-                low = section.start;
+                low = section.start.value();
             }
-            high = section.start + section.data.size();
+            high = section.start.value() + section.data.size();
             //LOGI("Writing '%s' to %x-%x", section.name, section.start,
             //     section.start + section.data.size());
-            machine->write_ram(section.start, section.data.data(),
+            machine->write_ram(section.start.value(), section.data.data(),
                                section.data.size());
         }
     }
@@ -628,18 +633,20 @@ std::pair<uint32_t, uint32_t> Machine::runSetup()
 
 uint32_t Machine::writeByte(uint8_t b)
 {
-    dis[currentSection->pc] = fmt::format("{:02x}", b);
+    auto& section_pc = currentSection->pc;
+    dis[section_pc.value()] = fmt::format("{:02x}", b);
     currentSection->data.push_back(b);
-    currentSection->pc++;
-    return currentSection->pc;
+    section_pc.emplace(section_pc.value() + 1);
+    return section_pc.value();
 }
 
 uint32_t Machine::writeChar(uint8_t b)
 {
-    dis[currentSection->pc] = fmt::format("{:02x}", b);
+    auto& section_pc = currentSection->pc;
+    dis[section_pc.value()] = fmt::format("{:02x}", b);
     currentSection->data.push_back(b);
-    currentSection->pc++;
-    return currentSection->pc;
+    section_pc.emplace(section_pc.value() + 1);
+    return section_pc.value();
 }
 
 std::string Machine::disassemble(sixfive::Machine<EmuPolicy>& m, uint32_t* pc)
@@ -752,13 +759,13 @@ AsmResult Machine::assemble(Instruction const& instr)
     arg.mode = it_op->mode;
 
     if (arg.mode == Mode::REL) {
-        arg.val = arg.val - currentSection->pc - 2;
+        arg.val = arg.val - currentSection->pc.value() - 2;
     }
 
     if (arg.mode == Mode::ZP_REL) {
         auto adr = arg.val & 0xffff;
         auto val = (arg.val >> 16) & 0xff;
-        auto diff = adr - currentSection->pc - 2;
+        auto diff = adr - currentSection->pc.value() - 2;
         arg.val = diff << 8 | val;
     }
 
@@ -767,22 +774,22 @@ AsmResult Machine::assemble(Instruction const& instr)
     auto& cs = *currentSection;
     auto v = arg.val & (sz == 2 ? 0xff : 0xffff);
     if (arg.mode == sixfive::Mode::REL) {
-        v = (static_cast<int8_t>(v)) + 2 + cs.pc;
+        v = (static_cast<int8_t>(v)) + 2 + cs.pc.value();
     }
 
-    dis[cs.pc] = fmt::format(
+    dis[cs.pc.value()] = fmt::format(
         "{} "s + modeTemplate.at(static_cast<int>(arg.mode)), it_ins->name, v);
 
     cs.data.push_back(it_op->code);
     if (sz > 1) {
         cs.data.push_back(arg.val & 0xff);
-        dis.erase(cs.pc + 1);
+        dis.erase(cs.pc.value() + 1);
     }
     if (sz > 2) {
         cs.data.push_back(arg.val >> 8);
-        dis.erase(cs.pc + 2);
+        dis.erase(cs.pc.value() + 2);
     }
-    cs.pc += sz;
+    cs.pc.emplace(cs.pc.value() + sz);
 
     if (arg.mode == Mode::REL && (arg.val > 127 || arg.val < -128)) {
         return AsmResult::Truncated;

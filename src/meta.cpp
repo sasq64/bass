@@ -359,12 +359,13 @@ void initMeta(Assembler& assem)
     });
 
     assem.registerMeta("ds", [&](Meta const& meta) {
+        auto& section_pc = mach.getCurrentSection().pc;
         if (meta.args.empty()) {
-            mach.getCurrentSection().pc ++;
+            section_pc.emplace(section_pc.value() + 1);
             return;
         }
         auto sz = number<int32_t>(meta.args[0]);
-        mach.getCurrentSection().pc += sz;
+        section_pc.emplace(section_pc.value() + sz);
     });
 
     assem.registerMeta("run", [&](Meta const& meta) {
@@ -420,8 +421,9 @@ void initMeta(Assembler& assem)
             assem.evaluateBlock(meta.blocks[0]);
 
             if (!section.parent.empty()) {
-                mach.getSection(section.parent).pc +=
-                    static_cast<int32_t>(section.get_size() - sz);
+                auto& parent_section_pc = mach.getSection(section.parent).pc;
+                parent_section_pc.emplace(parent_section_pc.value() +
+                                          static_cast<int32_t>(section.get_size() - sz));
             }
 
             if ((section.flags & Backwards) != 0) {
@@ -445,8 +447,8 @@ void initMeta(Assembler& assem)
                 section.data = packed;
             }
             syms.set(p + ".data", section.data);
-            syms.set(p + ".start", section.start);
-            syms.set(p + ".pc", pc);
+            syms.set(p + ".start", section.start.value());
+            syms.set(p + ".pc", pc.value());
             syms.set(p + ".size", section.data.size());
             mach.popSection();
             return;
