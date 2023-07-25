@@ -216,9 +216,8 @@ void Machine::removeSection(std::string const& name)
 // Layout section 's', exactly at address if Floating, otherwise
 // it must at least be placed after address
 // Return section end
-int32_t Machine::layoutSection(Optional<int32_t> const& o_start, Section& s)
+int32_t Machine::layoutSection(int32_t start, Section& s)
 {
-    auto start = o_start.value();
     if (!s.valid) {
         LOGI("Skipping invalid section %s", s.name);
         return start;

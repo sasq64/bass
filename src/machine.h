@@ -129,7 +129,7 @@ public:
 
     void clear();
 
-    int32_t layoutSection(Optional<int32_t> const& o_start, Section& s);
+    int32_t layoutSection(int32_t start, Section& s);
     bool layoutSections();
     Error checkOverlap();
 
