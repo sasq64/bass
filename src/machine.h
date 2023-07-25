@@ -104,7 +104,7 @@ struct Section
     std::string name;
     std::string parent;
     std::vector<std::string> children;
-    Optional<int32_t> start = -1;
+    Optional<int32_t> start;
     Optional<int32_t> pc = -1;
     Optional<int32_t> size = -1;
     uint32_t flags{};

@@ -155,7 +155,7 @@ Section& Machine::addSection(Section const& s)
         section.flags |= SectionFlags::FixedSize;
     }
 
-    if (start != -1) {
+    if (start.has_value()) {
         section.start = start;
         section.flags |= SectionFlags::FixedStart;
     }
@@ -174,7 +174,7 @@ Section& Machine::addSection(Section const& s)
             section.flags |= SectionFlags::ReadOnly;
         }
 
-        if (section.start == -1) {
+        if (!section.start.has_value()) {
             LOGD("Setting start to %x", parent.pc.value());
             section.start = parent.pc;
         }
@@ -184,7 +184,7 @@ Section& Machine::addSection(Section const& s)
         section.pc = section.start;
     }
 
-    Check(section.start != -1, "Section must have start");
+    Check(section.start.has_value(), "Section must have start");
 
     return section;
 }
@@ -265,8 +265,13 @@ bool Machine::layoutSections()
     for (auto& s : sections) {
         if (s.parent.empty()) {
             // LOGI("Root %s at %x", s.name, s.start);
-            auto start = s.start.value();
-            layoutSection(start, s);
+            if (s.start.has_value()) {
+                auto start = s.start.value();
+                layoutSection(start, s);
+            } else {
+                LOGD(fmt::format("Start of section {} is undefined -> skipping layout", s.name));
+                layoutOk = false;
+            }
         }
     }
     return layoutOk;
