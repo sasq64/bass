@@ -37,5 +37,5 @@ yo:
 }
 
 last:
-    !fill sections.funky.data
+    !fill section.funky.data
 
