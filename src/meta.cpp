@@ -429,7 +429,7 @@ void initMeta(Assembler& assem)
             }
 
 
-            auto p = "sections."s + std::string(section.name);
+            auto p = "section."s + std::string(section.name);
             if ((section.flags & Compressed) != 0) {
                 LOGI("Packing %s", p.c_str());
                 std::vector<uint8_t> packed(0x10000);
