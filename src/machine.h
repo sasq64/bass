@@ -156,7 +156,7 @@ public:
         });
     }
     uint32_t getPC() const;
-    void write(std::string_view name, OutFmt fmt);
+    void write(std::string_view name, OutFmt fmt, bool verify = false);
     void writeListFile(std::string_view name);
 
     uint8_t readRam(uint16_t offset) const;

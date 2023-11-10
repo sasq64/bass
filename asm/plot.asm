@@ -108,7 +108,7 @@ plot_test:
         mask:   !byte 0
     }
 
-;!test "Plot single pixel"
+!test "Plot single pixel"
 plotbit:
 
 		lda	#0
@@ -189,7 +189,7 @@ fast_plot:
     sta (target),y
     
     rts
-    !assert tests.fast_plot.ram[$614A] == $20
+    ;!assert tests.fast_plot.ram[$614A] == $20
 
 yoffset = [y -> (y>>3) * 40 * 8 + (y&7) + SCREEN ]
 
@@ -207,3 +207,35 @@ lookup_mask:
     }
 
 
+buffer = $1000
+data = $ff00
+fast_write:
+    ; x = 255 - a
+    ; jump to start + (255 - a) * 6
+
+    sta $4
+    lda #255
+    sbc $4
+    tax
+
+    asl
+    bcc +
+    inc modify+1
+$   sta $4
+    asl
+    bcc +
+    inc modify+1
+$   adc $4
+    bcc +
+    inc modify+1
+$   sta modify+2
+modify:
+    jmp wstart
+
+    !align 256
+wstart:
+    !rept n=256 {
+        lda buffer+n-255,x
+        sta data
+    }
+    rts

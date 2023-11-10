@@ -232,6 +232,7 @@ int main(int argc, char** argv)
         }
 
         std::vector<fs::file_time_type> times;
+        times.reserve(state.sourceFiles.size());
         for (auto const& sourceFile : state.sourceFiles) {
             times.push_back(fs::last_write_time(sourceFile));
         }
@@ -276,6 +277,27 @@ int main(int argc, char** argv)
         return 1;
     }
 
+
+    std::unordered_map<std::string, std::vector<std::string>> files;
+    uint32_t pc = 0;
+    for (auto&& [file, line] : assem.getLines())
+    {
+        if (!file.empty()) {
+            if (!files.contains(file)) {
+                utils::File f {file};
+                auto contents = f.readAllString();
+                std::vector<std::string> split = utils::split(contents, "\n");
+                files[file] = split;
+            }
+            auto& contents = files[file];
+            fmt::print("{:04x}: {}\n", pc, contents[line-1]);
+        }
+        pc++;
+    }
+
+
+
+
     try {
         mach.write(state.outFile, state.outFmt);
     } catch (utils::io_exception&) {
@@ -283,6 +305,8 @@ int main(int argc, char** argv)
                    state.outFile);
         return 1;
     }
+
+
 
     if (!state.listFile.empty()) {
         mach.writeListFile(state.listFile);

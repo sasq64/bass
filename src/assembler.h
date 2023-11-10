@@ -178,6 +178,8 @@ private:
 
     std::vector<Error> errors;
 
+    uint32_t linePc = 0;
+
     bool passDebug = false;
     std::unordered_map<std::string, AnyCallable> functions;
     std::unordered_map<std::string, MetaFn> metaFunctions;

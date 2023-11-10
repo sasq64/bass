@@ -574,9 +574,16 @@ void Assembler::setupRules()
     using SV = const SemanticValues;
     using namespace std::string_literals;
 
-    parser.before("NonEmptyLine", [this](SV& sv) {
+    parser.before("Statement", [this](SV& sv) {
+        linePc  = mach->getPC();
+        return true;
+    });
+    parser.after("Statement", [this](SV& sv) {
         auto pc = mach->getPC();
-        lines[pc & 0xffff] = std::make_pair(sv.file_name(), sv.line());
+        if (pc != linePc) {
+            lines[linePc & 0xffff] = std::make_pair(sv.file_name(), sv.line());
+        }
+        linePc = pc;
         return true;
     });
 

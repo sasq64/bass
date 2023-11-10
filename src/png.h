@@ -48,11 +48,7 @@ std::unordered_map<int, int> remap_palette(std::vector<T> const& colors,
             }
             j++;
         }
-        auto new24 = static_cast<uint32_t>(newColors[bestColor]) & 0xff'ff'ff;
-        // LOGI("%d : %06x -> %d : %06x", i, col24, bestColor, new24);
-        convert[i] = bestColor;
-
-        i++;
+        convert[i++] = bestColor;
     }
     return convert;
 }

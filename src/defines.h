@@ -39,6 +39,15 @@ inline utils::File createFile(fs::path const& p)
     }
     return utils::File{p.string(), utils::File::Mode::Write};
 }
+inline utils::File verifyFile(fs::path const& p)
+{
+    auto pp = p.parent_path();
+    if (!pp.empty()) {
+        fs::create_directories(pp);
+    }
+    return utils::File{p.string(), utils::File::Mode::Write};
+}
+
 
 class dbz_error : public std::exception
 {

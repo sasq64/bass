@@ -473,7 +473,8 @@ void Machine::writeListFile(std::string_view name)
     }
 }
 
-void Machine::write(std::string_view name, OutFmt fmt)
+
+void Machine::write(std::string_view name, OutFmt fmt, bool verify)
 {
     auto non_empty = utils::filter_to(sections, [](auto const& s) {
         return !s.data.empty() && ((s.flags & NoStorage) == 0);
@@ -491,7 +492,13 @@ void Machine::write(std::string_view name, OutFmt fmt)
 
     int32_t last_end = -1;
 
-    utils::File outFile = createFile(name);
+    utils::File outFile = verify ? createFile("_temp.bass") : createFile(name);
+
+    utils::File checkFile;
+
+    if (verify) {
+        checkFile = utils::File{name, utils::File::Mode::Read};
+    }
 
     auto start = non_empty.front().start;
     auto end = non_empty.back().start +
@@ -508,6 +515,9 @@ void Machine::write(std::string_view name, OutFmt fmt)
     }
 
     if (fmt == OutFmt::Prg) {
+        if (verify) {
+            outFile.read<uint8_t>();
+        }
         outFile.write<uint8_t>(start & 0xff);
         outFile.write<uint8_t>(start >> 8);
     }
