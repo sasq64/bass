@@ -1,29 +1,91 @@
 ---
 marp: true
-theme: gaia
+theme: uncover
 class:
  - lead
 paginate: true
 ---
-# C++ and the 6502 
+# C++ and the 6502
 
-1. Emulation
-2. Assembling
-3. Compiling
+1. Emulating it
+1. Targeting it (using C++)
+1. (Assembling for it)
 
-
----
-## Emulating the 6502 using modern C++
-_by Jonas Minnberg_
-
-Investigating wether you can write traditionally size/performance
-sensitive code without macros, reduntant code and other ugliness
-
+<!-- 
+Originally first part. Now also second.
+Because: FUN and the new llvm 6502 backend
+-->
 ---
 
 # The 6502
 
-* Used in C64, NES, Atari 2600, Apple II etc
+<!-- 
+Created by Chuck Peddle. 1975. Replacement for the Motorola 6800.
+
+CHEAP!
+
+There's a whole story, books etc, but not for us.
+
+-->
+---
+
+## Atari 2600
+
+![width:800px](./atari.jpg)
+
+<!-- 128 byte memory, 5 byte VRAM -->
+
+---
+## Apple II
+
+![width:640px](./apple2.png)
+
+---
+
+## Nintendo
+
+![width:720px](./nes.jpg)
+
+---
+
+## C64
+
+![width:720px](./c64.jpg)
+
+---
+
+## New machines
+
+---
+
+
+## Commander X16
+
+![width:720px](./x16.png)
+
+<!-- Pre order 350 dollars, board only -->
+---
+
+## Mega 65 
+
+![width:720px](./mega65.jpg)
+
+<!-- Pre order 800 euro -->
+
+---
+
+# Emulation
+
+---
+<!--
+Investigating wether you can write traditionally size/performance
+sensitive code without macros, redundant code and other ugliness
+
+Who was tried writing an emulator, or thought about it?
+
+65C02, 6510
+-->
+
 * Around 155 opcodes (56 instructions)
 * Opcodes 1-3 bytes long
 * Uniquely identified by first byte
@@ -44,6 +106,30 @@ I wanted to see if I could write a 6502 emulator...
 ## Jump table or switch statement ?
 <!-- 
 C-Style. Vice.
+-->
+---
+
+```c
+while (...) {
+    op = *pc++;
+    switch (op) {
+    case OPCODE:
+        // .. 
+        break;
+    }
+}
+```
+
+```c
+while (...) {
+    op = *pc++;
+    jumpTable[op](state);
+}
+```
+<!--
+One unpredictable + one predicatable jump
+
+Big cost is passing state. Member function?
 -->
 ---
 
@@ -103,7 +189,12 @@ mrb_vm_exec(mrb_state *mrb, ...)
 #define END_DISPATCH L_END_DISPATCH:;}}
 
 #else
+```
+...
 
+---
+
+```c
 #define INIT_DISPATCH JUMP; return mrb_nil_value();
 #define CASE(insn,ops) L_ ## insn: pc++; FETCH_ ## ops (); \
                        mrb->c->ci->pc = pc; L_ ## insn ## _BODY:
@@ -192,6 +283,17 @@ And here are our jump table entries;
 ---
 
 ## Intermission - it used to be so easy!
+
+---
+
+```asm
+
+    inc $d020
+    jsr draw_line
+    dec $d020
+
+```
+
 
 ---
 
@@ -303,7 +405,189 @@ offending functions;
 
 ---
 
-# Tageting 6502 with C++ 
+# Targeting 6502 with C++ 
+
+<!-- 
+llvm-mos project
+
+Started 2021 ?
+
+-->
+
+---
+
+## memcpy
+
+```cpp
+void memcpy(char*dst, char* src, short len)
+{
+    while(len--) {
+        *dst++ = *src++;
+    }
+}
+```
+
+```cpp
+void memcpy(char*dst, char* src, short len)
+{
+    for(int i = 0; i<len; i++) {
+        dst[i] = src[i];
+    }
+}
+```
+
+<!-- 
+-->
+
+---
+
+```asm
+memcpy:
+        sta     __rc6
+        txa
+        bne     .LBB0_2
+        lda     __rc6
+        beq     .LBB0_11
+.LBB0_2:
+        ldy     #0
+        jmp     .LBB0_4
+.LBB0_3:
+        inc     __rc3
+        txa
+        beq     .LBB0_10
+.LBB0_4:
+        lda     #255
+        dec     __rc6
+        cmp     __rc6
+        bne     .LBB0_6
+        dex
+.LBB0_6:
+        lda     (__rc4),y
+        inc     __rc4
+        bne     .LBB0_8
+        inc     __rc5
+.LBB0_8:
+        sta     (__rc2),y
+        inc     __rc2
+        beq     .LBB0_3
+        txa
+        bne     .LBB0_4
+.LBB0_10:
+        lda     __rc6
+        bne     .LBB0_4
+.LBB0_11:
+        rts
+```
+
+---
+
+```asm
+        ldx     16384
+        stx     32768
+        ldx     16385
+        stx     32769
+        ldx     16386
+        stx     32770
+        ...
+```
+
+<!-- 
+    Unrolls for len <= 28
+-->
+
+---
+
+```asm
+        ldx     #0
+.LBB1_1:
+        lda     16384,x
+        sta     32768,x
+        inx
+        cpx     #50
+        bne     .LBB1_1
+```
+
+<!-- 
+    Nice loop for len <= 256. Then bad.
+-->
+
+---
+```asm
+    ldx #0
+.loop
+    lda $2000,x
+    sta $3000,x
+    lda $2100,x
+    sta $3100,x
+    ...
+    dex
+    beq .loop
+```
+
+<!-- 
+What we actually want. Can maybe be accomplished with TMP forced loop
+unrolling tricks.
+-->
+
+---
+
+```asm
+!macro MemMove(dest, src, len)
+{
+    !if (src + len < dest) || (dest + len < src) {
+        FastCopy(dest, src, len)
+    } else {
+        !if dest > src {
+            MemCpyBack(dest, src, len)
+        } else {
+            MemCpyForward(dest, src, len)
+        }
+    }
+}
+```
+
+---
+
+```asm
+!macro FastCopy(dest, src, len) {
+    .blocks = len >> 8
+    .rest = len & 0xff
+
+    !if .blocks > 0 {
+        ldx #0
+    .a  !rept .blocks {
+            lda src + i * $100, x
+            sta dest + i * $100, x
+        }
+        inx
+        bne .c
+    }
+    .c
+    !if .rest > 1 {
+        ldx #.rest-1
+    .b  lda src + .blocks * $100,x
+        sta dest + .blocks * $100,x
+        dex
+        bne .b
+    }
+    !if .rest > 0 {
+        lda src + .blocks
+        sta dest + .blocks
+    }
+}
+```
+
+---
+
+```
+*** Test 'copy' : 410503 cycles, [A=$ff X=$00 Y=$00]
+*** Test 'fastcopy' : 91873 cycles, [A=$00 X=$00 Y=$00]
+```
+<!-- 
+
+Appropox 50 bytes vs 250 bytes code foot print
+
+-->
 
 ---
 
@@ -397,6 +681,7 @@ put_pixel:
         sta     (__rc4),y
         rts
 ```
+
 ---
 
 ```asm
@@ -423,170 +708,3 @@ lookup_hi:
 lookup_mask:
     !rept 256 { !byte (1<<(7-(i&7))) }
 ```
-
-```cpp
-void memcpy(char*dst, char* src, short len)
-{
-    while(len--) {
-        *dst++ = *src++;
-    }
-}
-```
-
-```cpp
-void memcpy(char*dst, char* src, short len)
-{
-    for(int i = 0; i<len; i++) {
-        dst[i] = src[i];
-    }
-}
-```
-
-<!-- 
--->
-
-
----
-
-```asm
-memcpy:
-       sta     __rc6
-        txa
-        bne     .LBB0_2
-        lda     __rc6
-        beq     .LBB0_11
-.LBB0_2:
-        ldy     #0
-        jmp     .LBB0_4
-.LBB0_3:
-        inc     __rc3
-        txa
-        beq     .LBB0_10
-.LBB0_4:
-        lda     #255
-        dec     __rc6
-        cmp     __rc6
-        bne     .LBB0_6
-        dex
-.LBB0_6:
-        lda     (__rc4),y
-        inc     __rc4
-        bne     .LBB0_8
-        inc     __rc5
-.LBB0_8:
-        sta     (__rc2),y
-        inc     __rc2
-        beq     .LBB0_3
-        txa
-        bne     .LBB0_4
-.LBB0_10:
-        lda     __rc6
-        bne     .LBB0_4
-.LBB0_11:
-        rts
-```
-
----
-
-```asm
-        ldx     16384
-        stx     32768
-        ldx     16385
-        stx     32769
-        ldx     16386
-        stx     32770
-        ...
-```
-
-<!-- 
-    Unrolls for len <= 28
--->
-
----
-
-```asm
-        ldx     #0
-.LBB1_1:
-        lda     16384,x
-        sta     32768,x
-        inx
-        cpx     #50
-        bne     .LBB1_1
-```
-
-<!-- 
-    Nice loop for len <= 256. Then bad.
--->
-
----
-```asm
-    ldx #0
-.loop
-    lda $2000,x
-    sta $3000,x
-    lda $2100,x
-    sta $3100,x
-    ...
-    dex
-    beq .loop
-```
-
-<!-- 
-What we actually want. Can maybe be accomplished with TMP forced loop
-unrolling tricks.
--->
-
----
-```asm
-!macro MemMove(dest, src, len)
-{
-    !if (src + len < dest) || (dest + len < src) {
-        FastCopy(dest, src, len)
-    } else {
-        !if dest > src {
-            MemCpyBack(dest, src, len)
-        } else {
-            MemCpyForward(dest, src, len)
-        }
-    }
-}
-```
-
----
-```asm
-!macro FastCopy(dest, src, len) {
-    .blocks = len >> 8
-    .rest = len & 0xff
-
-    !if .blocks > 0 {
-        ldx #0
-    .a  !rept .blocks {
-            lda src + i * $100, x
-            sta dest + i * $100, x
-        }
-        dex
-        beq .c
-        jmp .a
-    }
-    .c
-    !if .rest > 0 {
-        ldx #.rest
-    .b  lda src + .blocks * $100 - 1,x
-        sta dest + .blocks * $100 - 1,x
-        dex
-        bne .b
-    }
-}
-```
-
----
-
-```
-*** Test 'copy' : 410503 cycles, [A=$ff X=$00 Y=$00]
-*** Test 'fastcopy' : 91873 cycles, [A=$00 X=$00 Y=$00]
-```
-<!-- 
-
-Appropox 50 bytes vs 250 bytes code foot print
-
--- >
