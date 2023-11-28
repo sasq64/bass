@@ -263,6 +263,7 @@ class Machine {
 ## Example opcode: **TAX**
 
 ---
+
 ```c++
     template <int FROM, int TO>
     static constexpr void Transfer(Machine& m)
@@ -358,12 +359,84 @@ bmi (14/0/1)
 ```
 
 <!--
-Here we see that our 156 functions disassembles to 3306 x86 opcodes in
-total.
 
-Interestingly we also have 4 branches. The full output show the four
-offending functions;
+Sign bit check generates branch... strange
+
+But our assumption holds.
+MOST IMPORTANT: No calls, all template functions inlined
+
 -->
+---
+
+## Configuring
+
+---
+
+```c++
+
+// The Policy defines the compile & runtime time settings for the emulator
+struct DefaultPolicy
+{
+    DefaultPolicy() = default;
+    explicit DefaultPolicy(Machine<DefaultPolicy>&) {}
+
+    static constexpr bool ExitOnStackWrap = true;
+
+    // PC accesses does not normally need to work in IO areas
+    static constexpr int PC_AccessMode = Banked;
+
+    // Generic reads and writes should normally not be direct
+    static constexpr int Read_AccessMode = Callback;
+    static constexpr int Write_AccessMode = Callback;
+
+    static constexpr int MemSize = 65536;
+
+    static constexpr bool breakFn(DefaultPolicy&, int /*n*/) { return false; }
+    // This function is run after each opcode. Return true to stop emulation.
+    static constexpr bool eachOp(DefaultPolicy&) { return false; }
+};
+```
+
+---
+
+```c++
+uint32_t Machine<POLICY>::run(uint32_t toCycles = 0x01000000)
+{
+    cycles = 0;
+    while (cycles < toCycles) {
+        if (POLICY::eachOp(policy)) break;
+        auto code = ReadPC();
+        auto& op = jumpTable[code];
+        op.op(*this);
+        cycles += op.cycles;
+    }
+    return cycles;
+}
+unsigned ReadPC() { return Read<POLICY::PC_AccessMode>(pc++); }
+```
+---
+
+```c++
+enum EmulatedMemoryAccess {
+    Direct,  // Access `ram` array directly; 
+    Banked,  // Access memory through `wbank` and `rbank`;
+    Callback // Access memory via function pointer per bank
+};
+
+template <int ACCESS_MODE = POLICY::Read_AccessMode>
+unsigned Read(unsigned adr) const {
+    if constexpr (ACCESS_MODE == Direct)
+        return ram[adr];
+    else if constexpr (ACCESS_MODE == Banked)
+        return rbank[hi(adr)][lo(adr)];
+    else
+        return rcallbacks[hi(adr)](adr, rcbdata[hi(adr)]);
+}
+```
+
+---
+
+### Comparasion: Vice
 
 ---
 
@@ -522,21 +595,6 @@ memcpy:
 ---
 
 ```asm
-        ldx     #0
-.LBB1_1:
-        lda     16384,x
-        sta     32768,x
-        inx
-        cpx     #50
-        bne     .LBB1_1
-```
-
-<!-- 
-    Nice loop for len <= 256. Then bad.
--->
-
----
-```asm
     ldx #0
 .loop
     lda $2000,x
@@ -628,6 +686,33 @@ void put_pixel(int x, int y)
     We really want x & y to be 8 bit and extend to 16 bit
 -->
 ---
+
+```cpp
+    put_pixel(55, 33)
+
+```
+
+|
+V
+
+
+```asm
+        lda     34129
+        ora     #1
+        sta     34129
+```
+
+---
+
+```cpp
+    put_pixel(x, y)
+
+```
+ |
+ V
+
+---
+
 
 ```asm
 
