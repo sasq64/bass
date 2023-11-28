@@ -101,7 +101,7 @@ Makes it really easy to start an emulator!
 
 ##### LDA (LoaD Accumulator)
 
-```
+```text
 Affects Flags: N Z
 
 MODE           SYNTAX       HEX LEN TIM
@@ -260,8 +260,18 @@ class Machine {
 ```
 ---
 
-## Example opcode: **TAX**
+## Example opcode: **Txx**
 
+---
+
+```c++
+    { "tax", { { 0xaa, 2, NONE, Transfer<A, X> } } },
+    { "txa", { { 0x8a, 2, NONE, Transfer<X, A> } } },
+    { "tay", { { 0xa8, 2, NONE, Transfer<A, Y> } } },
+    { "tya", { { 0x98, 2, NONE, Transfer<Y, A> } } },
+    { "txs", { { 0x9a, 2, NONE, Transfer<X, SP> } } },
+    { "tsx", { { 0xba, 2, NONE, Transfer<SP, X> } } },
+```
 ---
 
 ```c++
@@ -291,18 +301,14 @@ class Machine {
             sr |= ((~(a ^ arg) & (a ^ res) & 0x80) >> 1);
     }
 ```
----
 
-And here are our jump table entries;
+<!-- 
 
-```c++
-    { "tax", { { 0xaa, 2, NONE, Transfer<A, X> } } },
-    { "txa", { { 0x8a, 2, NONE, Transfer<X, A> } } },
-    { "tay", { { 0xa8, 2, NONE, Transfer<A, Y> } } },
-    { "tya", { { 0x98, 2, NONE, Transfer<Y, A> } } },
-    { "txs", { { 0x9a, 2, NONE, Transfer<X, SP> } } },
-    { "tsx", { { 0xba, 2, NONE, Transfer<SP, X> } } },
-```
+Real implementation opt: Dont set S and Z flags, just store `res` and use it to
+check values later.
+Works because all opcodes that affect flags affects S & Z... except 65c02 trb opcode!
+-->
+
 ---
 ## Benchmarking
 ---
@@ -380,8 +386,6 @@ struct DefaultPolicy
     DefaultPolicy() = default;
     explicit DefaultPolicy(Machine<DefaultPolicy>&) {}
 
-    static constexpr bool ExitOnStackWrap = true;
-
     // PC accesses does not normally need to work in IO areas
     static constexpr int PC_AccessMode = Banked;
 
@@ -391,7 +395,6 @@ struct DefaultPolicy
 
     static constexpr int MemSize = 65536;
 
-    static constexpr bool breakFn(DefaultPolicy&, int /*n*/) { return false; }
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
 };
@@ -405,13 +408,14 @@ uint32_t Machine<POLICY>::run(uint32_t toCycles = 0x01000000)
     cycles = 0;
     while (cycles < toCycles) {
         if (POLICY::eachOp(policy)) break;
-        auto code = ReadPC();
-        auto& op = jumpTable[code];
+        auto const code = ReadPC();
+        auto const& op = jumpTable[code];
         op.op(*this);
         cycles += op.cycles;
     }
     return cycles;
 }
+
 unsigned ReadPC() { return Read<POLICY::PC_AccessMode>(pc++); }
 ```
 ---
@@ -436,7 +440,7 @@ unsigned Read(unsigned adr) const {
 
 ---
 
-### Comparasion: Vice
+### Comparison: Vice
 
 ---
 
@@ -516,16 +520,7 @@ Started 2021 ?
 ## memcpy
 
 ```cpp
-void memcpy(char*dst, char* src, short len)
-{
-    while(len--) {
-        *dst++ = *src++;
-    }
-}
-```
-
-```cpp
-void memcpy(char*dst, char* src, short len)
+void memcpy(char* dst, char const* src, int len)
 {
     for(int i = 0; i<len; i++) {
         dst[i] = src[i];
