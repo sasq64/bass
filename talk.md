@@ -31,44 +31,48 @@ There's a whole story, books etc, but not for us.
 
 ## Atari 2600
 
-![width:800px](./atari.jpg)
+![width:800px](./img/atari.jpg)
 
 <!-- 128 byte memory, 5 byte VRAM -->
 
 ---
 ## Apple II
 
-![width:640px](./apple2.png)
+![width:640px](./img/apple2.png)
 
 ---
 
 ## Nintendo
 
-![width:720px](./nes.jpg)
+![width:720px](./img/nes.jpg)
 
+<!-- CPU based on 6502, no decimal mode -->
 ---
 
 ## C64
 
-![width:720px](./c64.jpg)
+![width:720px](./img/c64.jpg)
+
+<!-- 6510, IO at $0/1, (tristate bus) -->
 
 ---
 
 ## New machines
 
+<!-- 65c02, more opcodes, 450w vs 20w -->
 ---
 
 
 ## Commander X16
 
-![width:720px](./x16.png)
+![width:720px](./img/x16.png)
 
 <!-- Pre order 350 dollars, board only -->
 ---
 
 ## Mega 65 
 
-![width:720px](./mega65.jpg)
+![width:720px](./img/mega65.jpg)
 
 <!-- Pre order 800 euro -->
 
@@ -83,9 +87,9 @@ sensitive code without macros, redundant code and other ugliness
 
 Who was tried writing an emulator, or thought about it?
 
-65C02, 6510
 -->
 
+* Three 8-bit registers (A,X,Y)
 * Around 155 opcodes (56 instructions)
 * Opcodes 1-3 bytes long
 * Uniquely identified by first byte
@@ -95,6 +99,26 @@ Makes it really easy to start an emulator!
 -->
 ---
 
+##### LDA (LoaD Accumulator)
+
+```
+Affects Flags: N Z
+
+MODE           SYNTAX       HEX LEN TIM
+Immediate     LDA #$44      $A9  2   2
+Zero Page     LDA $44       $A5  2   3
+Zero Page,X   LDA $44,X     $B5  2   4
+Absolute      LDA $4400     $AD  3   4
+Absolute,X    LDA $4400,X   $BD  3   4+
+Absolute,Y    LDA $4400,Y   $B9  3   4+
+Indirect,X    LDA ($44,X)   $A1  2   6
+Indirect,Y    LDA ($44),Y   $B1  2   5+
+
++ add 1 cycle if page boundary crossed
+```
+  
+---
+
 I wanted to see if I could write a 6502 emulator...
 
 * Using modern C++
@@ -102,7 +126,10 @@ I wanted to see if I could write a 6502 emulator...
 * Being as fast or _faster_ than earlier emulators
 * Being more _configurable_ than earlier emulators.
 
+<!-- Compare to vice etc; all C, lots of macros -->
+
 ---
+
 ## Jump table or switch statement ?
 <!-- 
 C-Style. Vice.
@@ -204,14 +231,11 @@ mrb_vm_exec(mrb_state *mrb, ...)
 #define END_DISPATCH
 ```
 
-
-
 ---
 Jump table! because...
 
 * Better code separation
 * Allows for templated function calls
-* Switch statements are ugly!
 
 ---
 
