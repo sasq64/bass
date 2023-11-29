@@ -65,7 +65,7 @@ There's a whole story, books etc, but not for us.
 
 ## Commander X16
 
-![width:720px](./img/x16.png)
+![width:720px](./img/x16.jpg)
 
 <!-- Pre order 350 dollars, board only -->
 ---
@@ -209,10 +209,12 @@ mrb_vm_exec(mrb_state *mrb, ...)
 #ifndef DIRECT_THREADED
 
 #define INIT_DISPATCH for (;;) { insn = *pc; switch (insn) {
+
 #define CASE(insn,ops) case insn: pc++; FETCH_ ## ops (); \
-                       mrb->c->ci->pc = pc; L_ ## insn ## _BODY:
+                       mrb->c->ci->pc = pc; 
+
 #define NEXT goto L_END_DISPATCH
-#define JUMP NEXT
+
 #define END_DISPATCH L_END_DISPATCH:;}}
 
 #else
@@ -222,13 +224,14 @@ mrb_vm_exec(mrb_state *mrb, ...)
 ---
 
 ```c
-#define INIT_DISPATCH JUMP; return mrb_nil_value();
+#define INIT_DISPATCH NEXT; return mrb_nil_value();
+
 #define CASE(insn,ops) L_ ## insn: pc++; FETCH_ ## ops (); \
-                       mrb->c->ci->pc = pc; L_ ## insn ## _BODY:
+                       mrb->c->ci->pc = pc; 
 #define NEXT insn=*pc; goto *optable[insn]
-#define JUMP NEXT
 
 #define END_DISPATCH
+
 ```
 
 ---
@@ -310,10 +313,109 @@ Works because all opcodes that affect flags affects S & Z... except 65c02 trb op
 -->
 
 ---
+
+```c++
+    { "lda", {
+        { 0xa9, 2, Mode::IMM, Load<Reg::A, Mode::IMM>},
+        { 0xa5, 3, Mode::ZP, Load<Reg::A, Mode::ZP>},
+        { 0xb5, 4, Mode::ZPX, Load<Reg::A, Mode::ZPX>},
+        { 0xad, 4, Mode::ABS, Load<Reg::A, Mode::ABS>},
+        { 0xbd, 4, Mode::ABSX, Load<Reg::A, Mode::ABSX>},
+        { 0xb9, 4, Mode::ABSY, Load<Reg::A, Mode::ABSY>},
+        { 0xa1, 6, Mode::INDX, Load<Reg::A, Mode::INDX>},
+        { 0xb1, 5, Mode::INDY, Load<Reg::A, Mode::INDY>},
+    } },
+```
+
+```c++
+    template <int REG, int MODE>
+    static constexpr void Load(Machine& m)
+    {
+        m.Reg<REG>() = m.LoadEA<MODE>();
+        m.set_SZ<REG>();
+    }
+```
+
+---
+
+```cpp
+    // Read operand from PC and create effective address depending on 'MODE'
+    template <enum Mode MODE>
+    unsigned ReadEA()
+    {
+        if constexpr (MODE == Mode::IMM) return pc++;
+        if constexpr (MODE == Mode::ZP) return ReadPC8();
+        if constexpr (MODE == Mode::ZPX) return ReadPC8(x);
+        if constexpr (MODE == Mode::ZPY) return ReadPC8(y);
+        if constexpr (MODE == Mode::ABS) return ReadPC16();
+        if constexpr (MODE == Mode::ABSX) return ReadPC16(x);
+        if constexpr (MODE == Mode::ABSY) return ReadPC16(y);
+        if constexpr (MODE == Mode::INDX) return Read16(ReadPC8(x));
+        if constexpr (MODE == Mode::INDY) return Read16(ReadPC8(), y);
+        if constexpr (MODE == Mode::IND) return Read16(ReadPC16());
+        if constexpr (MODE == Mode::INDZ) return Read16(ReadPC8());
+    }
+
+    template <enum Mode MODE>
+    unsigned LoadEA() { return Read(ReadEA<MODE>()); }
+
+```
+
+---
+
+### Comparison: Vice
+
+---
+
+```c++
+#define LDA(value, clk_inc, pc_inc) \
+    do {                            \
+        BYTE tmp = (BYTE)(value);   \
+        reg_a_write(tmp);           \
+        CLK_ADD(CLK, (clk_inc));    \
+        LOCAL_SET_NZ(tmp);          \
+        INC_PC(pc_inc);             \
+    } while (0)
+
+#define LDX(value, clk_inc, pc_inc) \
+    do {                            \
+        reg_x_write((BYTE)(value)); \
+        LOCAL_SET_NZ(reg_x_read);   \
+        CLK_ADD(CLK, (clk_inc));    \
+        INC_PC(pc_inc);             \
+    } while (0)
+
+#define LDY(value, clk_inc, pc_inc) \
+    do {                            \
+        reg_y_write((BYTE)(value)); \
+        LOCAL_SET_NZ(reg_y_read);   \
+        CLK_ADD(CLK, (clk_inc));    \
+        INC_PC(pc_inc);             \
+    } while (0)
+```
+
+---
+
+```c++
+    case 0xa0:          /* LDY #$nn */
+        LDY(p1, 0, 2);
+        break;
+
+    case 0xa1:          /* LDA ($nn,X) */
+        LDA(LOAD_IND_X(p1), 1, 2);
+        break;
+
+    case 0xa2:          /* LDX #$nn */
+        LDX(p1, 0, 2);
+        break;
+```
+
+---
 ## Benchmarking
 ---
 
-## Intermission - it used to be so easy!
+## Intermission
+####  (it used to be so easy!)
 
 ---
 
@@ -324,11 +426,15 @@ Works because all opcodes that affect flags affects S & Z... except 65c02 trb op
     dec $d020
 
 ```
-
+<!-- 
+Main worry: These function calls wont inline (compared to macros)
+-->
 
 ---
 
-[Zydis](https://github.com/zyantific/zydis) 
+###  [Zydis](https://github.com/zyantific/zydis) 
+
+https://github.com/zyantific/zydis
 
 ---
 
@@ -436,72 +542,6 @@ unsigned Read(unsigned adr) const {
     else
         return rcallbacks[hi(adr)](adr, rcbdata[hi(adr)]);
 }
-```
-
----
-
-### Comparison: Vice
-
----
-
-```c++
-#define LDA(value, clk_inc, pc_inc) \
-    do {                            \
-        BYTE tmp = (BYTE)(value);   \
-        reg_a_write(tmp);           \
-        CLK_ADD(CLK, (clk_inc));    \
-        LOCAL_SET_NZ(tmp);          \
-        INC_PC(pc_inc);             \
-    } while (0)
-
-#define LDX(value, clk_inc, pc_inc) \
-    do {                            \
-        reg_x_write((BYTE)(value)); \
-        LOCAL_SET_NZ(reg_x_read);   \
-        CLK_ADD(CLK, (clk_inc));    \
-        INC_PC(pc_inc);             \
-    } while (0)
-
-#define LDY(value, clk_inc, pc_inc) \
-    do {                            \
-        reg_y_write((BYTE)(value)); \
-        LOCAL_SET_NZ(reg_y_read);   \
-        CLK_ADD(CLK, (clk_inc));    \
-        INC_PC(pc_inc);             \
-    } while (0)
-```
-
----
-
-```c++
-    case 0xa0:          /* LDY #$nn */
-        LDY(p1, 0, 2);
-        break;
-
-    case 0xa1:          /* LDA ($nn,X) */
-        LDA(LOAD_IND_X(p1), 1, 2);
-        break;
-
-    case 0xa2:          /* LDX #$nn */
-        LDX(p1, 0, 2);
-        break;
-```
-
----
-
-```c++
-    template <int REG, int MODE>
-    static constexpr void Load(Machine& m)
-    {
-        m.Reg<REG>() = m.LoadEA<MODE>();
-        m.set_SZ<REG>();
-    }
-```
-
-```c++
-    { 0xa0, 2, IMM, Load<Y, IMM>},
-    { 0xa1, 6, INDX, Load<A, INDX>},
-    { 0xa2, 2, IMM, Load<X, IMM>},
 ```
 
 ---
