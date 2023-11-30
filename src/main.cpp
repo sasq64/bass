@@ -278,6 +278,7 @@ int main(int argc, char** argv)
     }
 
 
+#if DUMP_TEST
     std::unordered_map<std::string, std::vector<std::string>> files;
     uint32_t pc = 0;
     for (auto&& [file, line] : assem.getLines())
@@ -294,6 +295,7 @@ int main(int argc, char** argv)
         }
         pc++;
     }
+#endif
 
 
 

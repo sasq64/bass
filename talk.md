@@ -81,6 +81,17 @@ There's a whole story, books etc, but not for us.
 # Emulation
 
 ---
+
+I wanted to see if I could write a 6502 emulator...
+
+* Using modern C++
+* Without any _macros_ or _ifdefs_
+* Being as fast or _faster_ than earlier emulators
+* Being more _configurable_ than earlier emulators.
+
+<!-- Compare to vice etc; all C, lots of macros -->
+
+---
 <!--
 Investigating wether you can write traditionally size/performance
 sensitive code without macros, redundant code and other ugliness
@@ -90,6 +101,7 @@ Who was tried writing an emulator, or thought about it?
 -->
 
 * Three 8-bit registers (A,X,Y)
+* OK so acatually six (SP, PC, SR)
 * Around 155 opcodes (56 instructions)
 * Opcodes 1-3 bytes long
 * Uniquely identified by first byte
@@ -117,17 +129,6 @@ Indirect,Y    LDA ($44),Y   $B1  2   5+
 + add 1 cycle if page boundary crossed
 ```
   
----
-
-I wanted to see if I could write a 6502 emulator...
-
-* Using modern C++
-* Without any _macros_ or _ifdefs_
-* Being as fast or _faster_ than earlier emulators
-* Being more _configurable_ than earlier emulators.
-
-<!-- Compare to vice etc; all C, lots of macros -->
-
 ---
 
 ## Jump table or switch statement ?
@@ -159,82 +160,6 @@ One unpredictable + one predicatable jump
 Big cost is passing state. Member function?
 -->
 ---
-
-## Intermission: _mruby_
-
----
-
-### Direct Threaded Code
-
-<!--
-mruby vm.c:1008
-
-Why this may not be good idea (any more)?
-
-Larger code vs cache vs one predictable jump
--->
----
-
-```cpp
-MRB_API mrb_value
-mrb_vm_exec(mrb_state *mrb, ...) 
-{
-#ifdef DIRECT_THREADED
-  static const void * const optable[] = {
-#include "mruby/ops.h"
-  };
-#endif
-  ...
-
-  INIT_DISPATCH {
-    CASE(OP_NOP, Z) {
-      /* do nothing */
-      NEXT;
-    }
-
-    CASE(OP_MOVE, BB) {
-      regs[a] = regs[b];
-      NEXT;
-    }
-    ...
-    L_STOP:
-      return;
-  }
-  END_DISPATCH;
-```
-
----
-
-```cpp
-#ifndef DIRECT_THREADED
-
-#define INIT_DISPATCH for (;;) { insn = *pc; switch (insn) {
-
-#define CASE(insn,ops) case insn: pc++; FETCH_ ## ops (); \
-                       mrb->c->ci->pc = pc; 
-
-#define NEXT goto L_END_DISPATCH
-
-#define END_DISPATCH L_END_DISPATCH:;}}
-
-#else
-```
-...
-
----
-
-```c
-#define INIT_DISPATCH NEXT; return mrb_nil_value();
-
-#define CASE(insn,ops) L_ ## insn: pc++; FETCH_ ## ops (); \
-                       mrb->c->ci->pc = pc; 
-#define NEXT insn=*pc; goto *optable[insn]
-
-#define END_DISPATCH
-
-```
-
----
 Jump table! because...
 
 * Better code separation
@@ -244,19 +169,22 @@ Jump table! because...
 
 ```cpp
 class Machine {
-    using OpFunc = void (*op)(Machine&);
 
-    std::array<OpFunc, 256> jumpTable;
-    uint16_t pc = 0;
-    int cycles = 0;
-    std::array<uint8_t, 65536> memory;
-    
+    struct Opcode {
+        using OpFunc = void (*op)(Machine&);
+        uint8_t cycles = 0;
+        OpFunc op = nullptr;
+        // ...
+    };
+
+    Opcode const* jumpTable;
     // ...
-
-    void run(int numOpcodes) {
-        while (numOpcodes--) {
-            auto code = memory[pc++];
-            jumpTable[code](*this);
+    void run(int toCycles) {
+        while (cycles < toCycles) {
+            auto code = ReadPC();
+            auto& op = jumpTable[code];
+            op.op(*this);
+            cycles += op.cycles;
         }
     }
 }
@@ -412,24 +340,6 @@ Works because all opcodes that affect flags affects S & Z... except 65c02 trb op
 
 ---
 ## Benchmarking
----
-
-## Intermission
-####  (it used to be so easy!)
-
----
-
-```asm
-
-    inc $d020
-    jsr draw_line
-    dec $d020
-
-```
-<!-- 
-Main worry: These function calls wont inline (compared to macros)
--->
-
 ---
 
 ###  [Zydis](https://github.com/zyantific/zydis) 
@@ -852,3 +762,99 @@ lookup_hi:
 lookup_mask:
     !rept 256 { !byte (1<<(7-(i&7))) }
 ```
+
+---
+
+## Extra: _mruby_
+
+---
+
+### Direct Threaded Code
+
+<!--
+mruby vm.c:1008
+
+Why this may not be good idea (any more)?
+
+Larger code vs cache vs one predictable jump
+-->
+---
+
+```cpp
+MRB_API mrb_value
+mrb_vm_exec(mrb_state *mrb, ...) 
+{
+#ifdef DIRECT_THREADED
+  static const void * const optable[] = {
+#include "mruby/ops.h"
+  };
+#endif
+  ...
+
+  INIT_DISPATCH {
+    CASE(OP_NOP, Z) {
+      /* do nothing */
+      NEXT;
+    }
+
+    CASE(OP_MOVE, BB) {
+      regs[a] = regs[b];
+      NEXT;
+    }
+    ...
+    L_STOP:
+      return;
+  }
+  END_DISPATCH;
+```
+
+---
+
+```cpp
+#ifndef DIRECT_THREADED
+
+#define INIT_DISPATCH for (;;) { insn = *pc; switch (insn) {
+
+#define CASE(insn,ops) case insn: pc++; FETCH_ ## ops (); \
+                       mrb->c->ci->pc = pc; 
+
+#define NEXT goto L_END_DISPATCH
+
+#define END_DISPATCH L_END_DISPATCH:;}}
+
+#else
+```
+...
+
+---
+
+```c
+#define INIT_DISPATCH NEXT; return mrb_nil_value();
+
+#define CASE(insn,ops) L_ ## insn: pc++; FETCH_ ## ops (); \
+                       mrb->c->ci->pc = pc; 
+#define NEXT insn=*pc; goto *optable[insn]
+
+#define END_DISPATCH
+
+```
+
+---
+
+## Extra: 
+####  (it used to be so easy!)
+
+---
+
+```asm
+
+    inc $d020
+    jsr draw_line
+    dec $d020
+
+```
+<!-- 
+Main worry: These function calls wont inline (compared to macros)
+-->
+
+---

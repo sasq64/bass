@@ -21,31 +21,17 @@ start:
     lda #$3b
     sta $d011
 
-   ; Clear colors to white on black
-   MemSet(COLORS, $10, 1000)
+    ; Clear colors to white on black
+    MemSet(COLORS, $10, 1000)
 
     jsr clear_screen
     jsr plot_sine
 
-    ldx #10
-    ldy #10
-    jsr fast_plot
-
-    ldx #20
-    ldy #20
-    jsr fast_plot
-
-    ldx #30
-    ldy #30
-    jsr fast_plot
-$
-    jmp -
+$   jmp -
 
     !section in="zpage", NoStore=true {
 sinx: !byte 0
     }
-
-;!test "plot_sine", $c000
 
 plot_sine:
     lda #0
@@ -55,28 +41,19 @@ $
     ldx xcoord
     lda sine, x
     sta ycoord
-    jsr plotbit
+    jsr fast_plot_xy 
     inc xcoord
     bne -
-    inc xcoord+1
-$
-    ldx xcoord
-    cpx #320-256
-    beq .done
-    lda sine, x
-    sta ycoord
-    jsr plotbit ; plotbit
-    inc xcoord
-    bne -
-.done
     rts
 
-!test
+sine:
+    !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 }
+
 clear_screen:
     MemSet(SCREEN, 0, 320*200/8)
     rts
 
-;!test "Verify plot pixel logic"
+!test "Verify plot pixel logic"
 plot_test:
     jsr clear_screen
     lda #0
@@ -101,14 +78,13 @@ plot_test:
     rts
 
 
-    !section in="zpage", NoStore=true {
-        loc:    !word 0
-        xcoord: !word 0
-        ycoord: !byte 0
-        mask:   !byte 0
-    }
+!section in="zpage", NoStore=true {
+    loc:    !word 0
+    xcoord: !word 0
+    ycoord: !byte 0
+    mask:   !byte 0
+}
 
-!test "Plot single pixel"
 plotbit:
 
 		lda	#0
@@ -132,7 +108,6 @@ plotbit:
 
 		sta loc+1
         ; loc = Y offset : (y/8) * 320
-        ;!run { fmt("{:02x}{:02x} {:02x}", mem_read(3), mem_read(2), reg_a()) }
 
 		lda ycoord
 		and #7
@@ -160,19 +135,16 @@ plotbit:
         lda offs,x
 
 		ora (loc),y
-        ;!run { fmt("{:02x}{:02x} {:02x}", mem_read(3), mem_read(2), reg_a()) }
 		sta (loc),y
 		rts
 offs:   !fill 8, [i -> $80>>i]
 
-        ;!section "sine", $8000
-sine:
-    !rept 256 { !byte (sin(i*Math.Pi*2/256)+1) * 100 }
-
 target = $20
 
-;xy == coord
-!test "fast_plot", X=10, Y=10
+fast_plot_xy:
+    ldx xcoord
+    ldy ycoord
+
 fast_plot:
 
     lda lookup_lo,y
@@ -205,37 +177,3 @@ lookup_mask:
     !rept 256 {
         !byte (1<<(7-(i&7)))
     }
-
-
-buffer = $1000
-data = $ff00
-fast_write:
-    ; x = 255 - a
-    ; jump to start + (255 - a) * 6
-
-    sta $4
-    lda #255
-    sbc $4
-    tax
-
-    asl
-    bcc +
-    inc modify+1
-$   sta $4
-    asl
-    bcc +
-    inc modify+1
-$   adc $4
-    bcc +
-    inc modify+1
-$   sta modify+2
-modify:
-    jmp wstart
-
-    !align 256
-wstart:
-    !rept n=256 {
-        lda buffer+n-255,x
-        sta data
-    }
-    rts

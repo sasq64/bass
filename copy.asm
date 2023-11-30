@@ -192,8 +192,30 @@
     }
 }
 
+    !org $0801
+    !byte $0b,$08,$01,$00,$9e,str(start),$00,$00,$00
+start:
+    sei
+loop
+$   lda $d012
+    cmp #100
+    bne -
+
+    inc $d020
+    jsr copy_test
+    inc $d020
+    jsr copy_test2
+    dec $d020
+    dec $d020
+
+    jmp loop
+
+
     !org $1000
     !test
 copy_test:
-    MemMove($3010, $3000, 2000)
+    MemMove($4000, $4010, 200)
+    rts
+copy_test2:
+    MemMove($4000, $4200, 200)
     rts
