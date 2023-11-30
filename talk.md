@@ -18,6 +18,7 @@ Because: FUN and the new llvm 6502 backend
 ---
 
 # The 6502
+![width:500px](./img/mos.jpg)
 
 <!-- 
 Created by Chuck Peddle. 1975. Replacement for the Motorola 6800.
@@ -453,10 +454,17 @@ unsigned Read(unsigned adr) const {
         return rcallbacks[hi(adr)](adr, rcbdata[hi(adr)]);
 }
 ```
+<!-- Can you see the obvious optimization -->
+---
+
+![width:1210px](./img/map.jpg)
+m
 
 ---
 
 # Targeting 6502 with C++ 
+
+https://godbolt.org/z/7vbehhnvW
 
 <!-- 
 llvm-mos project
