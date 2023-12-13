@@ -4,17 +4,14 @@ theme: uncover
 class:
  - lead
 paginate: true
+
 ---
 # C++ and the 6502
 
-1. Emulating it
-1. Targeting it (using C++)
-1. (Assembling for it)
+Jonas Minnberg
 
-<!-- 
-Originally first part. Now also second.
-Because: FUN and the new llvm 6502 backend
--->
+https://github.com/sasq64/
+
 ---
 
 # The 6502
