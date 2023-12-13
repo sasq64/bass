@@ -43,8 +43,6 @@ struct EmuPolicy : public sixfive::DefaultPolicy
 
     int breakId = -1;
 
-    std::array<int, 65536> coverage;
-
     bool doTrace = false;
 
     // This function is run after each opcode. Return true to stop emulation.
@@ -54,7 +52,6 @@ struct EmuPolicy : public sixfive::DefaultPolicy
         auto pc = policy.machine->regPC();
 
         if (pc != last_pc) {
-            policy.coverage[pc]++;
             //auto code = policy.machine->read_ram(pc);
             if (policy.doTrace) {
                 uint32_t pp = pc;
@@ -140,7 +137,7 @@ Section& Machine::addSection(Section const& s)
 
     auto it =
         std::find_if(sections.begin(), sections.end(),
-                     [name = name](auto const& as) { return as.name == name; });
+                     [n=name](auto const& as) { return as.name == n; });
 
     Section& section =
         it == sections.end() ? sections.emplace_back(name, -1) : *it;
@@ -197,8 +194,8 @@ void Machine::mapFile(std::string const& name, uint8_t bank)
     std::vector<uint8_t> data(f.getSize());
     f.read(data.data(), data.size());
 
-    auto len = (data.size()+255)/256;
-    setBankRead(bank, len, [d=std::move(data), bank](uint32_t adr) {
+    auto len = (std::ssize(data)+255)/256;
+    setBankRead(bank, (int)len, [d=std::move(data), bank](uint32_t adr) {
         return d[adr - (bank<<8)];
     });
 
@@ -563,7 +560,7 @@ void Machine::write(std::string_view name, OutFmt fmt)
             }
         }
 
-        last_end = offset + section.data.size();
+        last_end = offset + std::ssize(section.data);
 
         outFile.write(section.data);
     }

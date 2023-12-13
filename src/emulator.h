@@ -78,11 +78,11 @@ struct Machine
 
     struct Instruction
     {
-        Instruction(const char* name, std::vector<Opcode> ov)
+        Instruction(char const* name, std::vector<Opcode> ov)
             : name(name), opcodes(std::move(ov))
         {
         }
-        const char* name;
+        char const* name;
         std::vector<Opcode> opcodes;
     };
 
@@ -98,7 +98,7 @@ struct Machine
                                      std::numeric_limits<uint32_t>::max() - 32;
                              }};
 
-    Machine() : p{*this}
+    Machine() : policy_{*this}
     {
         ram.fill(0);
         stack = &ram[0x100];
@@ -120,39 +120,42 @@ struct Machine
             jumpTable_normal[i] = illegal_opcode;
             jumpTable_bcd[i] = illegal_opcode;
         }
-        for (const auto& i : getInstructions<false>(cpu6502)) {
-            for (const auto& o : i.opcodes)
+        for (auto const& i : getInstructions<false>(cpu6502)) {
+            for (auto const& o : i.opcodes)
                 jumpTable_normal[o.code] = o;
         }
-        for (const auto& i : getInstructions<true>(cpu6502)) {
-            for (const auto& o : i.opcodes)
+        for (auto const& i : getInstructions<true>(cpu6502)) {
+            for (auto const& o : i.opcodes)
                 jumpTable_bcd[o.code] = o;
         }
     }
 
-    POLICY p;
+    POLICY policy_;
 
     POLICY& policy()
     {
         // static POLICY policy(*this);
-        return p;
+        return policy_;
     }
 
     // Access ram directly
 
-    const Word& get_stack(const Word& adr) const { return stack[adr]; }
+    [[nodiscard]] Word const& get_stack(Word const& adr) const
+    {
+        return stack[adr];
+    }
 
-    void write_ram(uint16_t org, const Word data) { ram[org] = data; }
+    void write_ram(uint16_t org, Word const data) { ram[org] = data; }
 
     void clear_ram() { std::fill(ram.begin(), ram.end(), 0); }
 
-    void write_ram(uint16_t org, const uint8_t* data, size_t size)
+    void write_ram(uint16_t org, uint8_t const* data, size_t size)
     {
         for (size_t i = 0; i < size; i++)
             ram[org + i] = data[i];
     }
 
-    void write_memory(uint16_t org, const uint8_t* data, size_t size)
+    void write_memory(uint16_t org, uint8_t const* data, size_t size)
     {
         for (size_t i = 0; i < size; i++)
             Write(org + i, data[i]);
@@ -164,11 +167,11 @@ struct Machine
             data[i] = ram[org + i];
     }
 
-    uint8_t read_ram(uint16_t org) const { return ram[org]; }
+    [[nodiscard]] uint8_t read_ram(uint16_t org) const { return ram[org]; }
 
     // Access memory through bank mapping
 
-    uint8_t read_mem(uint16_t org) const { return Read(org); }
+    [[nodiscard]] uint8_t read_mem(uint16_t org) const { return Read(org); }
 
     void read_mem(uint16_t org, uint8_t* data, int size) const
     {
@@ -177,7 +180,7 @@ struct Machine
     }
 
     // Map ROM to a bank
-    void map_rom(uint8_t bank, const Word* data, int len)
+    void map_rom(uint8_t bank, Word const* data, int len)
     {
         auto const* end = data + len;
         while (data < end) {
@@ -216,7 +219,7 @@ struct Machine
     }
 
     template <enum Reg REG>
-    unsigned get() const
+    [[nodiscard]] unsigned get() const
     {
         return Reg<REG>();
     }
@@ -226,8 +229,8 @@ struct Machine
         Reg<REG>() = v;
     }
 
-    Adr regPC() const { return pc; }
-    void setPC(const uint16_t& p) { pc = p; }
+    [[nodiscard]] Adr regPC() const { return pc; }
+    void setPC(uint16_t const& p) { pc = p; }
 
     uint32_t run(uint32_t toCycles = 0x01000000)
     {
@@ -275,7 +278,7 @@ private:
     uint32_t realCycles = 0;
 
     // Current jumptable
-    const Opcode* jumpTable;
+    Opcode const* jumpTable;
 
     // Stack normally points to ram[0x100];
     Word* stack;
@@ -287,7 +290,7 @@ private:
     // void* breakData = nullptr;
 
     // Banks normally point to corresponding ram
-    std::array<const Word*, 256> rbank{};
+    std::array<Word const*, 256> rbank{};
     std::array<Word*, 256> wbank{};
 
     std::array<Word (*)(uint16_t, void*), 256> rcallbacks{};
@@ -365,7 +368,7 @@ private:
     static constexpr auto SZC = S | Z | C;
     static constexpr auto SZCV = S | Z | C | V;
 
-    uint8_t get_SR() const
+    [[nodiscard]] uint8_t get_SR() const
     {
         return sr | ((result | (result >> 2)) & 0x80) | (result == 0 ? 2 : 0);
     }
@@ -453,8 +456,9 @@ private:
             ram[adr] = v;
         else if constexpr (ACCESS_MODE == Banked)
             wbank[hi(adr)][lo(adr)] = v;
-        else
+        else {
             wcallbacks[hi(adr)](adr, v, wcbdata[hi(adr)]);
+        }
     }
 
     unsigned ReadPC() { return Read<POLICY::PC_AccessMode>(pc++); }
@@ -815,16 +819,16 @@ private:
 
             { "nop", {{ 0xea, 2, Mode::NONE, [](Machine& ) {} }} },
 
-            { "lda", {
-                { 0xa9, 2, Mode::IMM, Load<Reg::A, Mode::IMM>},
-                { 0xa5, 3, Mode::ZP, Load<Reg::A, Mode::ZP>},
-                { 0xb5, 4, Mode::ZPX, Load<Reg::A, Mode::ZPX>},
-                { 0xad, 4, Mode::ABS, Load<Reg::A, Mode::ABS>},
-                { 0xbd, 4, Mode::ABSX, Load<Reg::A, Mode::ABSX>},
-                { 0xb9, 4, Mode::ABSY, Load<Reg::A, Mode::ABSY>},
-                { 0xa1, 6, Mode::INDX, Load<Reg::A, Mode::INDX>},
-                { 0xb1, 5, Mode::INDY, Load<Reg::A, Mode::INDY>},
-            } },
+{ "lda", {
+    { 0xa9, 2, Mode::IMM, Load<Reg::A, Mode::IMM>},
+    { 0xa5, 3, Mode::ZP, Load<Reg::A, Mode::ZP>},
+    { 0xb5, 4, Mode::ZPX, Load<Reg::A, Mode::ZPX>},
+    { 0xad, 4, Mode::ABS, Load<Reg::A, Mode::ABS>},
+    { 0xbd, 4, Mode::ABSX, Load<Reg::A, Mode::ABSX>},
+    { 0xb9, 4, Mode::ABSY, Load<Reg::A, Mode::ABSY>},
+    { 0xa1, 6, Mode::INDX, Load<Reg::A, Mode::INDX>},
+    { 0xb1, 5, Mode::INDY, Load<Reg::A, Mode::INDY>},
+} },
 
             { "ldx", {
                 { 0xa2, 2, Mode::IMM, Load<Reg::X, Mode::IMM>},
@@ -1257,19 +1261,19 @@ private:
 
 public:
     template <bool USE_BCD = false>
-    static const auto& getInstructions()
+    static auto const& getInstructions()
     {
-        static const std::vector<Instruction> instructionTable =
+        static std::vector<Instruction> const instructionTable =
             makeInstructionTable<USE_BCD>();
         return instructionTable;
     }
 
     template <bool USE_BCD = false>
-    static const auto& getInstructions(bool cpu65c02)
+    static auto const& getInstructions(bool cpu65c02)
     {
-        static const std::vector<Instruction> instructionTable =
+        static std::vector<Instruction> const instructionTable =
             makeInstructionTable<USE_BCD>(true);
-        static const std::vector<Instruction> instructionTable2 =
+        static std::vector<Instruction> const instructionTable2 =
             makeInstructionTable<USE_BCD>(false);
         return cpu65c02 ? instructionTable : instructionTable2;
     }
