@@ -1,6 +1,6 @@
 #pragma once
 
-#include "6502.h"
+#include "emulator.h"
 
 #include <any>
 #include <coreutils/file.h>

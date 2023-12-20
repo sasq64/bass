@@ -1,13 +1,9 @@
+#include "../external/coreutils/src/coreutils/file.h"
 #include "emulator.h"
 #include <benchmark/benchmark.h>
 
-//#include <coreutils/format.h>
-
 #include <cstdio>
 #include <vector>
-#include <string>
-
-namespace sixfive {
 
 struct Result
 {
@@ -19,22 +15,87 @@ struct Result
 
 
 struct DirectPolicy : sixfive::DefaultPolicy {
+    DirectPolicy() = default;
 	explicit DirectPolicy(sixfive::Machine<DirectPolicy>&m) {}
-    int ops = 0;
+    static constexpr int PC_AccessMode = sixfive::Direct;
+    static constexpr int Read_AccessMode = sixfive::Direct;
+    static constexpr int Write_AccessMode = sixfive::Direct;
+};
 
-    static constexpr bool eachOp(DirectPolicy& p) {
-        p.ops++;
+struct CheckPolicy : public sixfive::DefaultPolicy {
+
+    sixfive::Machine<CheckPolicy>& machine;
+
+    explicit CheckPolicy(sixfive::Machine<CheckPolicy>& m) : machine(m) {}
+
+    int ops = 0;
+    static bool eachOp(CheckPolicy& dp)
+    {
+        auto& m = dp.machine;
+        static int lastpc = -1;
+        const auto [a, x, y, sr, sp, pc] = m.regs();
+        if (m.regPC() == lastpc) {
+            printf("STALL @ %04x A %02x X %02x Y %02x SR %02x SP %02x\n",
+                   lastpc, a, x, y, sr, sp);
+            for (int i = 0; i < 256; i++)
+                printf("%02x ", m.get_stack(i));
+            printf("\n");
+
+            return true;
+        }
+        lastpc = m.regPC();
+        //printf("%04x : %02x %02x %02x : %02x -- %d\n", lastpc, a, x, y, sr, m.cycles);
+        dp.ops++;
         return false;
     }
 
-    static constexpr int PC_AccessMode = Direct;
-    static constexpr int Read_AccessMode = Direct;
-    static constexpr int Write_AccessMode = Direct;
+    static inline bool doTrace = false;
 };
 
-static void Bench_sort(benchmark::State& state)
-{
 
+struct OpCountPolicy : DirectPolicy {
+    explicit OpCountPolicy(sixfive::Machine<OpCountPolicy>&m) {}
+    int ops = 0;
+
+    static constexpr bool eachOp(OpCountPolicy& p) {
+        p.ops++;
+        return false;
+    }
+    static constexpr void afterRun(OpCountPolicy& p) {
+        printf("Opcodes: %d\n",p.ops);
+    }
+};
+
+void FullTest()
+{
+    utils::File f{"6502test.bin"};
+    auto data = f.readAll();
+    // PC: 3B91 indicates successful test, so return
+    data[0x3b91] = 0x60;
+    sixfive::Machine<CheckPolicy> m;
+    m.write_ram(0, data.data(), data.size());
+    m.setPC(0x1000);
+    m.run();
+    printf("Opcodes: %d\n", m.policy().ops);
+}
+
+static void Bench_full(benchmark::State& state) {
+    utils::File f{"6502test.bin"};
+    auto data = f.readAll();
+    data[0x3b91] = 0x60;
+    sixfive::Machine<DirectPolicy> m;
+    while (state.KeepRunning()) {
+        m.write_ram(0, data.data(), data.size());
+        m.setPC(0x1000);
+        m.run();
+    }
+    // 30036805
+}
+BENCHMARK(Bench_full);
+
+template <typename Policy>
+static void Sort(benchmark::State& state)
+{
     static const uint8_t sortCode[] = {
         0xa0, 0x00, 0x84, 0x32, 0xb1, 0x30, 0xaa, 0xc8, 0xca, 0xb1,
         0x30, 0xc8, 0xd1, 0x30, 0x90, 0x10, 0xf0, 0x0e, 0x48, 0xb1,
@@ -49,25 +110,32 @@ static void Bench_sort(benchmark::State& state)
         220, 50, 30,  20,  67,  111, 109, 175, 4,   66, 100,
     };
 
-    sixfive::Machine<DirectPolicy> m;
-    for (int i = 0; i < (int)sizeof(data); i++)
+    sixfive::Machine<Policy> m;
+    for (int i = 0; i < std::ssize(data); i++)
         m.write_ram(0x2000 + i, data[i]);
-    for (int i = 0; i < (int)sizeof(sortCode); i++)
+    for (int i = 0; i < std::ssize(sortCode); i++)
         m.write_ram(0x1000 + i, sortCode[i]);
     m.write_ram(0x30, 0x00);
     m.write_ram(0x31, 0x20);
-    m.write_ram(0x2000, sizeof(data) - 1);
+    m.write_ram(0x2000, std::size(data) - 1);
     m.setPC(0x1000);
-    m.run(500000);
-    printf("Opcodes %d\n", m.policy().ops);
+    m.run();
     while (state.KeepRunning()) {
         for (int i = 1; i < (int)sizeof(data); i++)
             m.write_ram(0x2000 + i, data[i]);
         m.setPC(0x1000);
-        m.run(500000);
+        m.run();
     }
 }
+
+static void Bench_sort(benchmark::State& state) {
+    Sort<DirectPolicy>(state);
+}
 BENCHMARK(Bench_sort);
+static void Bench_sort2(benchmark::State& state) {
+    Sort<sixfive::DefaultPolicy>(state);
+}
+BENCHMARK(Bench_sort2);
 
 static void Bench_dayofweek(benchmark::State& state)
 {
@@ -84,7 +152,6 @@ static void Bench_dayofweek(benchmark::State& state)
         m.write_ram(0x1000 + i, WEEK[i]);
     m.setPC(0x1000);
     m.run(5000);
-    printf("Opcodes %d\n", m.policy().ops);
     while (state.KeepRunning()) {
         m.setPC(0x1000);
         m.run(5000);
@@ -95,22 +162,21 @@ BENCHMARK(Bench_dayofweek);
 
 static void Bench_allops(benchmark::State& state)
 {
-    sixfive::Machine<> m;
+    sixfive::Machine<DirectPolicy> m;
     m.setPC(0x1000);
     auto instr = m.getInstructions();
-    int total;
+    ssize_t total;
     while (state.KeepRunning()) {
         total = 0;
         m.setPC(0x1000);
         for (const auto& i : instr) {
-            total += i.opcodes.size();
+            total += std::ssize(i.opcodes);
             for (const auto& o : i.opcodes) {
                 o.op(m);
             }
         }
     }
-    printf("Opcodes %d\n", total);
+    //printf("Opcodes %zd\n", total);
 }
 BENCHMARK(Bench_allops);
 
-} // namespace sixfive

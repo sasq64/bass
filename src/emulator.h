@@ -7,9 +7,39 @@
 #include <tuple>
 #include <vector>
 
-#include "6502.h"
-
 namespace sixfive {
+
+enum class Mode : uint8_t
+{
+    NONE,
+    ACC,
+    IMM,
+    REL,
+    ZP,
+    ZPX,
+    ZPY,
+    INDX,
+    INDY,
+    INDZ,
+    IND,
+    ABS,
+    ABSX,
+    ABSY,
+    ZP_REL,
+    ADR, // Undecided ABS or ZP
+    ADRX, // Undecided ABS or ZP
+    ADRY, // Undecided ABS or ZP
+};
+
+enum class Reg
+{
+    A,
+    X,
+    Y,
+    SP,
+    SR,
+    PC
+};
 
 static constexpr inline int opSize(Mode am)
 {
@@ -53,6 +83,7 @@ struct DefaultPolicy
 
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
+    static constexpr void afterRun(DefaultPolicy&) {}
 };
 
 template <typename POLICY = DefaultPolicy>
@@ -226,13 +257,14 @@ struct Machine
     template <enum Reg REG>
     void set(unsigned v)
     {
-        Reg<REG>() = v;
+        if constexpr (REG == Reg::SR) { set_SR(v); }
+        else { Reg<REG>() = v; }
     }
 
     [[nodiscard]] Adr regPC() const { return pc; }
     void setPC(uint16_t const& p) { pc = p; }
 
-    uint32_t run(uint32_t toCycles = 0x01000000)
+    uint32_t run(uint32_t toCycles = 0x010000000)
     {
         auto& p = policy();
         cycles = 0;
@@ -246,6 +278,7 @@ struct Machine
             op.op(*this);
             cycles += op.cycles;
         }
+        POLICY::afterRun(p);
         if (realCycles != 0) {
             cycles = realCycles;
             realCycles = 0;
@@ -255,8 +288,10 @@ struct Machine
         return cycles;
     }
 
-    auto regs() const { return std::make_tuple(a, x, y, sr, sp, pc); }
-    auto regs() { return std::tie(a, x, y, sr, sp, pc); }
+    auto regs() const { return std::make_tuple(a, x, y, get_SR(), sp, pc); }
+    //auto regs() { return std::tie(a, x, y, get_SR(), sp, pc); }
+
+    uint32_t cycles = 0;
 
 private:
     // The 6502 registers
@@ -274,7 +309,6 @@ private:
 
     uint8_t sp{0xff};
 
-    uint32_t cycles = 0;
     uint32_t realCycles = 0;
 
     // Current jumptable
@@ -314,12 +348,12 @@ private:
     }
 
     template <enum Reg REG>
-    constexpr auto& Reg() const
+    constexpr auto Reg() const
     {
         if constexpr (REG == Reg::A) return a;
         if constexpr (REG == Reg::X) return x;
         if constexpr (REG == Reg::Y) return y;
-        if constexpr (REG == Reg::SR) return sr;
+        if constexpr (REG == Reg::SR) return get_SR();
         if constexpr (REG == Reg::SP) return sp;
         if constexpr (REG == Reg::PC) return pc;
     }
@@ -330,7 +364,7 @@ private:
         if constexpr (REG == Reg::A) return a;
         if constexpr (REG == Reg::X) return x;
         if constexpr (REG == Reg::Y) return y;
-        if constexpr (REG == Reg::SR) return sr;
+        if constexpr (REG == Reg::SR) return get_SR();
         if constexpr (REG == Reg::SP) return sp;
         if constexpr (REG == Reg::PC) return pc;
     }
@@ -370,7 +404,7 @@ private:
 
     [[nodiscard]] uint8_t get_SR() const
     {
-        return sr | ((result | (result >> 2)) & 0x80) | (result == 0 ? 2 : 0);
+        return sr | ((result | (result >> 2)) & 0x80) | ((result & 0xff) == 0 ? 2 : 0);
     }
 
     template <bool DEC>
@@ -409,10 +443,10 @@ private:
     static constexpr bool SET = true;
     static constexpr bool CLEAR = false;
 
-    constexpr unsigned carry() const { return sr & 1; }
+    [[nodiscard]] constexpr unsigned carry() const { return sr & 1; }
 
     template <int FLAG, bool v>
-    constexpr bool check() const
+    [[nodiscard]] constexpr bool check() const
     {
         if constexpr (FLAG == ZERO) return ((result & 0xff) != 0) == !v;
         if constexpr (FLAG == SIGN)
@@ -439,7 +473,7 @@ private:
     }
 
     template <int ACCESS_MODE = POLICY::Read_AccessMode>
-    unsigned Read(unsigned adr) const
+    [[nodiscard]] unsigned Read(unsigned adr) const
     {
         if constexpr (ACCESS_MODE == Direct)
             return ram[adr];
@@ -476,7 +510,7 @@ private:
         return adr + offs;
     }
 
-    unsigned Read16(unsigned adr, unsigned offs = 0) const
+    [[nodiscard]] unsigned Read16(unsigned adr, unsigned offs = 0) const
     {
         return to_adr(Read(adr), Read(adr + 1)) + offs;
     }
