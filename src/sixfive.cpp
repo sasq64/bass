@@ -4,8 +4,8 @@ void FullTest();
 
 int main()
 {
-    //FullTest();
-    ::benchmark::RunSpecifiedBenchmarks();
-    ::benchmark::Shutdown();
+    FullTest();
+    //::benchmark::RunSpecifiedBenchmarks();
+    //::benchmark::Shutdown();
     return 0;
 }

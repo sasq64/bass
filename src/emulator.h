@@ -6,6 +6,7 @@
 #include <cstring>
 #include <limits>
 #include <tuple>
+#include <type_traits>
 #include <vector>
 
 namespace sixfive {
@@ -63,6 +64,9 @@ struct DefaultPolicy
 {
     DefaultPolicy() = default;
     explicit DefaultPolicy(Machine<DefaultPolicy>&) {}
+
+
+    static constexpr bool UseSwitch = true;
 
     static constexpr bool ExitOnStackWrap = true;
 
@@ -279,6 +283,7 @@ struct Machine
             op.op(*this);
             cycles += op.cycles;
         }
+
         POLICY::afterRun(p);
         if (realCycles != 0) {
             cycles = realCycles;
@@ -407,10 +412,13 @@ private:
     {
         return sr | ((result | (result >> 2)) & 0x80) | ((result & 0xff) == 0 ? 2 : 0);
     }
+    
+    bool decMode = false;
 
     template <bool DEC>
     void setDec()
     {
+        decMode = DEC;
         if constexpr (DEC)
             jumpTable = jumpTable_bcd.data();
         else
@@ -1157,8 +1165,6 @@ private:
                     }
                 } }
             } },
-
-
         };
 
         auto mergeInstructions = [&](std::vector<Instruction> const& vec) {
@@ -1311,6 +1317,687 @@ public:
         static std::vector<Instruction> const instructionTable2 =
             makeInstructionTable<USE_BCD>(false);
         return cpu65c02 ? instructionTable : instructionTable2;
+    }
+    
+    int32_t run2(int32_t toCycles = 0x10000000)
+    {
+        auto& p = policy();
+        cycles = 0;
+        // We sometimes set 'cycles' high to break out of emulation,
+        // in that case 'realCycles' will contain the real value
+        realCycles = 0;
+        while (cycles < toCycles) {
+            if (POLICY::eachOp(p)) break;
+            auto code = ReadPC();
+            switch (code) {
+            case 0xea:
+                cycles += 2;
+                break;
+            case 0xa9:
+                Load<Reg::A, Mode::IMM>(*this);
+                cycles += 2;
+                break;
+            case 0xa5:
+                Load<Reg::A, Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0xb5:
+                Load<Reg::A, Mode::ZPX>(*this);
+                cycles += 4;
+                break;
+            case 0xad:
+                Load<Reg::A, Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0xbd:
+                Load<Reg::A, Mode::ABSX>(*this);
+                cycles += 4;
+                break;
+            case 0xb9:
+                Load<Reg::A, Mode::ABSY>(*this);
+                cycles += 4;
+                break;
+            case 0xa1:
+                Load<Reg::A, Mode::INDX>(*this);
+                cycles += 6;
+                break;
+            case 0xb1:
+                Load<Reg::A, Mode::INDY>(*this);
+                cycles += 5;
+                break;
+            case 0xa2:
+                Load<Reg::X, Mode::IMM>(*this);
+                cycles += 2;
+                break;
+            case 0xa6:
+                Load<Reg::X, Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0xb6:
+                Load<Reg::X, Mode::ZPY>(*this);
+                cycles += 4;
+                break;
+            case 0xae:
+                Load<Reg::X, Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0xbe:
+                Load<Reg::X, Mode::ABSY>(*this);
+                cycles += 4;
+                break;
+            case 0xa0:
+                Load<Reg::Y, Mode::IMM>(*this);
+                cycles += 2;
+                break;
+            case 0xa4:
+                Load<Reg::Y, Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0xb4:
+                Load<Reg::Y, Mode::ZPX>(*this);
+                cycles += 4;
+                break;
+            case 0xac:
+                Load<Reg::Y, Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0xbc:
+                Load<Reg::Y, Mode::ABSX>(*this);
+                cycles += 4;
+                break;
+            case 0x85:
+                Store<Reg::A, Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0x95:
+                Store<Reg::A, Mode::ZPX>(*this);
+                cycles += 4;
+                break;
+            case 0x8d:
+                Store<Reg::A, Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0x9d:
+                Store<Reg::A, Mode::ABSX>(*this);
+                cycles += 5;
+                break;
+            case 0x99:
+                Store<Reg::A, Mode::ABSY>(*this);
+                cycles += 5;
+                break;
+            case 0x81:
+                Store<Reg::A, Mode::INDX>(*this);
+                cycles += 6;
+                break;
+            case 0x91:
+                Store<Reg::A, Mode::INDY>(*this);
+                cycles += 6;
+                break;
+            case 0x86:
+                Store<Reg::X, Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0x96:
+                Store<Reg::X, Mode::ZPY>(*this);
+                cycles += 4;
+                break;
+            case 0x8e:
+                Store<Reg::X, Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0x84:
+                Store<Reg::Y, Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0x94:
+                Store<Reg::Y, Mode::ZPX>(*this);
+                cycles += 4;
+                break;
+            case 0x8c:
+                Store<Reg::Y, Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0xc6:
+                Inc<Mode::ZP, -1>(*this);
+                cycles += 5;
+                break;
+            case 0xd6:
+                Inc<Mode::ZPX, -1>(*this);
+                cycles += 6;
+                break;
+            case 0xce:
+                Inc<Mode::ABS, -1>(*this);
+                cycles += 6;
+                break;
+            case 0xde:
+                Inc<Mode::ABSX, -1>(*this);
+                cycles += 7;
+                break;
+            case 0xe6:
+                Inc<Mode::ZP, 1>(*this);
+                cycles += 5;
+                break;
+            case 0xf6:
+                Inc<Mode::ZPX, 1>(*this);
+                cycles += 6;
+                break;
+            case 0xee:
+                Inc<Mode::ABS, 1>(*this);
+                cycles += 6;
+                break;
+            case 0xfe:
+                Inc<Mode::ABSX, 1>(*this);
+                cycles += 7;
+                break;
+            case 0xaa:
+                Transfer<Reg::A, Reg::X>(*this);
+                cycles += 2;
+                break;
+            case 0x8a:
+                Transfer<Reg::X, Reg::A>(*this);
+                cycles += 2;
+                break;
+            case 0xa8:
+                Transfer<Reg::A, Reg::Y>(*this);
+                cycles += 2;
+                break;
+            case 0x98:
+                Transfer<Reg::Y, Reg::A>(*this);
+                cycles += 2;
+                break;
+            case 0x9a:
+                Transfer<Reg::X, Reg::SP>(*this);
+                cycles += 2;
+                break;
+            case 0xba:
+                Transfer<Reg::SP, Reg::X>(*this);
+                cycles += 2;
+                break;
+            case 0xca:
+                Inc<Reg::X, -1>(*this);
+                cycles += 2;
+                break;
+            case 0xe8:
+                Inc<Reg::X, 1>(*this);
+                cycles += 2;
+                break;
+            case 0x88:
+                Inc<Reg::Y, -1>(*this);
+                cycles += 2;
+                break;
+            case 0xc8:
+                Inc<Reg::Y, 1>(*this);
+                cycles += 2;
+                break;
+
+            case 0x48:
+                stack[sp--] = a;
+                cycles += 3;
+                break;
+
+            case 0x68:
+                a = stack[++sp];
+                cycles += 4;
+                break;
+
+            case 0x08:
+                stack[sp--] = get_SR();
+                cycles += 3;
+                break;
+
+            case 0x28:
+                set_SR(stack[++sp]);
+                cycles += 4;
+                break;
+
+            case 0x90:
+                Branch<CARRY, CLEAR>(*this);
+                cycles += 2;
+                break;
+            case 0xb0:
+                Branch<CARRY, SET>(*this);
+                cycles += 2;
+                break;
+            case 0xd0:
+                Branch<ZERO, CLEAR>(*this);
+                cycles += 2;
+                break;
+            case 0xf0:
+                Branch<ZERO, SET>(*this);
+                cycles += 2;
+                break;
+            case 0x10:
+                Branch<SIGN, CLEAR>(*this);
+                cycles += 2;
+                break;
+            case 0x30:
+                Branch<SIGN, SET>(*this);
+                cycles += 2;
+                break;
+            case 0x50:
+                Branch<OVER, CLEAR>(*this);
+                cycles += 2;
+                break;
+            case 0x70:
+                Branch<OVER, SET>(*this);
+                cycles += 2;
+                break;
+            case 0x69:
+                decMode ? Adc<Mode::IMM, true>(*this) : Adc<Mode::IMM, false>(*this) ;
+                cycles += 2;
+                break;
+            case 0x65:
+                decMode ? Adc<Mode::ZP, true>(*this) : Adc<Mode::ZP, false>(*this) ;
+                cycles += 3;
+                break;
+            case 0x75:
+                decMode ? Adc<Mode::ZPX, true>(*this) : Adc<Mode::ZPX, false>(*this) ;
+                cycles += 4;
+                break;
+            case 0x6d:
+                decMode ? Adc<Mode::ABS, true>(*this) : Adc<Mode::ABS, false>(*this) ;
+                cycles += 4;
+                break;
+            case 0x7d:
+                decMode ? Adc<Mode::ABSX, true>(*this) : Adc<Mode::ABSX, false>(*this) ;
+                cycles += 4;
+                break;
+            case 0x79:
+                decMode ? Adc<Mode::ABSY, true>(*this) : Adc<Mode::ABSY, false>(*this) ;
+                cycles += 4;
+                break;
+            case 0x61:
+                decMode ? Adc<Mode::INDX, true>(*this) : Adc<Mode::INDX, false>(*this) ;
+                cycles += 6;
+                break;
+            case 0x71:
+                decMode ? Adc<Mode::INDY, true>(*this) : Adc<Mode::INDY, false>(*this) ;
+                cycles += 5;
+                break;
+            case 0x72:
+                decMode ? Adc<Mode::INDZ, true>(*this) : Adc<Mode::INDZ, false>(*this) ;
+                cycles += 5;
+                break;
+
+            case 0xe9:
+                decMode ? Sbc<Mode::IMM, true>(*this) : Sbc<Mode::IMM, false>(*this) ;
+                cycles += 2;
+                break;
+            case 0xe5:
+                decMode ? Sbc<Mode::ZP, true>(*this) : Sbc<Mode::ZP, false>(*this) ;
+                cycles += 3;
+                break;
+            case 0xf5:
+                decMode ? Sbc<Mode::ZPX, true>(*this) : Sbc<Mode::ZPX, false>(*this) ;
+                cycles += 4;
+                break;
+            case 0xed:
+                decMode ? Sbc<Mode::ABS, true>(*this) : Sbc<Mode::ABS, false>(*this) ;
+                cycles += 4;
+                break;
+            case 0xfd:
+                decMode ? Sbc<Mode::ABSX, true>(*this) : Sbc<Mode::ABSX, false>(*this) ;
+                cycles += 4;
+                break;
+            case 0xf9:
+                decMode ? Sbc<Mode::ABSY, true>(*this) : Sbc<Mode::ABSY, false>(*this) ;
+                cycles += 4;
+                break;
+            case 0xe1:
+                decMode ? Sbc<Mode::INDX, true>(*this) : Sbc<Mode::INDX, false>(*this) ;
+                cycles += 6;
+                break;
+            case 0xf1:
+                decMode ? Sbc<Mode::INDY, true>(*this) : Sbc<Mode::INDY, false>(*this) ;
+                cycles += 5;
+                break;
+
+            case 0xc9:
+                Cmp<Reg::A, Mode::IMM>(*this);
+                cycles += 2;
+                break;
+            case 0xc5:
+                Cmp<Reg::A, Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0xd5:
+                Cmp<Reg::A, Mode::ZPX>(*this);
+                cycles += 4;
+                break;
+            case 0xcd:
+                Cmp<Reg::A, Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0xdd:
+                Cmp<Reg::A, Mode::ABSX>(*this);
+                cycles += 4;
+                break;
+            case 0xd9:
+                Cmp<Reg::A, Mode::ABSY>(*this);
+                cycles += 4;
+                break;
+            case 0xc1:
+                Cmp<Reg::A, Mode::INDX>(*this);
+                cycles += 6;
+                break;
+            case 0xd1:
+                Cmp<Reg::A, Mode::INDY>(*this);
+                cycles += 5;
+                break;
+            case 0xe0:
+                Cmp<Reg::X, Mode::IMM>(*this);
+                cycles += 2;
+                break;
+            case 0xe4:
+                Cmp<Reg::X, Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0xec:
+                Cmp<Reg::X, Mode::ABS>(*this);
+                cycles += 4;
+                break;
+
+            case 0xc0:
+                Cmp<Reg::Y, Mode::IMM>(*this);
+                cycles += 2;
+                break;
+            case 0xc4:
+                Cmp<Reg::Y, Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0xcc:
+                Cmp<Reg::Y, Mode::ABS>(*this);
+                cycles += 4;
+                break;
+
+            case 0x29:
+                And<Mode::IMM>(*this);
+                cycles += 2;
+                break;
+            case 0x25:
+                And<Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0x35:
+                And<Mode::ZPX>(*this);
+                cycles += 4;
+                break;
+            case 0x2d:
+                And<Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0x3d:
+                And<Mode::ABSX>(*this);
+                cycles += 4;
+                break;
+            case 0x39:
+                And<Mode::ABSY>(*this);
+                cycles += 4;
+                break;
+            case 0x21:
+                And<Mode::INDX>(*this);
+                cycles += 6;
+                break;
+            case 0x31:
+                And<Mode::INDY>(*this);
+                cycles += 5;
+                break;
+
+            case 0x49:
+                Eor<Mode::IMM>(*this);
+                cycles += 2;
+                break;
+            case 0x45:
+                Eor<Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0x55:
+                Eor<Mode::ZPX>(*this);
+                cycles += 4;
+                break;
+            case 0x4d:
+                Eor<Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0x5d:
+                Eor<Mode::ABSX>(*this);
+                cycles += 4;
+                break;
+            case 0x59:
+                Eor<Mode::ABSY>(*this);
+                cycles += 4;
+                break;
+            case 0x41:
+                Eor<Mode::INDX>(*this);
+                cycles += 6;
+                break;
+            case 0x51:
+                Eor<Mode::INDY>(*this);
+                cycles += 5;
+                break;
+
+            case 0x09:
+                Ora<Mode::IMM>(*this);
+                cycles += 2;
+                break;
+            case 0x05:
+                Ora<Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0x15:
+                Ora<Mode::ZPX>(*this);
+                cycles += 4;
+                break;
+            case 0x0d:
+                Ora<Mode::ABS>(*this);
+                cycles += 4;
+                break;
+            case 0x1d:
+                Ora<Mode::ABSX>(*this);
+                cycles += 4;
+                break;
+            case 0x19:
+                Ora<Mode::ABSY>(*this);
+                cycles += 4;
+                break;
+            case 0x01:
+                Ora<Mode::INDX>(*this);
+                cycles += 6;
+                break;
+            case 0x11:
+                Ora<Mode::INDY>(*this);
+                cycles += 5;
+                break;
+
+            case 0x38:
+                Set<CARRY, true>(*this);
+                cycles += 2;
+                break;
+            case 0x18:
+                Set<CARRY, false>(*this);
+                cycles += 2;
+                break;
+            case 0x78:
+                Set<IRQ, true>(*this);
+                cycles += 2;
+                break;
+            case 0x58:
+                Set<IRQ, false>(*this);
+                cycles += 2;
+                break;
+            case 0xf8:
+                Set<DECIMAL, true>(*this);
+                cycles += 2;
+                break;
+            case 0xd8:
+                Set<DECIMAL, false>(*this);
+                cycles += 2;
+                break;
+            case 0xb8:
+                Set<OVER, false>(*this);
+                cycles += 2;
+                break;
+
+            case 0x4a:
+                Lsr<Mode::ACC>(*this);
+                cycles += 2;
+                break;
+            case 0x46:
+                Lsr<Mode::ZP>(*this);
+                cycles += 5;
+                break;
+            case 0x56:
+                Lsr<Mode::ZPX>(*this);
+                cycles += 6;
+                break;
+            case 0x4e:
+                Lsr<Mode::ABS>(*this);
+                cycles += 6;
+                break;
+            case 0x5e:
+                Lsr<Mode::ABSX>(*this);
+                cycles += 7;
+                break;
+
+            case 0x0a:
+                Asl<Mode::ACC>(*this);
+                cycles += 2;
+                break;
+            case 0x06:
+                Asl<Mode::ZP>(*this);
+                cycles += 5;
+                break;
+            case 0x16:
+                Asl<Mode::ZPX>(*this);
+                cycles += 6;
+                break;
+            case 0x0e:
+                Asl<Mode::ABS>(*this);
+                cycles += 6;
+                break;
+            case 0x1e:
+                Asl<Mode::ABSX>(*this);
+                cycles += 7;
+                break;
+
+            case 0x6a:
+                Ror<Mode::ACC>(*this);
+                cycles += 2;
+                break;
+            case 0x66:
+                Ror<Mode::ZP>(*this);
+                cycles += 5;
+                break;
+            case 0x76:
+                Ror<Mode::ZPX>(*this);
+                cycles += 6;
+                break;
+            case 0x6e:
+                Ror<Mode::ABS>(*this);
+                cycles += 6;
+                break;
+            case 0x7e:
+                Ror<Mode::ABSX>(*this);
+                cycles += 7;
+                break;
+
+            case 0x2a:
+                Rol<Mode::ACC>(*this);
+                cycles += 2;
+                break;
+            case 0x26:
+                Rol<Mode::ZP>(*this);
+                cycles += 5;
+                break;
+            case 0x36:
+                Rol<Mode::ZPX>(*this);
+                cycles += 6;
+                break;
+            case 0x2e:
+                Rol<Mode::ABS>(*this);
+                cycles += 6;
+                break;
+            case 0x3e:
+                Rol<Mode::ABSX>(*this);
+                cycles += 7;
+                break;
+
+            case 0x24:
+                Bit<Mode::ZP>(*this);
+                cycles += 3;
+                break;
+            case 0x2c:
+                Bit<Mode::ABS>(*this);
+                cycles += 4;
+                break;
+
+            case 0x40:
+                set_SR(stack[sp + 1]);
+                pc = (stack[sp + 2] | (stack[sp + 3] << 8));
+                sp += 3;
+                cycles += 6;
+                break;
+            case 0x00: {
+                auto n = ReadPC();
+                if (POLICY::breakFn(policy(), n)) {
+                    realCycles = cycles;
+                    cycles = std::numeric_limits<decltype(cycles)>::max() - 32;
+                    break;
+                }
+                stack[sp] = pc >> 8;
+                stack[sp - 1] = pc & 0xff;
+                stack[sp - 2] = get_SR();
+                sp -= 3;
+                pc = Read16(to_adr(0xfe, 0xff));
+                cycles += 7;
+                break;
+            }
+            case 0x60:
+                if constexpr (POLICY::ExitOnStackWrap) {
+                    if (sp == 0xff) {
+                        realCycles = cycles;
+                        cycles =
+                            std::numeric_limits<decltype(cycles)>::max() - 32;
+                        break;
+                    }
+                }
+                pc = (stack[sp + 1] | (stack[sp + 2] << 8)) + 1;
+                sp += 2;
+                cycles += 6;
+                break;
+            case 0x4c:
+                pc = ReadPC16();
+                cycles += 3;
+                break;
+            case 0x6c:
+                pc = Read16(ReadPC16());
+                cycles += 5;
+                break;
+            case 0x20:
+                stack[sp] = (pc + 1) >> 8;
+                stack[sp - 1] = (pc + 1) & 0xff;
+                sp -= 2;
+                pc = ReadPC16();
+                if ((pc & POLICY::jsrMask) != 0) {
+                    if (POLICY::jsrFn(policy(), pc)) {
+                        // jsr was overriden
+                        pc = (stack[sp + 1] | (stack[sp + 2] << 8)) + 1;
+                        sp += 2;
+                    }
+                }
+                cycles += 6;
+                break;
+            default:
+                printf("ILLEGAL OPCODE %x at %04x\n", code, pc);
+                break;
+            }
+        }
+        POLICY::afterRun(p);
+        if (realCycles != 0) {
+            cycles = realCycles;
+            realCycles = 0;
+        }
+        return cycles;
     }
 };
 } // namespace sixfive

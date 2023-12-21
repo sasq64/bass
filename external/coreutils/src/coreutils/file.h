@@ -99,7 +99,7 @@ public:
     {
         T t;
         if (fread(&t, 1, sizeof(T), fp) != sizeof(T)) {
-            throw io_exception("Could not read object");
+            //throw io_exception("Could not read object");
         }
         return t;
     }
@@ -123,7 +123,7 @@ public:
         std::string target;
         target.resize(sz);
         if (fread(&target[0], 1, sz, fp) != sz) {
-            throw io_exception("Could not read file");
+            //throw io_exception("Could not read file");
         }
         return target;
     }
@@ -152,7 +152,7 @@ public:
                 if (eof()) {
                     break;
                 }
-                throw io_exception("readLine() failed");
+                //throw io_exception("readLine() failed");
             }
             // We read something. Strip LF if found
             size_t len = strlen(ptr);
@@ -202,7 +202,7 @@ public:
         if (!data.empty()) {
             auto rc = read(&data[0], data.size());
             if (rc != data.size()) {
-                throw io_exception("ReadAll failed");
+                //throw io_exception("ReadAll failed");
             }
         }
         return data;
@@ -227,7 +227,7 @@ public:
     template <typename T> void write(const T& t) const
     {
         if (fwrite(&t, 1, sizeof(T), fp) != sizeof(T)) {
-            throw io_exception("Could not write object");
+            //throw io_exception("Could not write object");
         }
     }
 
@@ -273,7 +273,7 @@ public:
     void openAndThrow(const char* name, Mode mode)
     {
         if (!open(name, mode)) {
-            throw io_exception(std::string("Could not open ") + name);
+            //throw io_exception(std::string("Could not open ") + name);
         }
     }
 

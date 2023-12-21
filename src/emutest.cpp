@@ -3,6 +3,7 @@
 #include <benchmark/benchmark.h>
 
 #include <cstdio>
+#include <chrono>
 #include <vector>
 
 struct Result
@@ -22,7 +23,7 @@ struct DirectPolicy : sixfive::DefaultPolicy {
     static constexpr int Write_AccessMode = sixfive::Direct;
 };
 
-struct CheckPolicy : public sixfive::DefaultPolicy {
+struct CheckPolicy : public DirectPolicy {
 
     sixfive::Machine<CheckPolicy>& machine;
 
@@ -66,32 +67,70 @@ struct OpCountPolicy : DirectPolicy {
     }
 };
 
+template <typename Policy> uint32_t
+RunTest(sixfive::Machine<Policy>& m, std::vector<uint8_t> const& data, int count)
+{
+    uint32_t cycles;
+    for (int i=0; i< count; i++) {
+        m.write_ram(0, data.data(), data.size());
+        m.setPC(0x1000);
+        cycles = m.run2();
+    }
+    return cycles;
+}
+
 void FullTest()
 {
     utils::File f{"6502test.bin"};
     auto data = f.readAll();
     // PC: 3B91 indicates successful test, so return
     data[0x3b91] = 0x60;
-    sixfive::Machine<CheckPolicy> m;
-    m.write_ram(0, data.data(), data.size());
-    m.setPC(0x1000);
-    m.run();
-    printf("Opcodes: %d\n", m.policy().ops);
+
+    printf("Running full test\n");
+    sixfive::Machine<CheckPolicy> m0;
+    auto cycles = RunTest(m0, data, 1);
+
+    auto opcodes = m0.policy().ops;
+    printf("Opcodes: %d\n", opcodes);
+    printf("Cycles: %d\n", cycles);
+
+    sixfive::Machine<DirectPolicy> m1;
+
+    auto start = std::chrono::system_clock::now();
+    cycles = RunTest(m1, data, 10);
+    auto stop = std::chrono::system_clock::now();
+
+    auto d = (stop - start);
+    auto us =
+        std::chrono::duration_cast<std::chrono::microseconds>(d).count();
+
+    double no = us * 100.0 / opcodes;
+
+    double nc = us * 100.0 / cycles; // time for one cycle
+
+    auto total = (int)(1'000'000'000 / no);
+    auto mhz = 1000.0 / nc;
+    printf("Total %lld us\n%f ns per opcode\n%d opcodes per sec\n%f MHz", us/10, no, total, mhz);
 }
 
-static void Bench_full(benchmark::State& state) {
-    utils::File f{"6502test.bin"};
-    auto data = f.readAll();
-    data[0x3b91] = 0x60;
-    sixfive::Machine<DirectPolicy> m;
-    while (state.KeepRunning()) {
-        m.write_ram(0, data.data(), data.size());
-        m.setPC(0x1000);
-        m.run();
-    }
-    // 30036805
-}
-BENCHMARK(Bench_full);
+
+
+
+
+
+//static void Bench_full(benchmark::State& state) {
+//    utils::File f{"6502test.bin"};
+//    auto data = f.readAll();
+//    data[0x3b91] = 0x60;
+//    sixfive::Machine<DirectPolicy> m;
+//    while (state.KeepRunning()) {
+//        m.write_ram(0, data.data(), data.size());
+//        m.setPC(0x1000);
+//        m.run();
+//    }
+//    // 30036805
+//}
+//BENCHMARK(Bench_full);
 
 template <typename Policy>
 static void Sort(benchmark::State& state)
