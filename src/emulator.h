@@ -145,12 +145,15 @@ struct Machine
             wcallbacks.at(i) = &write_bank;
             wcbdata.at(i) = this;
         }
-        set_cpu(false);
-        jumpTable = jumpTable_normal.data();
+        if constexpr (!POLICY::UseSwitch) {
+            jumpTable = jumpTable_normal.data();
+            set_cpu(false);
+        }
     }
 
     void set_cpu(bool cpu6502)
     {
+        static_assert(!POLICY::UseSwitch, "Can't set cpu when using switch/case version");
 
         for (int i = 0; i < 256; i++) {
             jumpTable_normal[i] = illegal_opcode;
@@ -271,33 +274,34 @@ struct Machine
 
     uint32_t run(uint32_t toCycles = 0x010000000)
     {
-        auto& p = policy();
-        cycles = 0;
-        // We sometimes set 'cycles' high to break out of emulation,
-        // in that case 'realCycles' will contain the real value
-        realCycles = 0;
-        while (cycles < toCycles) {
-            if (POLICY::eachOp(p)) break;
-            auto code = ReadPC();
-            auto& op = jumpTable[code];
-            op.op(*this);
-            cycles += op.cycles;
+        if constexpr (POLICY::UseSwitch) {
+            return run_switch_case(toCycles);
         }
-
-        POLICY::afterRun(p);
-        if (realCycles != 0) {
-            cycles = realCycles;
-            realCycles = 0;
-        } // else
-          //   return 0;
-
-        return cycles;
+        return run_jumptable(toCycles);
     }
 
     auto regs() const { return std::make_tuple(a, x, y, get_SR(), sp, pc); }
     //auto regs() { return std::tie(a, x, y, get_SR(), sp, pc); }
 
     uint32_t cycles = 0;
+
+    template <bool USE_BCD = false>
+    static auto const& getInstructions()
+    {
+        static std::vector<Instruction> const instructionTable =
+            makeInstructionTable<USE_BCD>();
+        return instructionTable;
+    }
+
+    template <bool USE_BCD = false>
+    static auto const& getInstructions(bool cpu65c02)
+    {
+        static std::vector<Instruction> const instructionTable =
+            makeInstructionTable<USE_BCD>(true);
+        static std::vector<Instruction> const instructionTable2 =
+            makeInstructionTable<USE_BCD>(false);
+        return cpu65c02 ? instructionTable : instructionTable2;
+    }
 
 private:
     // The 6502 registers
@@ -418,11 +422,14 @@ private:
     template <bool DEC>
     void setDec()
     {
-        decMode = DEC;
-        if constexpr (DEC)
-            jumpTable = jumpTable_bcd.data();
-        else
-            jumpTable = jumpTable_normal.data();
+        if constexpr (POLICY::UseSwitch) {
+            decMode = DEC;
+        } else {
+            if constexpr (DEC)
+                jumpTable = jumpTable_bcd.data();
+            else
+                jumpTable = jumpTable_normal.data();
+        }
     }
 
     void set_SR(uint8_t s)
@@ -1267,8 +1274,6 @@ private:
                      {0xbf, 4, Mode::ABSY, Lax<Mode::ABSY>},
                      {0xa3, 6, Mode::INDX, Lax<Mode::INDX>},
                      {0xb3, 5, Mode::INDY, Lax<Mode::INDY>},
-                     // NOTE: Emulate as unstable ?
-                     {0xab, 2, Mode::IMM, Lax<Mode::IMM>},
                  }},
 
                 {"sax",
@@ -1281,6 +1286,7 @@ private:
                 {"lxa",
                  {{0xab, 2, Mode::IMM,
                    [](Machine& m) {
+                       // NOTE: Emulate as unstable ?
                        m.a &= m.LoadEA<Mode::IMM>();
                        m.x = m.a;
                    }}}},
@@ -1300,26 +1306,32 @@ private:
         return instructionTable;
     }
 
-public:
-    template <bool USE_BCD = false>
-    static auto const& getInstructions()
+    uint32_t run_jumptable(uint32_t toCycles = 0x010000000)
     {
-        static std::vector<Instruction> const instructionTable =
-            makeInstructionTable<USE_BCD>();
-        return instructionTable;
+        auto& p = policy();
+        cycles = 0;
+        // We sometimes set 'cycles' high to break out of emulation,
+        // in that case 'realCycles' will contain the real value
+        realCycles = 0;
+        while (cycles < toCycles) {
+            if (POLICY::eachOp(p)) break;
+            auto code = ReadPC();
+            auto& op = jumpTable[code];
+            op.op(*this);
+            cycles += op.cycles;
+        }
+
+        POLICY::afterRun(p);
+        if (realCycles != 0) {
+            cycles = realCycles;
+            realCycles = 0;
+        } // else
+        //   return 0;
+
+        return cycles;
     }
 
-    template <bool USE_BCD = false>
-    static auto const& getInstructions(bool cpu65c02)
-    {
-        static std::vector<Instruction> const instructionTable =
-            makeInstructionTable<USE_BCD>(true);
-        static std::vector<Instruction> const instructionTable2 =
-            makeInstructionTable<USE_BCD>(false);
-        return cpu65c02 ? instructionTable : instructionTable2;
-    }
-    
-    int32_t run2(int32_t toCycles = 0x10000000)
+    int32_t run_switch_case(int32_t toCycles = 0x10000000)
     {
         auto& p = policy();
         cycles = 0;
@@ -1987,6 +1999,26 @@ public:
                 }
                 cycles += 6;
                 break;
+            // Illegal opcodes
+            case 0xa7: Lax<Mode::ZP>(*this); cycles += 3; break;
+            case 0xb7: Lax<Mode::ZPY>(*this); cycles += 4; break;
+            case 0xaf: Lax<Mode::ABS>(*this); cycles += 4; break;
+            case 0xbf: Lax<Mode::ABSY>(*this); cycles += 4; break;
+            case 0xa3: Lax<Mode::INDX>(*this); cycles += 6; break;
+            case 0xb3: Lax<Mode::INDY>(*this); cycles += 5; break;
+            case 0x87: Sax<Mode::ZP>(*this); cycles += 3; break;
+            case 0x97: Sax<Mode::ZPY>(*this); cycles += 4; break;
+            case 0x8f: Sax<Mode::ABS>(*this); cycles += 4; break;
+            case 0x83: Sax<Mode::INDX>(*this); cycles += 6; break;
+            case 0xab:
+                  // NOTE: Emulate as unstable ?
+                  a &= LoadEA<Mode::IMM>();
+                  x = a;
+                  cycles += 2;
+                  break;
+            case 0xe2: LoadEA<Mode::IMM>(); cycles += 2; break;
+            case 0x04: LoadEA<Mode::ZP>(); cycles += 2; break;
+            case 0x0c: LoadEA<Mode::ABS>(); cycles += 2; break;
             default:
                 printf("ILLEGAL OPCODE %x at %04x\n", code, pc);
                 break;

@@ -74,7 +74,7 @@ RunTest(sixfive::Machine<Policy>& m, std::vector<uint8_t> const& data, int count
     for (int i=0; i< count; i++) {
         m.write_ram(0, data.data(), data.size());
         m.setPC(0x1000);
-        cycles = m.run2();
+        cycles = m.run();
     }
     return cycles;
 }

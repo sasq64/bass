@@ -24,6 +24,8 @@ struct EmuPolicy : public sixfive::DefaultPolicy
 {
     explicit EmuPolicy(sixfive::Machine<EmuPolicy>& m) : machine(&m) {}
 
+    static constexpr bool UseSwitch = false;
+
     static constexpr bool ExitOnStackWrap = true;
 
     // PC accesses does not normally need to work in IO areas
