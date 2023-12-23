@@ -66,8 +66,11 @@ struct DefaultPolicy
     explicit DefaultPolicy(Machine<DefaultPolicy>&) {}
 
 
+    // Use switch/case statement instead of jump table. Quite a bit faster but
+    // limits the emulation to a fixed opcode setup (6502 + illegals).
     static constexpr bool UseSwitch = true;
 
+    // Return from run() if "rts" is executed when there is nothing on the stack
     static constexpr bool ExitOnStackWrap = true;
 
     // PC accesses does not normally need to work in IO areas
@@ -89,6 +92,8 @@ struct DefaultPolicy
     // This function is run after each opcode. Return true to stop emulation.
     static constexpr bool eachOp(DefaultPolicy&) { return false; }
     static constexpr void afterRun(DefaultPolicy&) {}
+
+    static constexpr void ioWrite(DefaultPolicy&, uint8_t v) {}
 };
 
 template <typename POLICY = DefaultPolicy>
@@ -283,8 +288,6 @@ struct Machine
     auto regs() const { return std::make_tuple(a, x, y, get_SR(), sp, pc); }
     //auto regs() { return std::tie(a, x, y, get_SR(), sp, pc); }
 
-    uint32_t cycles = 0;
-
     template <bool USE_BCD = false>
     static auto const& getInstructions()
     {
@@ -319,6 +322,7 @@ private:
 
     uint8_t sp{0xff};
 
+    uint32_t cycles = 0;
     uint32_t realCycles = 0;
 
     // Current jumptable
@@ -488,6 +492,9 @@ private:
         return (hi << 8) | lo;
     }
 
+    uint64_t rmask = 0;
+    uint64_t wmask = 0;
+
     template <int ACCESS_MODE = POLICY::Read_AccessMode>
     [[nodiscard]] unsigned Read(unsigned adr) const
     {
@@ -495,13 +502,25 @@ private:
             return ram[adr];
         else if constexpr (ACCESS_MODE == Banked)
             return rbank[hi(adr)][lo(adr)];
-        else
-            return rcallbacks[hi(adr)](adr, rcbdata[hi(adr)]);
+        else {
+            auto h = hi(adr);
+            if ((1<<(h>>4)) & rmask) {
+                return rcallbacks[h](adr, rcbdata[hi(adr)]);
+            } else {
+                return rbank[h][lo(adr)];
+            }
+        }
     }
 
     template <int ACCESS_MODE = POLICY::Write_AccessMode>
     void Write(unsigned adr, unsigned v)
     {
+        if(adr == 1) {
+           // 6510 I/O register
+           ram[adr] = v;
+           POLICY::ioWrite(policy(), v);
+           return;
+        }
         if constexpr (ACCESS_MODE == Direct)
             ram[adr] = v;
         else if constexpr (ACCESS_MODE == Banked)
@@ -1331,7 +1350,7 @@ private:
         return cycles;
     }
 
-    int32_t run_switch_case(int32_t toCycles = 0x10000000)
+    uint32_t run_switch_case(uint32_t toCycles = 0x10000000)
     {
         auto& p = policy();
         cycles = 0;

@@ -100,33 +100,37 @@ target_include_directories(badlib PRIVATE external/peglib PUBLIC src)
 target_link_libraries(badlib PUBLIC coreutils lzsa
         PRIVATE lua lodepng fmt ${THREAD_LIB} PUBLIC sol2::sol2 sha512)
 
+add_executable(bass src/main.cpp src/pet100.cpp)
+target_link_options(bass PRIVATE ${THREAD_OPTIONS})
+target_link_libraries(bass PRIVATE badlib CLI11 ansi)
+
+add_executable(gtest src/gtest.cpp src/grammar.cpp)
+target_link_options(gtest PRIVATE ${THREAD_OPTIONS})
+target_include_directories(gtest PRIVATE external/peglib)
+target_link_libraries(gtest PRIVATE coreutils CLI11 ${THREAD_LIB})
+
+
+add_executable(sectiontest EXCLUDE_FROM_ALL src/testmain.cpp
+    src/sectiontest.cpp src/machine.cpp)
+target_include_directories(sectiontest PRIVATE src)
+target_link_libraries(sectiontest PRIVATE catch coreutils fmt)
+
+add_executable(symtest EXCLUDE_FROM_ALL src/testmain.cpp src/symtest.cpp)
+target_compile_definitions(symtest PUBLIC USE_FMT)
+target_include_directories(symtest PRIVATE src)
+target_link_libraries(symtest PRIVATE catch fmt coreutils)
+
+add_executable(tester src/testmain.cpp src/asmtest.cpp)
+target_link_libraries(tester PRIVATE catch fmt badlib)
+
+add_executable(sixfive src/sixfive.cpp)
+target_link_libraries(sixfive PRIVATE fmt)
+
+add_subdirectory(../pix pix)
+add_executable(emu emu.cpp)
+target_link_libraries(emu PRIVATE pix::pix)
+
 if(FUZZ)
     add_executable(bazz src/fuzz.cpp)
     target_link_libraries(bazz PRIVATE badlib)
-else()
-    add_executable(bass src/main.cpp src/pet100.cpp)
-    target_link_options(bass PRIVATE ${THREAD_OPTIONS})
-    target_link_libraries(bass PRIVATE badlib CLI11 ansi)
-
-    add_executable(gtest src/gtest.cpp src/grammar.cpp)
-    target_link_options(gtest PRIVATE ${THREAD_OPTIONS})
-    target_include_directories(gtest PRIVATE external/peglib)
-    target_link_libraries(gtest PRIVATE coreutils CLI11 ${THREAD_LIB})
-
-
-    add_executable(sectiontest EXCLUDE_FROM_ALL src/testmain.cpp
-        src/sectiontest.cpp src/machine.cpp)
-    target_include_directories(sectiontest PRIVATE src)
-    target_link_libraries(sectiontest PRIVATE catch coreutils fmt)
-
-    add_executable(symtest EXCLUDE_FROM_ALL src/testmain.cpp src/symtest.cpp)
-    target_compile_definitions(symtest PUBLIC USE_FMT)
-    target_include_directories(symtest PRIVATE src)
-    target_link_libraries(symtest PRIVATE catch fmt coreutils)
-
-    add_executable(tester src/testmain.cpp src/asmtest.cpp)
-    target_link_libraries(tester PRIVATE catch fmt badlib)
-
-    add_executable(sixfive src/sixfive.cpp)
-    target_link_libraries(sixfive PRIVATE fmt)
 endif(FUZZ)
