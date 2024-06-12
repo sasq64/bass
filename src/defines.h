@@ -6,6 +6,7 @@
 #include <coreutils/file.h>
 #include <fmt/format.h>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -110,6 +111,15 @@ inline std::string_view operator+(std::string_view sv, std::string_view n)
 }
 
 using Number = double;
+
+template<typename T>
+using Optional = std::optional<T>;
+// TODO: register type for RTTI comparison (aka std::type_info)
+// struct Optional : public std::optional<T> {
+//     Optional() : std::optional<T>() {
+//         // TODO: register type for RTTI comparison (aka std::typeinfo)
+//     }
+// };
 
 inline Num div(Num a, Num b)
 {

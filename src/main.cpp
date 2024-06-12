@@ -238,9 +238,9 @@ int main(int argc, char** argv)
         int32_t start = 0x10000;
         for (auto const& s : mach.getSections()) {
             if (!s.data.empty() && (s.flags & NoStorage) == 0) {
-                emu.load(s.start, s.data);
+                emu.load(s.start.value(), s.data);
                 if (s.start < start) {
-                    start = s.start;
+                    start = s.start.value();
                 }
             }
         }
@@ -292,8 +292,8 @@ int main(int argc, char** argv)
         mach.sortSectionsByStart();
         for (auto const& section : mach.getSections()) {
             if (!section.data.empty()) {
-                fmt::print("{:04x}-{:04x} {}\n", section.start,
-                           section.start + section.data.size()-1, section.name);
+                fmt::print("{:04x}-{:04x} {}\n", section.start.value(),
+                           section.start.value() + section.data.size()-1, section.name);
             }
         }
     }
