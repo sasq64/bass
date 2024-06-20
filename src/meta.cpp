@@ -18,9 +18,9 @@ using namespace std::string_literals;
 
 namespace {
 
-Section parseArgs(std::vector<std::any> const& args)
+SectionInitializer parseArgs(std::vector<std::any> const& args)
 {
-    Section result;
+    SectionInitializer result;
     int i = 0;
 
     if (args.empty()) {
@@ -432,6 +432,9 @@ void initMeta(Assembler& assem)
             auto p = "sections."s + std::string(section.name);
             if ((section.flags & Compressed) != 0) {
                 LOGI("Packing %s", p.c_str());
+#ifdef USE_BASS_VALUEPROVIDER
+                section.storeOriginalSize();
+#endif
                 std::vector<uint8_t> packed(0x10000);
                 int flags = LZSA_FLAG_RAW_BLOCK;
                 if ((section.flags & Backwards) != 0) {
@@ -448,6 +451,9 @@ void initMeta(Assembler& assem)
             syms.set(p + ".start", section.start);
             syms.set(p + ".pc", pc);
             syms.set(p + ".size", section.data.size());
+#ifdef USE_BASS_VALUEPROVIDER
+            section.storeSymbols();
+#endif
             mach.popSection();
             return;
         }

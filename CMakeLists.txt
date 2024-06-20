@@ -5,6 +5,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# bass feature toggle(s)
+add_definitions(
+    -DUSE_BASS_VALUEPROVIDER
+)
+
 if(WIN32)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_USE_MATH_DEFINES -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
     set(WARN_EXT /W2)
@@ -91,7 +96,8 @@ add_library(sha512 STATIC src/sha512.c)
 add_library(badlib STATIC
     src/assembler.cpp src/grammar.cpp src/functions.cpp src/chars.cpp
     src/machine.cpp src/parser.cpp src/meta.cpp src/petscii.cpp
-    src/png.cpp src/script.cpp src/script_functions.cpp)
+    src/png.cpp src/script.cpp src/script_functions.cpp
+    src/valueprovider.cpp)
 
 target_compile_definitions(badlib PUBLIC SOL_USING_CXX_LUA USE_FMT)
 target_compile_options(badlib PUBLIC ${WARNINGS})
@@ -123,7 +129,7 @@ else()
     target_include_directories(symtest PRIVATE src)
     target_link_libraries(symtest PRIVATE catch fmt coreutils)
 
-    add_executable(tester src/testmain.cpp src/asmtest.cpp)
+    add_executable(tester src/testmain.cpp src/asmtest.cpp src/valueprovidertest.cpp)
     target_link_libraries(tester PRIVATE catch fmt badlib)
 
     add_executable(sixfive src/emutest.cpp src/sixfive.cpp)
