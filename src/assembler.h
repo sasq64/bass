@@ -14,8 +14,6 @@
 
 class Machine;
 
-using AsmValue = std::variant<Number, std::string_view, std::vector<uint8_t>, std::vector<Number>>;
-
 inline void Check(bool v, std::string const& txt)
 {
     if (!v) throw parse_error(txt);

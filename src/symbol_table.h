@@ -258,6 +258,7 @@ public:
             }
             undefined.insert(std::string{name});
             if constexpr (std::is_same_v<T, std::any>) {
+                LOGD(fmt::format("Returning zero value for undefined label '{}'\n", name));
                 return zero;
             }
             LOGD("Returning default (%s)", typeid(T{}).name());

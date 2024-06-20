@@ -9,6 +9,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
 #include <vector>
 
 #include <filesystem>
@@ -110,6 +111,7 @@ inline std::string_view operator+(std::string_view sv, std::string_view n)
 }
 
 using Number = double;
+using AsmValue = std::variant<Number, std::string_view, std::vector<uint8_t>, std::vector<Number>>;
 
 inline Num div(Num a, Num b)
 {
@@ -125,12 +127,18 @@ inline Num pow(Num a, Num b)
 template <typename T>
 inline T number(std::any const& v)
 {
-    return static_cast<T>(std::any_cast<Number>(v));
+    if (v.has_value()) {
+        return static_cast<T>(std::any_cast<Number>(v));
+    }
+    throw std::runtime_error(fmt::format("Cannot convert 'None' to arithmetic type '{}'.", typeid(T).name()));
 }
 
 inline Number number(std::any const& v)
 {
-    return std::any_cast<Number>(v);
+    if (v.has_value()) {
+        return std::any_cast<Number>(v);
+    }
+    throw std::runtime_error(fmt::format("Cannot converted 'None' to Number type ({})", typeid(Number).name()));
 }
 
 template <typename T>
@@ -158,8 +166,8 @@ private:
 
 struct Instruction
 {
-    Instruction(std::string_view op, sixfive::Mode m, double v)
-        : opcode(op), mode(m), val(static_cast<int32_t>(v))
+    Instruction(std::string_view op, sixfive::Mode m, int32_t v)
+        : opcode(op), mode(m), val(v)
     {}
     std::string opcode;
     sixfive::Mode mode;
@@ -190,7 +198,7 @@ inline std::string getHomeDir()
     return homeDir;
 }
 
-std::string any_to_string(std::any const& val);
+std::string any_to_string(std::any const& val, std::string_view name);
 
 inline void printArg(std::any const& arg)
 {
