@@ -1,0 +1,44 @@
+name: lint
+
+on:
+  pull_request:
+    paths:
+      - '**.h'
+      - '**.cc'
+      - '**.cmake'
+      - '**/CMakeLists.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+    - name: Install clang-format
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        sudo bash ./llvm.sh 21
+        sudo apt install clang-format-21
+
+    - name: Run clang-format
+      run: |
+        find include src -name '*.h' -o -name '*.cc' | \
+          xargs clang-format-21 -i -style=file -fallback-style=none
+        git diff --exit-code
+
+  cmake-format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+    - name: Install cmake-format
+      run: pip install cmakelang
+
+    - name: Run cmake-format
+      run: |
+        find . -name CMakeLists.txt -o -name '*.cmake' | \
+          xargs cmake-format -i
+        git diff --exit-code

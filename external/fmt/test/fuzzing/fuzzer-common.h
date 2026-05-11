@@ -4,11 +4,11 @@
 #ifndef FUZZER_COMMON_H
 #define FUZZER_COMMON_H
 
-#include <cstdint>      // std::uint8_t
-#include <cstring>      // memcpy
-#include <vector>
+#include <fmt/base.h>
 
-#include <fmt/core.h>
+#include <cstdint>  // std::uint8_t
+#include <cstring>  // memcpy
+#include <vector>
 
 // One can format to either a string, or a buffer. The latter is faster, but
 // one may be interested in formatting to a string instead to verify it works
@@ -22,7 +22,7 @@
 #define FMT_FUZZ_SEPARATE_ALLOCATION 1
 
 // The size of the largest possible type in use.
-// To let the the fuzzer mutation be efficient at cross pollinating between
+// To let the fuzzer mutation be efficient at cross pollinating between
 // different types, use a fixed size format. The same bit pattern, interpreted
 // as another type, is likely interesting.
 constexpr auto fixed_size = 16;
@@ -56,7 +56,9 @@ struct data_to_string {
 
   data_to_string(const uint8_t* data, size_t size, bool add_terminator = false)
       : buffer(size + (add_terminator ? 1 : 0)) {
-    std::memcpy(buffer.data(), data, size);
+    if (size) {
+      std::memcpy(buffer.data(), data, size);
+    }
   }
 
   fmt::string_view get() const { return {buffer.data(), buffer.size()}; }

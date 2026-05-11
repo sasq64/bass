@@ -1,15 +1,25 @@
+// Copyright (c) 2017-2026, University of Cincinnati, developed by Henry Schreiner
+// under NSF AWARD 1414736 and by the respective contributors.
+// All rights reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
+
 #pragma once
 
-// Distributed under the 3-Clause BSD License.  See accompanying
-// file LICENSE or https://github.com/CLIUtils/CLI11 for details.
+// IWYU pragma: private, include "CLI/CLI.hpp"
 
+// [CLI11:public_includes:set]
+#include <functional>
 #include <map>
 #include <string>
 #include <utility>
+#include <vector>
+// [CLI11:public_includes:end]
 
-#include "CLI/StringTools.hpp"
+#include "StringTools.hpp"
 
 namespace CLI {
+// [CLI11:formatter_fwd_hpp:verbatim]
 
 class Option;
 class App;
@@ -19,10 +29,10 @@ class App;
 /// This is passed in by App; all user classes must accept this as
 /// the second argument.
 
-enum class AppFormatMode {
-    Normal, //< The normal, detailed help
-    All,    //< A fully expanded help
-    Sub,    //< Used when printed as part of expanded subcommand
+enum class AppFormatMode : std::uint8_t {
+    Normal,  ///< The normal, detailed help
+    All,     ///< A fully expanded help
+    Sub,     ///< Used when printed as part of expanded subcommand
 };
 
 /// This is the minimum requirements to run a formatter.
@@ -34,12 +44,35 @@ class FormatterBase {
     /// @name Options
     ///@{
 
-    /// The width of the first column
-    size_t column_width_{30};
+    /// The width of the left column (options/flags/subcommands)
+    std::size_t column_width_{30};
 
+    /// The alignment ratio for long options within the left column
+    float long_option_alignment_ratio_{1 / 3.f};
+
+    /// The width of the right column (description of options/flags/subcommands)
+    std::size_t right_column_width_{65};
+
+    /// The width of the description paragraph at the top of help
+    std::size_t description_paragraph_width_{80};
+
+    /// The width of the footer paragraph
+    std::size_t footer_paragraph_width_{80};
+
+    /// options controlling formatting for footer and descriptions
+    bool enable_description_formatting_{true};
+    bool enable_footer_formatting_{true};
+
+    /// options controlling formatting of options
+    bool enable_option_defaults_{true};
+    bool enable_option_type_names_{true};
+    bool enable_default_flag_values_{true};
     /// @brief The required help printout labels (user changeable)
     /// Values are Needs, Excludes, etc.
-    std::map<std::string, std::string> labels_;
+    std::map<std::string, std::string> labels_{};
+
+    /// Default user-facing help labels used when no override is set
+    static std::string default_label(const std::string &key) { return key; }
 
     ///@}
     /// @name Basic
@@ -49,9 +82,11 @@ class FormatterBase {
     FormatterBase() = default;
     FormatterBase(const FormatterBase &) = default;
     FormatterBase(FormatterBase &&) = default;
+    FormatterBase &operator=(const FormatterBase &) = default;
+    FormatterBase &operator=(FormatterBase &&) = default;
 
     /// Adding a destructor in this form to work around bug in GCC 4.7
-    virtual ~FormatterBase() noexcept {} // NOLINT(modernize-use-equals-default)
+    virtual ~FormatterBase() noexcept {}  // NOLINT(modernize-use-equals-default)
 
     /// This is the key method that puts together help
     virtual std::string make_help(const App *, std::string, AppFormatMode) const = 0;
@@ -60,26 +95,78 @@ class FormatterBase {
     /// @name Setters
     ///@{
 
-    /// Set the "REQUIRED" label
+    /// Set the "REQUIRED" or other labels
     void label(std::string key, std::string val) { labels_[key] = val; }
 
-    /// Set the column width
-    void column_width(size_t val) { column_width_ = val; }
+    /// Set the left column width (options/flags/subcommands)
+    void column_width(std::size_t val) { column_width_ = val; }
 
+    /// Set the alignment ratio for long options within the left column
+    /// The ratio is in [0;1] range (e.g. 0.2 = 20% of column width, 6.f/column_width = 6th character)
+    void long_option_alignment_ratio(float ratio) {
+        long_option_alignment_ratio_ =
+            (ratio >= 0.0f) ? ((ratio <= 1.0f) ? ratio : 1.0f / ratio) : ((ratio < -1.0f) ? 1.0f / (-ratio) : -ratio);
+    }
+
+    /// Set the right column width (description of options/flags/subcommands)
+    void right_column_width(std::size_t val) { right_column_width_ = val; }
+
+    /// Set the description paragraph width at the top of help
+    void description_paragraph_width(std::size_t val) { description_paragraph_width_ = val; }
+
+    /// Set the footer paragraph width
+    void footer_paragraph_width(std::size_t val) { footer_paragraph_width_ = val; }
+    /// enable formatting for description paragraph
+    void enable_description_formatting(bool value = true) { enable_description_formatting_ = value; }
+    /// disable formatting for footer paragraph
+    void enable_footer_formatting(bool value = true) { enable_footer_formatting_ = value; }
+
+    /// enable option defaults to be printed
+    void enable_option_defaults(bool value = true) { enable_option_defaults_ = value; }
+    /// enable option type names to be printed
+    void enable_option_type_names(bool value = true) { enable_option_type_names_ = value; }
+    /// enable default flag values to be printed
+    void enable_default_flag_values(bool value = true) { enable_default_flag_values_ = value; }
     ///@}
     /// @name Getters
     ///@{
 
     /// Get the current value of a name (REQUIRED, etc.)
-    std::string get_label(std::string key) const {
-        if(labels_.find(key) == labels_.end())
-            return key;
-        else
-            return labels_.at(key);
+    CLI11_NODISCARD std::string get_label(std::string key) const {
+        auto it = labels_.find(key);
+        return it != labels_.end() ? it->second : default_label(key);
     }
 
-    /// Get the current column width
-    size_t get_column_width() const { return column_width_; }
+    /// Get the current left column width (options/flags/subcommands)
+    CLI11_NODISCARD std::size_t get_column_width() const { return column_width_; }
+
+    /// Get the current right column width (description of options/flags/subcommands)
+    CLI11_NODISCARD std::size_t get_right_column_width() const { return right_column_width_; }
+
+    /// Get the current description paragraph width at the top of help
+    CLI11_NODISCARD std::size_t get_description_paragraph_width() const { return description_paragraph_width_; }
+
+    /// Get the current footer paragraph width
+    CLI11_NODISCARD std::size_t get_footer_paragraph_width() const { return footer_paragraph_width_; }
+
+    /// @brief Get the current alignment ratio for long options within the left column
+    /// @return The alignment ratio used for long options within the left column
+    CLI11_NODISCARD float get_long_option_alignment_ratio() const { return long_option_alignment_ratio_; }
+
+    /// Get the current status of description paragraph formatting
+    CLI11_NODISCARD bool is_description_paragraph_formatting_enabled() const { return enable_description_formatting_; }
+
+    /// Get the current status of whether footer paragraph formatting is enabled
+    CLI11_NODISCARD bool is_footer_paragraph_formatting_enabled() const { return enable_footer_formatting_; }
+
+    /// Get the current status of whether option defaults are printed
+    CLI11_NODISCARD bool is_option_defaults_enabled() const { return enable_option_defaults_; }
+
+    /// Get the current status of whether option type names are printed
+    CLI11_NODISCARD bool is_option_type_names_enabled() const { return enable_option_type_names_; }
+
+    /// Get the current status of whether default flag values are printed
+    CLI11_NODISCARD bool is_default_flag_values_enabled() const { return enable_default_flag_values_; }
 
     ///@}
 };
@@ -96,7 +183,7 @@ class FormatterLambda final : public FormatterBase {
     explicit FormatterLambda(funct_t funct) : lambda_(std::move(funct)) {}
 
     /// Adding a destructor (mostly to make GCC 4.7 happy)
-    ~FormatterLambda() noexcept override {} // NOLINT(modernize-use-equals-default)
+    ~FormatterLambda() noexcept override {}  // NOLINT(modernize-use-equals-default)
 
     /// This will simply call the lambda function
     std::string make_help(const App *app, std::string name, AppFormatMode mode) const override {
@@ -111,13 +198,16 @@ class Formatter : public FormatterBase {
     Formatter() = default;
     Formatter(const Formatter &) = default;
     Formatter(Formatter &&) = default;
+    Formatter &operator=(const Formatter &) = default;
+    Formatter &operator=(Formatter &&) = default;
 
     /// @name Overridables
     ///@{
 
     /// This prints out a group of options with title
     ///
-    virtual std::string make_group(std::string group, bool is_positional, std::vector<const Option *> opts) const;
+    CLI11_NODISCARD virtual std::string
+    make_group(std::string group, bool is_positional, std::vector<const Option *> opts) const;
 
     /// This prints out just the positionals "group"
     virtual std::string make_positionals(const App *app) const;
@@ -132,7 +222,7 @@ class Formatter : public FormatterBase {
     virtual std::string make_subcommand(const App *sub) const;
 
     /// This prints out a subcommand in help-all
-    virtual std::string make_expanded(const App *sub) const;
+    virtual std::string make_expanded(const App *sub, AppFormatMode mode) const;
 
     /// This prints out all the groups of options
     virtual std::string make_footer(const App *app) const;
@@ -144,19 +234,14 @@ class Formatter : public FormatterBase {
     virtual std::string make_usage(const App *app, std::string name) const;
 
     /// This puts everything together
-    std::string make_help(const App * /*app*/, std::string, AppFormatMode) const override;
+    std::string make_help(const App *app, std::string, AppFormatMode mode) const override;
 
     ///@}
     /// @name Options
     ///@{
 
     /// This prints out an option help line, either positional or optional form
-    virtual std::string make_option(const Option *opt, bool is_positional) const {
-        std::stringstream out;
-        detail::format_help(
-            out, make_option_name(opt, is_positional) + make_option_opts(opt), make_option_desc(opt), column_width_);
-        return out.str();
-    }
+    virtual std::string make_option(const Option *, bool) const;
 
     /// @brief This is the name part of an option, Default: left column
     virtual std::string make_option_name(const Option *, bool) const;
@@ -173,4 +258,5 @@ class Formatter : public FormatterBase {
     ///@}
 };
 
-} // namespace CLI
+// [CLI11:formatter_fwd_hpp:end]
+}  // namespace CLI

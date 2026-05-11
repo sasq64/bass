@@ -2,7 +2,7 @@
 #include "keycodes.h"
 #include "machine.h"
 #include "script.h"
-
+#include <fmt/args.h>
 #include <fmt/core.h>
 
 #include <sol/sol.hpp>
@@ -34,7 +34,7 @@ void registerLuaFunctions(Assembler& assembler, Scripting& scripting)
         assembler.evaluateBlock(block);
     };
     lua["assemble"] = [&](std::string const& source) {
-      assembler.evaluateCode(source, "from_lua");
+        assembler.evaluateCode(source, "from_lua");
     };
 
     lua["get_meta_fn"] = [&](std::string const& name) {

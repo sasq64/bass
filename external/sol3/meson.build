@@ -1,4 +1,4 @@
-project('sol3', 'cpp')
+project('sol2', 'cpp')
 
 # Find lua dependency
 if get_option('lua_cpp')
@@ -7,7 +7,15 @@ else
 	lua_cpp = 'false'
 endif
 
-lua_dep = dependency('lua', fallback: [ 'lua', 'lua_dep' ], default_options: [ 'lua_cpp=' + lua_cpp ])
+if get_option('use_luajit')
+	luadep_name = 'luajit'
+	luadep_options = []
+	lua_cpp = 'false'
+else
+	luadep_name = 'lua'
+	luadep_options = [ 'lua_cpp=' + lua_cpp ]
+endif
+lua_dep = dependency(luadep_name, fallback: [ luadep_name, luadep_name + '_dep' ], default_options: luadep_options)
 
 # Set compiler flags if we're compiling lua as C++.
 compile_args = []
@@ -41,7 +49,7 @@ if get_option('single')
 	cmd = run_command(python, 'list_headers.py')
 
 	if cmd.returncode() != 0
-		error('Could not list sol3 header files.')
+		error('Could not list sol2 header files.')
 	endif
 
 	# Create our custom target to generate the single header file.

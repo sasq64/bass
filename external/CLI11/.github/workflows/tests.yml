@@ -1,0 +1,68 @@
+name: Tests
+on:
+  push:
+    branches:
+      - main
+      - v*
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: "1"
+
+jobs:
+  preset:
+    name: Preset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run CMake Workflow
+        run: cmake --workflow default
+
+
+  catch2-3:
+    name: Catch 2 3.x
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Catch 2
+        run: brew install catch2
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_CXX_STANDARD=14 \
+            -DCLI11_SINGLE_FILE_TESTS=OFF \
+            -DCLI11_BUILD_EXAMPLES=OFF \
+            -DCLI11_PRECOMPILED=ON
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Test
+        run: cmake --build build --target test
+
+
+  clang-tidy:
+    name: Clang-Tidy
+    runs-on: ubuntu-latest
+    container: silkeh/clang:20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install requirements
+        run: apt-get update && apt-get install -y ninja-build
+
+      - name: Configure
+        run: cmake --preset tidy
+
+      - name: Build
+        run: cmake --build --preset tidy

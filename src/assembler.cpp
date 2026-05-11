@@ -14,6 +14,7 @@
 #include <coreutils/utf8.h>
 
 #include <charconv>
+#include <fmt/args.h>
 #include <fmt/format.h>
 #include <string_view>
 #include <unordered_set>
@@ -22,15 +23,15 @@ extern char const* const grammar6502;
 using namespace std::string_literals;
 using sixfive::Mode;
 
-// OpenBSD
-#ifdef _N
-#    undef _N
-#endif
-
-Number operator"" _N(unsigned long long a)
-{
-    return static_cast<Number>(a);
-}
+// // OpenBSD
+// #ifdef _N
+// #    undef _N
+// #endif
+//
+// Number operator"" _N(unsigned long long a)
+// {
+//     return static_cast<Number>(a);
+// }
 Number to_number(std::string_view txt)
 {
     std::string const t{txt};
@@ -477,7 +478,7 @@ std::vector<uint8_t> operator+(const std::vector<uint8_t>& lhs,
 }
 
 std::vector<Number> operator+(const std::vector<Number>& lhs,
-                               const std::vector<Number>& rhs)
+                              const std::vector<Number>& rhs)
 {
     std::vector<Number> result = lhs;
     result.reserve(lhs.size() + rhs.size());
@@ -507,42 +508,44 @@ A do_op(std::string_view ope, A const& a, B const& b)
     if (ope == "<=") return a <= b;
     if (ope == ">=") return a >= b;
     if (ope == "\\") return div(a, b);
-    if (ope == ":") return (a<<16) | b;
+    if (ope == ":") return (a << 16) | b;
     return {};
 }
 
 AsmValue operation(std::string_view ope, AsmValue const& a, AsmValue const& b)
 {
-    return std::visit([&](auto&& a0, auto&& b0) -> AsmValue {
-        using A = std::decay_t<decltype(a0)>;
-        using B = std::decay_t<decltype(b0)>;
-        if constexpr (std::is_same_v<A, B>) {
-            if constexpr (std::is_arithmetic_v<A>) {
-                return static_cast<A>(do_op(ope, Num(a0), Num(b0)));
-            } else {
-                if (ope == "+") return a0 + b0;
-                if (ope == "==") return static_cast<Number>(a0 == b0);
-                if (ope == "!=") return static_cast<Number>(a0 != b0);
-            }
-        } else if constexpr (std::is_arithmetic_v<B> && !std::is_same_v<A, std::string_view>) {
-            if (ope == "*") {
-                A res;
-                for(int i=0; i<b0; i++) {
-                    res.insert(res.end(), a0.begin(), a0.end());
+    return std::visit(
+        [&](auto&& a0, auto&& b0) -> AsmValue {
+            using A = std::decay_t<decltype(a0)>;
+            using B = std::decay_t<decltype(b0)>;
+            if constexpr (std::is_same_v<A, B>) {
+                if constexpr (std::is_arithmetic_v<A>) {
+                    return static_cast<A>(do_op(ope, Num(a0), Num(b0)));
+                } else {
+                    if (ope == "+") return a0 + b0;
+                    if (ope == "==") return static_cast<Number>(a0 == b0);
+                    if (ope == "!=") return static_cast<Number>(a0 != b0);
                 }
-                return res;
+            } else if constexpr (std::is_arithmetic_v<B> &&
+                                 !std::is_same_v<A, std::string_view>) {
+                if (ope == "*") {
+                    A res;
+                    for (int i = 0; i < b0; i++) {
+                        res.insert(res.end(), a0.begin(), a0.end());
+                    }
+                    return res;
+                }
             }
-        }
-        return {};
-        }, a, b);
+            return {};
+        },
+        a, b);
 }
 
 void Assembler::setSym(std::string_view sym, std::any val)
 {
     if (sym[0] == '.') {
         syms.set(std::string(lastLabel) + sym, val);
-    } else
-    if (!scopes.empty()) {
+    } else if (!scopes.empty()) {
         syms.set(std::string(scopes.back()) + "." + sym, val);
         // LOGI("Prefixed to %s", sym);
     } else {
@@ -552,20 +555,16 @@ void Assembler::setSym(std::string_view sym, std::any val)
 
 AsmValue to_variant(std::any const& a)
 {
-    if (auto const* n = std::any_cast<Number>(&a))
-    {
+    if (auto const* n = std::any_cast<Number>(&a)) {
         return *n;
     }
-    if (auto const* sv = std::any_cast<std::string_view>(&a))
-    {
+    if (auto const* sv = std::any_cast<std::string_view>(&a)) {
         return *sv;
     }
-    if (auto const* v8 = std::any_cast<std::vector<uint8_t>>(&a))
-    {
+    if (auto const* v8 = std::any_cast<std::vector<uint8_t>>(&a)) {
         return *v8;
     }
-    if (auto const* vn = std::any_cast<std::vector<Number>>(&a))
-    {
+    if (auto const* vn = std::any_cast<std::vector<Number>>(&a)) {
         return *vn;
     }
     return {};
@@ -603,14 +602,14 @@ void Assembler::setupRules()
                 std::any vec = sv[1];
                 size_t i = 0;
                 if (auto const* v8 = any_cast<std::vector<uint8_t>>(&vec)) {
-                    for(auto&& sym : args) {
+                    for (auto&& sym : args) {
                         auto v = i < v8->size() ? (*v8)[i] : 0;
                         syms.set(sym, v);
                         i++;
                     }
-                }
-                else if (auto const* vn = any_cast<std::vector<Number>>(&vec)) {
-                    for(auto&& sym : args) {
+                } else if (auto const* vn =
+                               any_cast<std::vector<Number>>(&vec)) {
+                    for (auto&& sym : args) {
                         auto v = i < vn->size() ? (*vn)[i] : 0;
                         setSym(sym, v);
                         i++;
@@ -734,11 +733,10 @@ void Assembler::setupRules()
             i++;
         }
 
-        for(auto&& a : meta.args) {
+        for (auto&& a : meta.args) {
             auto v = to_variant(a);
             meta.vargs.push_back(v);
         }
-
 
         if (meta.name.empty()) {
             return sv[0];
@@ -1100,20 +1098,20 @@ void Assembler::setupRules()
         auto arg1 = to_variant(sv[0]);
         auto arg2 = to_variant(sv[2]);
 
-      try {
-          auto res = operation(ope, arg1, arg2);
-          return std::visit([&](auto&& r) { return std::any(r); }, res);
-      } catch (std::out_of_range&) {
-          if (isFinalPass()) {
-              throw parse_error("Out of range");
-          }
-          return any_num(0);
-      } catch (dbz_error&) {
-          if (isFinalPass()) {
-              throw parse_error("Division by zero");
-          }
-          return any_num(0);
-      }
+        try {
+            auto res = operation(ope, arg1, arg2);
+            return std::visit([&](auto&& r) { return std::any(r); }, res);
+        } catch (std::out_of_range&) {
+            if (isFinalPass()) {
+                throw parse_error("Out of range");
+            }
+            return any_num(0);
+        } catch (dbz_error&) {
+            if (isFinalPass()) {
+                throw parse_error("Division by zero");
+            }
+            return any_num(0);
+        }
     });
 
     parser.after("Script", [this](SV& sv) {
@@ -1186,7 +1184,7 @@ void Assembler::setupRules()
         auto inum = number<int64_t>(num);
         switch (ope) {
         case '~':
-            return static_cast<Number>(~(inum)&0xffffffff);
+            return static_cast<Number>(~(inum) & 0xffffffff);
         case '-':
             return -num;
         case '!':

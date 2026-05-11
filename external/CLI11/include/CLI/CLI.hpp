@@ -1,33 +1,46 @@
-#pragma once
+// Copyright (c) 2017-2026, University of Cincinnati, developed by Henry Schreiner
+// under NSF AWARD 1414736 and by the respective contributors.
+// All rights reserved.
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
-// Distributed under the 3-Clause BSD License.  See accompanying
-// file LICENSE or https://github.com/CLIUtils/CLI11 for details.
+#pragma once
 
 // CLI Library includes
 // Order is important for combiner script
 
-#include "CLI/Version.hpp"
+// IWYU pragma: begin_exports
 
-#include "CLI/Macros.hpp"
+#include "Version.hpp"
 
-#include "CLI/StringTools.hpp"
+#include "Macros.hpp"
 
-#include "CLI/Error.hpp"
+#include "Encoding.hpp"
 
-#include "CLI/TypeTools.hpp"
+#include "Argv.hpp"
 
-#include "CLI/Split.hpp"
+#include "StringTools.hpp"
 
-#include "CLI/ConfigFwd.hpp"
+#include "Error.hpp"
 
-#include "CLI/Validators.hpp"
+#include "TypeTools.hpp"
 
-#include "CLI/FormatterFwd.hpp"
+#include "Split.hpp"
 
-#include "CLI/Option.hpp"
+#include "ConfigFwd.hpp"
 
-#include "CLI/App.hpp"
+#include "Validators.hpp"
 
-#include "CLI/Config.hpp"
+#include "FormatterFwd.hpp"
 
-#include "CLI/Formatter.hpp"
+#include "Option.hpp"
+
+#include "App.hpp"
+
+#include "Config.hpp"
+
+#include "Formatter.hpp"
+
+#include "ExtraValidators.hpp"
+
+// IWYU pragma: end_exports
